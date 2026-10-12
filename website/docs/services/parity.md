@@ -26,14 +26,13 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | Azure Cache for Redis | Full | Full | Full | Full | - | Real connectivity check via REDIS_URL |
 | Container Instances | Full | Full | Full | Full | - | Real Docker containers when available |
 | Kubernetes Service (AKS) | Full | Full | Full | Full | - | Real k3s clusters with `AKS_BACKEND=k3s`; agent pool GET only |
-| Virtual Machines | Full | Full | Full | Full | - | Real Docker containers when available; services, logs, run-command, identity attestation |
 | Public IP Addresses | Full | Full | Full | Full | - | Static/dynamic allocation, auto-generated IPs |
 | Network Security Groups | Full | Full | Full | Full | - | Security rules, default rules, cascade delete |
 | Network Interfaces | Full | Full | Full | Full | Full (PATCH) | IP configurations, subnet/Public IP references, VM back-reference |
 | Load Balancer | Full | Full | Full | Full | - | Frontends, backends, rules, probes, NAT |
 | Application Gateway | Full | Full | Full | Full | - | SKU, frontends, backends, listeners, rules, probes, WAF |
 | Storage Accounts | Full | Full | Full | Full | - | Shared key auth, blob/queue/table/file endpoints, management policies |
-| Virtual Machines | Full | Full | Full | Full | Full (PATCH) | Power ops (start/stop/restart/deallocate/redeploy), instance view, extensions, synthesized OS disks |
+| Virtual Machines | Full | Full | Full | Full | Full (PATCH) | Power ops (start/stop/restart/deallocate/redeploy), instance view, extensions, synthesized OS disks. Real Docker containers when available, with services, logs, run-command and identity attestation |
 | Managed Disks | Full | Full | Full | Full | Full (PATCH) | `beginGetAccess`/`endGetAccess` return placeholder SAS |
 | Compute Catalog (VM sizes, SKUs, images) | -- | Full | Full | -- | -- | Static catalog used by Terraform plan |
 | User-Assigned Managed Identities | Full | Full | Full | Full | Full (PATCH) | Deterministic `principalId`/`clientId`/`tenantId` |
@@ -69,7 +68,7 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | Instance discovery | Full | Authority validation (internal) |
 | Managed Identity (IMDS) | Full | Token endpoint for workload identity |
 | Cloud metadata | Full | Terraform provider metadata |
-| /health | Full | 26 services listed |
+| /health | Full | 32 services listed |
 | /metrics | Full | Uptime, request count, error rate |
 
 ## Not Implemented

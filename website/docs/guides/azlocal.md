@@ -178,9 +178,9 @@ All network commands require `--resource-group`. Optionally pass `--subscription
 ### vm (Virtual Machines)
 
 ```bash
-# Create a VM
+# Create a VM (--image is a container image, e.g. ubuntu:22.04 or nginx:alpine)
 azlocal vm create --resource-group myRG --name my-vm \
-  --image Ubuntu2204 --size Standard_B1s --admin-username azureuser
+  --image ubuntu:22.04 --size Standard_B1s --admin-username azureuser
 
 # Show a VM
 azlocal vm show --resource-group myRG --name my-vm
@@ -203,7 +203,7 @@ azlocal vm extension list --resource-group myRG --vm-name my-vm
 azlocal vm extension delete --resource-group myRG --vm-name my-vm --name customScript
 ```
 
-VM commands support `create`, `show`, `list`, `update`, `delete`, `start`, `stop`, `restart`, `deallocate`, `redeploy`, and `get-instance-view`.
+VM commands support `create`, `show`, `list`, `update`, `delete`, `start`, `stop`, `restart`, `deallocate`, `redeploy`, `get-instance-view`, plus `deploy`, `services`, `logs`, `run-command`, `ssh` and `identity-assign`/`identity-remove` (see [Virtual Machines](../services/virtual-machines.md)).
 
 ---
 

@@ -29,11 +29,10 @@ miniblue emulates 32 Azure services on a single port. All services use in-memory
 | [Virtual Machines](virtual-machines.md) | `Microsoft.Compute` | Done | Yes | Yes (real Docker, opt-in) |
 | Public IP Addresses | `Microsoft.Network` | Done | Yes | -- |
 | Network Security Groups | `Microsoft.Network` | Done | Yes | -- |
-| Network Interfaces | `Microsoft.Network` | Done | Yes | -- |
+| [Network Interfaces](network-interfaces.md) | `Microsoft.Network` | Done | Yes | -- |
 | Load Balancer | `Microsoft.Network` | Done | Yes | -- |
 | Application Gateway | `Microsoft.Network` | Done | Yes | -- |
 | Storage Accounts | `Microsoft.Storage` | Done | Yes | -- |
-| [Virtual Machines](virtual-machines.md) | `Microsoft.Compute` | Done | Yes | -- |
 | [Managed Disks](managed-disks.md) | `Microsoft.Compute` | Done | Yes | -- |
 | [Managed Identity](managed-identity.md) (user-assigned) | `Microsoft.ManagedIdentity` | Done | Yes | -- |
 | [RBAC](rbac.md) | `Microsoft.Authorization` | Done | Yes | -- |
@@ -45,7 +44,7 @@ miniblue emulates 32 Azure services on a single port. All services use in-memory
 
 ## Terraform compatibility
 
-The following resources work with `hashicorp/azurerm` provider v3.x:
+The following resources work with the `hashicorp/azurerm` provider (v3.x and v4.x):
 
 | Terraform Resource | miniblue Service |
 |--------------------|-----------------|

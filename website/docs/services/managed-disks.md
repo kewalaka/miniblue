@@ -4,10 +4,11 @@ miniblue emulates `Microsoft.Compute/disks` so that Terraform and the Azure
 SDKs can create, attach, snapshot-grant (via `beginGetAccess`) and delete
 managed disks alongside virtual machines.
 
-Disks are tracked in the in-memory (or persisted) store. miniblue also
-synthesizes an OS disk record for every virtual machine created through the
-[Virtual Machines](virtual-machines.md) handler so that `GET` on the VM
-returns a realistic `storageProfile.osDisk.managedDisk.id` reference.
+Disks are tracked in the in-memory (or persisted) store. When a virtual machine
+is created through the [Virtual Machines](virtual-machines.md) handler without
+an existing managed disk, miniblue persists an OS disk here (`managedBy` set to
+the VM) so that `GET` on the VM returns a realistic
+`storageProfile.osDisk.managedDisk.id` reference and `GET` on the disk resolves.
 
 ## ARM endpoints
 

@@ -289,35 +289,35 @@ func TestBlobNestedPathLease(t *testing.T) {
 // path issues GetProperties (HEAD) on the state blob and treats a clean 404
 // as "blob doesn't exist yet, create it".
 func TestBlobNotFoundTerminatesResponse(t *testing.T) {
-ts := setupServer()
-defer ts.Close()
-base := ts.URL + "/blob/myaccount/mycontainer"
+	ts := setupServer()
+	defer ts.Close()
+	base := ts.URL + "/blob/myaccount/mycontainer"
 
-doRequest(t, "PUT", base, "").Body.Close()
+	doRequest(t, "PUT", base, "").Body.Close()
 
-for _, method := range []string{"HEAD", "GET"} {
-resp := doRequest(t, method, base+"/missing.txt", "")
-expectStatus(t, resp, 404)
+	for _, method := range []string{"HEAD", "GET"} {
+		resp := doRequest(t, method, base+"/missing.txt", "")
+		expectStatus(t, resp, 404)
 
-if got := resp.Header.Get("x-ms-error-code"); got != "BlobNotFound" {
-t.Errorf("%s: expected x-ms-error-code=BlobNotFound, got %q", method, got)
-}
-if resp.Header.Get("x-ms-request-id") == "" {
-t.Errorf("%s: missing x-ms-request-id header", method)
-}
-// The response MUST be terminated. Either via Content-Length, or — if
-// chunked — via the zero-length terminator (which makes io.ReadAll
-// return without error). Without termination, this read would block
-// until the test timeout.
-if _, err := io.ReadAll(resp.Body); err != nil {
-t.Errorf("%s: reading body: %v", method, err)
-}
-resp.Body.Close()
+		if got := resp.Header.Get("x-ms-error-code"); got != "BlobNotFound" {
+			t.Errorf("%s: expected x-ms-error-code=BlobNotFound, got %q", method, got)
+		}
+		if resp.Header.Get("x-ms-request-id") == "" {
+			t.Errorf("%s: missing x-ms-request-id header", method)
+		}
+		// The response MUST be terminated. Either via Content-Length, or — if
+		// chunked — via the zero-length terminator (which makes io.ReadAll
+		// return without error). Without termination, this read would block
+		// until the test timeout.
+		if _, err := io.ReadAll(resp.Body); err != nil {
+			t.Errorf("%s: reading body: %v", method, err)
+		}
+		resp.Body.Close()
 
-// Explicit Content-Length avoids Go's chunked fallback (which
-// silently truncates HEAD responses without a terminator).
-if cl := resp.Header.Get("Content-Length"); cl == "" {
-t.Errorf("%s: missing Content-Length on 404 response", method)
-}
-}
+		// Explicit Content-Length avoids Go's chunked fallback (which
+		// silently truncates HEAD responses without a terminator).
+		if cl := resp.Header.Get("Content-Length"); cl == "" {
+			t.Errorf("%s: missing Content-Length on 404 response", method)
+		}
+	}
 }

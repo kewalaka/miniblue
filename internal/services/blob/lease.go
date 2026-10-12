@@ -29,8 +29,8 @@ const (
 
 // leaseRecord is the in-memory lease state for a single blob.
 type leaseRecord struct {
-	ID         string    // active lease id (GUID)
-	Duration   int       // -1 == infinite
+	ID         string // active lease id (GUID)
+	Duration   int    // -1 == infinite
 	AcquiredAt time.Time
 	ExpiresAt  time.Time // zero for infinite
 	BreakAt    time.Time // when state == breaking, the instant it transitions to broken

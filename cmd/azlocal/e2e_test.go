@@ -976,4 +976,3 @@ func TestCosmosDBUnknownSubcommand(t *testing.T) {
 		t.Fatalf("expected 'Unknown subcommand' in output, got: %s", out)
 	}
 }
-

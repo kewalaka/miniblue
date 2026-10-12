@@ -17,14 +17,14 @@ import (
 // fields miniblue is aware of.
 
 type VNet struct {
-	ID               string                 `json:"id"`
-	Name             string                 `json:"name"`
-	Type             string                 `json:"type"`
-	Location         string                 `json:"location"`
-	Etag             string                 `json:"etag,omitempty"`
-	Tags             map[string]string      `json:"tags,omitempty"`
-	ExtendedLocation *ExtendedLocation      `json:"extendedLocation,omitempty"`
-	Properties       VNetProps              `json:"properties"`
+	ID               string            `json:"id"`
+	Name             string            `json:"name"`
+	Type             string            `json:"type"`
+	Location         string            `json:"location"`
+	Etag             string            `json:"etag,omitempty"`
+	Tags             map[string]string `json:"tags,omitempty"`
+	ExtendedLocation *ExtendedLocation `json:"extendedLocation,omitempty"`
+	Properties       VNetProps         `json:"properties"`
 }
 
 type ExtendedLocation struct {
@@ -33,21 +33,21 @@ type ExtendedLocation struct {
 }
 
 type VNetProps struct {
-	ProvisioningState           string             `json:"provisioningState"`
-	ResourceGuid                string             `json:"resourceGuid,omitempty"`
-	AddressSpace                AddressSpace       `json:"addressSpace"`
-	DhcpOptions                 *DhcpOptions       `json:"dhcpOptions,omitempty"`
-	Subnets                     []SubnetRef        `json:"subnets,omitempty"`
-	VirtualNetworkPeerings      []interface{}      `json:"virtualNetworkPeerings,omitempty"`
-	EnableDdosProtection        bool               `json:"enableDdosProtection,omitempty"`
-	EnableVmProtection          bool               `json:"enableVmProtection,omitempty"`
-	DdosProtectionPlan          *SubResourceRef    `json:"ddosProtectionPlan,omitempty"`
-	BgpCommunities              *BgpCommunities    `json:"bgpCommunities,omitempty"`
-	Encryption                  *VNetEncryption    `json:"encryption,omitempty"`
-	FlowLogs                    []interface{}      `json:"flowLogs,omitempty"` // ReadOnly
-	FlowTimeoutInMinutes        int                `json:"flowTimeoutInMinutes,omitempty"`
-	IPAllocations               []SubResourceRef   `json:"ipAllocations,omitempty"`
-	PrivateEndpointVNetPolicies string             `json:"privateEndpointVNetPolicies,omitempty"`
+	ProvisioningState           string           `json:"provisioningState"`
+	ResourceGuid                string           `json:"resourceGuid,omitempty"`
+	AddressSpace                AddressSpace     `json:"addressSpace"`
+	DhcpOptions                 *DhcpOptions     `json:"dhcpOptions,omitempty"`
+	Subnets                     []SubnetRef      `json:"subnets,omitempty"`
+	VirtualNetworkPeerings      []interface{}    `json:"virtualNetworkPeerings,omitempty"`
+	EnableDdosProtection        bool             `json:"enableDdosProtection,omitempty"`
+	EnableVmProtection          bool             `json:"enableVmProtection,omitempty"`
+	DdosProtectionPlan          *SubResourceRef  `json:"ddosProtectionPlan,omitempty"`
+	BgpCommunities              *BgpCommunities  `json:"bgpCommunities,omitempty"`
+	Encryption                  *VNetEncryption  `json:"encryption,omitempty"`
+	FlowLogs                    []interface{}    `json:"flowLogs,omitempty"` // ReadOnly
+	FlowTimeoutInMinutes        int              `json:"flowTimeoutInMinutes,omitempty"`
+	IPAllocations               []SubResourceRef `json:"ipAllocations,omitempty"`
+	PrivateEndpointVNetPolicies string           `json:"privateEndpointVNetPolicies,omitempty"`
 }
 
 type AddressSpace struct {
@@ -86,13 +86,13 @@ type SubnetProps struct {
 	ServiceEndpoints                   []interface{}    `json:"serviceEndpoints"`
 	ServiceEndpointPolicies            []interface{}    `json:"serviceEndpointPolicies"`
 	Delegations                        []interface{}    `json:"delegations"`
-	IPConfigurations                   []interface{}    `json:"ipConfigurations"`           // ReadOnly
-	IPConfigurationProfiles            []interface{}    `json:"ipConfigurationProfiles"`    // ReadOnly
+	IPConfigurations                   []interface{}    `json:"ipConfigurations"`        // ReadOnly
+	IPConfigurationProfiles            []interface{}    `json:"ipConfigurationProfiles"` // ReadOnly
 	IPAllocations                      []SubResourceRef `json:"ipAllocations,omitempty"`
 	ApplicationGatewayIPConfigurations []interface{}    `json:"applicationGatewayIPConfigurations,omitempty"`
-	PrivateEndpoints                   []interface{}    `json:"privateEndpoints"`           // ReadOnly
-	ResourceNavigationLinks            []interface{}    `json:"resourceNavigationLinks"`    // ReadOnly
-	ServiceAssociationLinks            []interface{}    `json:"serviceAssociationLinks"`    // ReadOnly
+	PrivateEndpoints                   []interface{}    `json:"privateEndpoints"`        // ReadOnly
+	ResourceNavigationLinks            []interface{}    `json:"resourceNavigationLinks"` // ReadOnly
+	ServiceAssociationLinks            []interface{}    `json:"serviceAssociationLinks"` // ReadOnly
 	PrivateEndpointNetworkPolicies     string           `json:"privateEndpointNetworkPolicies"`
 	PrivateLinkServiceNetworkPolicies  string           `json:"privateLinkServiceNetworkPolicies"`
 	DefaultOutboundAccess              bool             `json:"defaultOutboundAccess"`

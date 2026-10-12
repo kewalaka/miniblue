@@ -195,9 +195,9 @@ func TestLeaseBlobChange(t *testing.T) {
 
 	newID := "11111111-2222-3333-4444-555555555555"
 	resp = doBlobRequest(t, "PUT", base+"/b?comp=lease", "", map[string]string{
-		"x-ms-lease-action":        "change",
-		"x-ms-lease-id":            old,
-		"x-ms-proposed-lease-id":   newID,
+		"x-ms-lease-action":      "change",
+		"x-ms-lease-id":          old,
+		"x-ms-proposed-lease-id": newID,
 	})
 	resp.Body.Close()
 	expectStatus(t, resp, 200)

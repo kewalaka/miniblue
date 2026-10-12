@@ -74,12 +74,12 @@ func (h *Handler) armContainerKey(sub, rg, account, name string) string {
 // blob container under the ARM Storage RP.
 //
 // Fixes vs. the prior implementation:
-//  - lastModifiedTime is now an RFC3339 UTC timestamp (was an etag-shaped hex
-//    string, which is what the etag header should look like).
-//  - etag is moved to the top-level resource (per the 2025-01-01 schema) and
-//    emitted in the canonical hex format.
-//  - Caller-supplied properties (publicAccess, metadata, encryption scope
-//    settings, NFSv3 squash flags, etc.) are echoed so GET reflects PUT.
+//   - lastModifiedTime is now an RFC3339 UTC timestamp (was an etag-shaped hex
+//     string, which is what the etag header should look like).
+//   - etag is moved to the top-level resource (per the 2025-01-01 schema) and
+//     emitted in the canonical hex format.
+//   - Caller-supplied properties (publicAccess, metadata, encryption scope
+//     settings, NFSv3 squash flags, etc.) are echoed so GET reflects PUT.
 func (h *Handler) buildARMContainerResponse(sub, rg, account, name string, input map[string]interface{}) map[string]interface{} {
 	now := time.Now().UTC()
 	lastModified := now.Format(time.RFC3339)

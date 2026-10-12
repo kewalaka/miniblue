@@ -259,4 +259,3 @@ func TestARMCaseInsensitive_DeploymentDispatch(t *testing.T) {
 	expectStatus(t, resp, 200)
 	resp.Body.Close()
 }
-

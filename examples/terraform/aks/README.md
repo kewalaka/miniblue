@@ -32,7 +32,7 @@ AKS_BACKEND=k3s ./bin/miniblue
 # docker CLI; use the `full` target for real backends):
 docker build --target=full -t miniblue:full .
 docker run -v /var/run/docker.sock:/var/run/docker.sock \
-  -p 4566:4566 -p 4567:4567 \
+  -p 4566:4566 -p 443:4567 -p 4567:4567 \
   -e AKS_BACKEND=k3s miniblue:full
 ```
 

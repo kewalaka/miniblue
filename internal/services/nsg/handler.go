@@ -52,92 +52,38 @@ func (h *Handler) ruleKey(sub, rg, nsg, rule string) string {
 	return "nsgrule:" + sub + ":" + rg + ":" + nsg + ":" + rule
 }
 
-func defaultSecurityRules() []interface{} {
+// defaultSecurityRules returns the six built-in NSG rules. Each rule is
+// scoped to the parent NSG so that the resource ID matches what real Azure
+// returns (clients such as `data.azurerm_network_security_group` rely on the
+// `id` field of each default rule).
+func defaultSecurityRules(sub, rg, nsgName string) []interface{} {
+	nsgID := "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.Network/networkSecurityGroups/" + nsgName
+	rule := func(name string, priority int, direction, access, srcPrefix, dstPrefix string) map[string]interface{} {
+		return map[string]interface{}{
+			"id":   nsgID + "/defaultSecurityRules/" + name,
+			"name": name,
+			"type": "Microsoft.Network/networkSecurityGroups/defaultSecurityRules",
+			"etag": "W/\"miniblue\"",
+			"properties": map[string]interface{}{
+				"provisioningState":        "Succeeded",
+				"priority":                 float64(priority),
+				"direction":                direction,
+				"access":                   access,
+				"protocol":                 "*",
+				"sourceAddressPrefix":      srcPrefix,
+				"destinationAddressPrefix": dstPrefix,
+				"sourcePortRange":          "*",
+				"destinationPortRange":     "*",
+			},
+		}
+	}
 	return []interface{}{
-		map[string]interface{}{
-			"name": "AllowVnetInBound",
-			"properties": map[string]interface{}{
-				"provisioningState":      "Succeeded",
-				"priority":               float64(65000),
-				"direction":              "Inbound",
-				"access":                 "Allow",
-				"protocol":               "*",
-				"sourceAddressPrefix":    "VirtualNetwork",
-				"destinationAddressPrefix": "VirtualNetwork",
-				"sourcePortRange":        "*",
-				"destinationPortRange":   "*",
-			},
-		},
-		map[string]interface{}{
-			"name": "AllowAzureLoadBalancerInBound",
-			"properties": map[string]interface{}{
-				"provisioningState":      "Succeeded",
-				"priority":               float64(65001),
-				"direction":              "Inbound",
-				"access":                 "Allow",
-				"protocol":               "*",
-				"sourceAddressPrefix":    "AzureLoadBalancer",
-				"destinationAddressPrefix": "*",
-				"sourcePortRange":        "*",
-				"destinationPortRange":   "*",
-			},
-		},
-		map[string]interface{}{
-			"name": "DenyAllInBound",
-			"properties": map[string]interface{}{
-				"provisioningState":      "Succeeded",
-				"priority":               float64(65500),
-				"direction":              "Inbound",
-				"access":                 "Deny",
-				"protocol":               "*",
-				"sourceAddressPrefix":    "*",
-				"destinationAddressPrefix": "*",
-				"sourcePortRange":        "*",
-				"destinationPortRange":   "*",
-			},
-		},
-		map[string]interface{}{
-			"name": "AllowVnetOutBound",
-			"properties": map[string]interface{}{
-				"provisioningState":      "Succeeded",
-				"priority":               float64(65000),
-				"direction":              "Outbound",
-				"access":                 "Allow",
-				"protocol":               "*",
-				"sourceAddressPrefix":    "VirtualNetwork",
-				"destinationAddressPrefix": "VirtualNetwork",
-				"sourcePortRange":        "*",
-				"destinationPortRange":   "*",
-			},
-		},
-		map[string]interface{}{
-			"name": "AllowInternetOutBound",
-			"properties": map[string]interface{}{
-				"provisioningState":      "Succeeded",
-				"priority":               float64(65001),
-				"direction":              "Outbound",
-				"access":                 "Allow",
-				"protocol":               "*",
-				"sourceAddressPrefix":    "*",
-				"destinationAddressPrefix": "Internet",
-				"sourcePortRange":        "*",
-				"destinationPortRange":   "*",
-			},
-		},
-		map[string]interface{}{
-			"name": "DenyAllOutBound",
-			"properties": map[string]interface{}{
-				"provisioningState":      "Succeeded",
-				"priority":               float64(65500),
-				"direction":              "Outbound",
-				"access":                 "Deny",
-				"protocol":               "*",
-				"sourceAddressPrefix":    "*",
-				"destinationAddressPrefix": "*",
-				"sourcePortRange":        "*",
-				"destinationPortRange":   "*",
-			},
-		},
+		rule("AllowVnetInBound", 65000, "Inbound", "Allow", "VirtualNetwork", "VirtualNetwork"),
+		rule("AllowAzureLoadBalancerInBound", 65001, "Inbound", "Allow", "AzureLoadBalancer", "*"),
+		rule("DenyAllInBound", 65500, "Inbound", "Deny", "*", "*"),
+		rule("AllowVnetOutBound", 65000, "Outbound", "Allow", "VirtualNetwork", "VirtualNetwork"),
+		rule("AllowInternetOutBound", 65001, "Outbound", "Allow", "*", "Internet"),
+		rule("DenyAllOutBound", 65500, "Outbound", "Deny", "*", "*"),
 	}
 }
 
@@ -158,21 +104,34 @@ func buildNSGResponse(sub, rg, name string, input map[string]interface{}, securi
 		tags = map[string]interface{}{}
 	}
 
+	props := map[string]interface{}{
+		"provisioningState":    "Succeeded",
+		"resourceGuid":         uuid.New().String(),
+		"securityRules":        securityRules,
+		"defaultSecurityRules": defaultSecurityRules(sub, rg, name),
+		"subnets":              []interface{}{},
+		"networkInterfaces":    []interface{}{},
+		// ReadOnly collection — Azure always returns an array (possibly empty).
+		"flowLogs": []interface{}{},
+	}
+
+	// flushConnection is a writable bool. Only echo when the caller actually
+	// set it on PUT so GET reflects exactly what was written and Terraform
+	// azurerm v4 doesn't see phantom diffs for unspecified fields.
+	if inputProps, ok := input["properties"].(map[string]interface{}); ok {
+		if v, ok := inputProps["flushConnection"]; ok {
+			props["flushConnection"] = v
+		}
+	}
+
 	return map[string]interface{}{
-		"id":       id,
-		"name":     name,
-		"type":     "Microsoft.Network/networkSecurityGroups",
-		"location": location,
-		"tags":     tags,
-		"etag":     "W/\"miniblue\"",
-		"properties": map[string]interface{}{
-			"provisioningState":    "Succeeded",
-			"resourceGuid":        uuid.New().String(),
-			"securityRules":       securityRules,
-			"defaultSecurityRules": defaultSecurityRules(),
-			"subnets":             []interface{}{},
-			"networkInterfaces":   []interface{}{},
-		},
+		"id":         id,
+		"name":       name,
+		"type":       "Microsoft.Network/networkSecurityGroups",
+		"location":   location,
+		"tags":       tags,
+		"etag":       "W/\"miniblue\"",
+		"properties": props,
 	}
 }
 
@@ -193,6 +152,7 @@ func buildRuleResponse(sub, rg, nsgName, ruleName string, input map[string]inter
 		"sourceAddressPrefix", "destinationAddressPrefix",
 		"sourcePortRanges", "destinationPortRanges",
 		"sourceAddressPrefixes", "destinationAddressPrefixes",
+		"sourceApplicationSecurityGroups", "destinationApplicationSecurityGroups",
 		"description",
 	} {
 		if v, ok := props[field]; ok {

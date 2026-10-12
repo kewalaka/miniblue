@@ -7,7 +7,7 @@ Your first 5 minutes with miniblue. By the end you will have created a resource 
 === "Docker"
 
     ```bash
-    docker run -d --name miniblue -p 4566:4566 -p 4567:4567 moabukar/miniblue:latest
+    docker run -d --name miniblue -p 4566:4566 -p 443:4567 -p 4567:4567 moabukar/miniblue:latest
     ```
 
 === "Binary"

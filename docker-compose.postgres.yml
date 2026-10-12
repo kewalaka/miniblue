@@ -3,6 +3,7 @@ services:
     build: .
     ports:
       - "4566:4566"
+      - "443:4567"
       - "4567:4567"
     environment:
       - DATABASE_URL=postgres://miniblue:miniblue@postgres:5432/miniblue?sslmode=disable

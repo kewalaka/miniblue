@@ -4,6 +4,7 @@ services:
     image: moabukar/miniblue:latest
     ports:
       - "4566:4566"
+      - "443:4567"
       - "4567:4567"
     environment:
       - PORT=4566

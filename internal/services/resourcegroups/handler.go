@@ -43,8 +43,6 @@ func (h *Handler) Register(r chi.Router) {
 			r.Get("/resources", h.ListResources)
 		})
 	})
-	// Case-sensitive duplicate (Azure ARM is case-insensitive on 'resourceGroups')
-	r.Get("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/resources", h.ListResources)
 	// Async operation status polling endpoint
 	r.Get("/subscriptions/{subscriptionId}/operationresults/*", h.OperationResult)
 }
@@ -179,6 +177,9 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	h.store.DeleteByPrefix("nsg:" + p)
 	h.store.DeleteByPrefix("nsgrule:" + p)
 	h.store.DeleteByPrefix("publicip:" + p)
+	h.store.DeleteByPrefix("disk:" + p)
+	h.store.DeleteByPrefix("vmext:" + p)
+	h.store.DeleteByPrefix("nic:" + p)
 	h.store.DeleteByPrefix("lb:" + p)
 	h.store.DeleteByPrefix("appgw:" + p)
 	h.store.DeleteByPrefix("blob:account:" + p)

@@ -17,8 +17,11 @@ func (h *Handler) GetTableServiceProperties(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	resp := h.buildServicePropertiesResponse(sub, rg, account, "tableServices")
-	json.NewEncoder(w).Encode(resp)
+	if v, ok := h.store.Get(h.servicePropsKey(sub, rg, account, "tableServices")); ok {
+		json.NewEncoder(w).Encode(v)
+		return
+	}
+	json.NewEncoder(w).Encode(h.buildServicePropertiesResponse(sub, rg, account, "tableServices", nil))
 }
 
 func (h *Handler) SetTableServiceProperties(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +34,12 @@ func (h *Handler) SetTableServiceProperties(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	resp := h.buildServicePropertiesResponse(sub, rg, account, "tableServices")
+	var input map[string]interface{}
+	json.NewDecoder(r.Body).Decode(&input)
+
+	resp := h.buildServicePropertiesResponse(sub, rg, account, "tableServices", input)
+	h.store.Set(h.servicePropsKey(sub, rg, account, "tableServices"), resp)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
@@ -46,7 +54,12 @@ func (h *Handler) PatchTableServiceProperties(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	resp := h.buildServicePropertiesResponse(sub, rg, account, "tableServices")
+	var input map[string]interface{}
+	json.NewDecoder(r.Body).Decode(&input)
+
+	resp := h.buildServicePropertiesResponse(sub, rg, account, "tableServices", input)
+	h.store.Set(h.servicePropsKey(sub, rg, account, "tableServices"), resp)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }

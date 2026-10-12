@@ -43,13 +43,13 @@ Pull and run with a single command:
 === "Docker Hub"
 
     ```bash
-    docker run -p 4566:4566 -p 4567:4567 moabukar/miniblue:latest
+    docker run -p 4566:4566 -p 443:4567 -p 4567:4567 moabukar/miniblue:latest
     ```
 
 === "GitHub Container Registry"
 
     ```bash
-    docker run -p 4566:4566 -p 4567:4567 ghcr.io/moabukar/miniblue:latest
+    docker run -p 4566:4566 -p 443:4567 -p 4567:4567 ghcr.io/moabukar/miniblue:latest
     ```
 
 Verify it is running:

@@ -141,6 +141,15 @@ azlocal network vnet list --resource-group myRG
 
 # Delete
 azlocal network vnet delete --name my-vnet --resource-group myRG
+
+# Subnets
+azlocal network vnet subnet create --resource-group myRG --vnet-name my-vnet \
+  --name my-subnet --address-prefixes 10.0.1.0/24
+azlocal network vnet subnet show   --resource-group myRG --vnet-name my-vnet --name my-subnet
+azlocal network vnet subnet list   --resource-group myRG --vnet-name my-vnet
+azlocal network vnet subnet update --resource-group myRG --vnet-name my-vnet \
+  --name my-subnet --address-prefixes 10.0.2.0/24
+azlocal network vnet subnet delete --resource-group myRG --vnet-name my-vnet --name my-subnet
 ```
 
 ## Terraform

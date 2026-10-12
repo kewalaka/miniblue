@@ -17,8 +17,11 @@ func (h *Handler) GetQueueServiceProperties(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	resp := h.buildServicePropertiesResponse(sub, rg, account, "queueServices")
-	json.NewEncoder(w).Encode(resp)
+	if v, ok := h.store.Get(h.servicePropsKey(sub, rg, account, "queueServices")); ok {
+		json.NewEncoder(w).Encode(v)
+		return
+	}
+	json.NewEncoder(w).Encode(h.buildServicePropertiesResponse(sub, rg, account, "queueServices", nil))
 }
 
 func (h *Handler) SetQueueServiceProperties(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +34,12 @@ func (h *Handler) SetQueueServiceProperties(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	resp := h.buildServicePropertiesResponse(sub, rg, account, "queueServices")
+	var input map[string]interface{}
+	json.NewDecoder(r.Body).Decode(&input)
+
+	resp := h.buildServicePropertiesResponse(sub, rg, account, "queueServices", input)
+	h.store.Set(h.servicePropsKey(sub, rg, account, "queueServices"), resp)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
@@ -46,7 +54,12 @@ func (h *Handler) PatchQueueServiceProperties(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	resp := h.buildServicePropertiesResponse(sub, rg, account, "queueServices")
+	var input map[string]interface{}
+	json.NewDecoder(r.Body).Decode(&input)
+
+	resp := h.buildServicePropertiesResponse(sub, rg, account, "queueServices", input)
+	h.store.Set(h.servicePropsKey(sub, rg, account, "queueServices"), resp)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }

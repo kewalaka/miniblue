@@ -4,7 +4,7 @@ miniblue works with the official `hashicorp/azurerm` Terraform provider. This gu
 
 ## Prerequisites
 
-- miniblue running (`docker run -p 4566:4566 -p 4567:4567 moabukar/miniblue:latest`)
+- miniblue running (`docker run -p 4566:4566 -p 443:4567 -p 4567:4567 moabukar/miniblue:latest`)
 - Terraform 1.0+ installed
 - miniblue certificate trusted (see below)
 
@@ -196,6 +196,7 @@ jobs:
         image: moabukar/miniblue:latest
         ports:
           - 4566:4566
+          - 443:4567
           - 4567:4567
     steps:
       - uses: actions/checkout@v4

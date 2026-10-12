@@ -66,6 +66,7 @@ nav:
     - Virtual Networks: services/virtual-networks.md
     - Public IP Addresses: services/public-ip-addresses.md
     - Network Security Groups: services/network-security-groups.md
+    - Network Interfaces: services/network-interfaces.md
     - Load Balancer: services/load-balancer.md
     - Application Gateway: services/application-gateway.md
     - DNS Zones: services/dns-zones.md
@@ -73,6 +74,9 @@ nav:
     - Container Instances: services/container-instances.md
     - Kubernetes Service (AKS): services/kubernetes-service.md
     - Virtual Machines: services/virtual-machines.md
+    - Managed Disks: services/managed-disks.md
+    - Managed Identity: services/managed-identity.md
+    - RBAC: services/rbac.md
     - DB for PostgreSQL: services/database-postgresql.md
     - DB for MySQL: services/database-mysql.md
     - Azure SQL Database: services/database-sql.md

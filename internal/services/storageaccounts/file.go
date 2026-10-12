@@ -17,8 +17,11 @@ func (h *Handler) GetFileServiceProperties(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	resp := h.buildServicePropertiesResponse(sub, rg, account, "fileServices")
-	json.NewEncoder(w).Encode(resp)
+	if v, ok := h.store.Get(h.servicePropsKey(sub, rg, account, "fileServices")); ok {
+		json.NewEncoder(w).Encode(v)
+		return
+	}
+	json.NewEncoder(w).Encode(h.buildServicePropertiesResponse(sub, rg, account, "fileServices", nil))
 }
 
 func (h *Handler) SetFileServiceProperties(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +34,12 @@ func (h *Handler) SetFileServiceProperties(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	resp := h.buildServicePropertiesResponse(sub, rg, account, "fileServices")
+	var input map[string]interface{}
+	json.NewDecoder(r.Body).Decode(&input)
+
+	resp := h.buildServicePropertiesResponse(sub, rg, account, "fileServices", input)
+	h.store.Set(h.servicePropsKey(sub, rg, account, "fileServices"), resp)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
@@ -46,7 +54,12 @@ func (h *Handler) PatchFileServiceProperties(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	resp := h.buildServicePropertiesResponse(sub, rg, account, "fileServices")
+	var input map[string]interface{}
+	json.NewDecoder(r.Body).Decode(&input)
+
+	resp := h.buildServicePropertiesResponse(sub, rg, account, "fileServices", input)
+	h.store.Set(h.servicePropsKey(sub, rg, account, "fileServices"), resp)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }

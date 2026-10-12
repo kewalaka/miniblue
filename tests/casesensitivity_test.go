@@ -176,3 +176,87 @@ func TestARMNotFound_JSONEnvelope(t *testing.T) {
 		t.Fatal("expected non-empty error message")
 	}
 }
+
+// The case-insensitive middleware must not break routes that predate it:
+// resourcegroups (lowercase registration), deployments (registers both
+// casings and dispatches back into the router) and the Docker-backed vm.
+
+func TestARMCaseInsensitive_UpstreamResourceGroups(t *testing.T) {
+	ts := setupServer()
+	defer ts.Close()
+	base := ts.URL + "/subscriptions/sub1/"
+
+	for _, seg := range []string{"resourcegroups", "resourceGroups", "RESOURCEGROUPS"} {
+		resp := doRequest(t, "PUT", base+seg+"/rg-"+seg+"?api-version=2023-07-01", `{"location":"eastus"}`)
+		expectStatus(t, resp, 201)
+		resp.Body.Close()
+		resp = doRequest(t, "GET", base+seg+"/rg-"+seg+"?api-version=2023-07-01", "")
+		expectStatus(t, resp, 200)
+		resp.Body.Close()
+	}
+
+	resp := doRequest(t, "GET", ts.URL+"/SUBSCRIPTIONS/sub1/RESOURCEGROUPS?api-version=2023-07-01", "")
+	expectStatus(t, resp, 200)
+	resp.Body.Close()
+
+	resp = doRequest(t, "DELETE", base+"RESOURCEGROUPS/rg-resourcegroups?api-version=2023-07-01", "")
+	if resp.StatusCode != 200 && resp.StatusCode != 202 && resp.StatusCode != 204 {
+		t.Fatalf("DELETE status %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+}
+
+func TestARMCaseInsensitive_UpstreamVM(t *testing.T) {
+	ts := setupVMServer(t)
+	defer ts.Close()
+	createRG(t, ts, "sub1", "rg1")
+
+	url := ts.URL + "/subscriptions/sub1/RESOURCEGROUPS/rg1/providers/MICROSOFT.COMPUTE/VIRTUALMACHINES/web"
+	resp := doRequest(t, "PUT", url+vmAV, `{"location":"eastus","properties":{"miniblue":{"image":"ubuntu:24.04"}}}`)
+	expectStatus(t, resp, 201)
+	m := decodeJSON(t, resp)
+	resp.Body.Close()
+	if id, _ := m["id"].(string); !strings.Contains(id, "/RESOURCEGROUPS/rg1/providers/MICROSOFT.COMPUTE/VIRTUALMACHINES/web") {
+		t.Fatalf("id should mirror client casing, got %q", id)
+	}
+
+	resp = doRequest(t, "GET", vmURL(ts, "sub1", "rg1", "web")+vmAV, "")
+	expectStatus(t, resp, 200)
+	resp.Body.Close()
+
+	resp = doRequest(t, "POST", url+"/POWEROFF"+vmAV, "")
+	expectStatus(t, resp, 200)
+	resp.Body.Close()
+
+	resp = doRequest(t, "DELETE", url+vmAV, "")
+	expectStatus(t, resp, 204)
+	resp.Body.Close()
+}
+
+func TestARMCaseInsensitive_DeploymentDispatch(t *testing.T) {
+	ts := setupServer()
+	defer ts.Close()
+	base := ts.URL + "/subscriptions/sub1/"
+
+	resp := doRequest(t, "PUT", base+"resourceGroups/rg1?api-version=2023-07-01", `{"location":"eastus"}`)
+	expectStatus(t, resp, 201)
+	resp.Body.Close()
+
+	// The template types are lowercased; dispatch must normalize them.
+	tpl := `{"properties":{"mode":"Incremental","template":{"resources":[
+		{"type":"microsoft.network/virtualnetworks","apiVersion":"2023-09-01","name":"vn1","location":"eastus",
+		 "properties":{"addressSpace":{"addressPrefixes":["10.0.0.0/16"]}}}]}}}`
+	resp = doRequest(t, "PUT", base+"RESOURCEGROUPS/rg1/providers/Microsoft.Resources/deployments/d1?api-version=2021-04-01", tpl)
+	expectStatus(t, resp, 201)
+	m := decodeJSON(t, resp)
+	resp.Body.Close()
+	props, _ := m["properties"].(map[string]interface{})
+	if props["provisioningState"] != "Succeeded" {
+		t.Fatalf("deployment state=%v error=%v", props["provisioningState"], props["error"])
+	}
+
+	resp = doRequest(t, "GET", base+"resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks/vn1?api-version=2023-09-01", "")
+	expectStatus(t, resp, 200)
+	resp.Body.Close()
+}
+

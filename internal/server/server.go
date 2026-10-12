@@ -70,7 +70,7 @@ func New() *Server {
 	// in setupMiddleware() because the trie depends on the route list.
 	s.routeTrie = BuildRouteTrie(s.router)
 	s.router.NotFound(armNotFound)
-	s.router.MethodNotAllowed(armNotFound)
+	s.router.MethodNotAllowed(armMethodNotAllowed)
 	return s
 }
 
@@ -223,7 +223,12 @@ func (s *Server) setupRoutes() {
 		{"loadbalancer", func() { loadbalancer.NewHandler(s.store).Register(s.router) }},
 		{"appgw", func() { appgw.NewHandler(s.store).Register(s.router) }},
 		{"deployments", func() {
-			deployments.NewHandler(s.store, deployments.NewRouterDispatcher(s.router)).Register(s.router)
+			// Dispatch through the case-insensitive wrapper so templated
+			// resource types (e.g. microsoft.network/virtualnetworks) route.
+			dispatch := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				s.Handler().ServeHTTP(w, r)
+			})
+			deployments.NewHandler(s.store, deployments.NewRouterDispatcher(dispatch)).Register(s.router)
 		}},
 		{"vm", func() { vm.NewHandler(s.store).Register(s.router) }},
 	}

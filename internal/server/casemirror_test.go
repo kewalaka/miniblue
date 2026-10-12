@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -236,5 +237,63 @@ func TestMiddleware_PanicAllowsOuterRecover(t *testing.T) {
 	}
 	if rec.Body.String() != `{"error":"recovered"}` {
 		t.Fatalf("body=%q", rec.Body.String())
+	}
+}
+
+// Streaming handlers (e.g. vm `logs?follow=true`) require http.Flusher and
+// must see their chunks reach the client before the handler returns. Two
+// registered casings of the same literal force the response wrapper on even
+// when the client sends the canonical form.
+func TestMiddleware_StreamingFlushNotBuffered(t *testing.T) {
+	r := chi.NewRouter()
+	rec := httptest.NewRecorder()
+	r.Get("/subscriptions/{sub}/resourcegroups/{rg}/logs", func(w http.ResponseWriter, _ *http.Request) {
+		f, ok := w.(http.Flusher)
+		if !ok {
+			t.Error("wrapped writer must implement http.Flusher")
+			return
+		}
+		_, _ = w.Write([]byte("one /resourcegroups/x\n"))
+		f.Flush()
+		if rec.Body.Len() == 0 {
+			t.Error("first chunk was not streamed before handler returned")
+		}
+		_, _ = w.Write([]byte("two /resourcegroups/x\n"))
+		f.Flush()
+	})
+	r.Get("/subscriptions/{sub}/resourceGroups/{rg}/other", func(http.ResponseWriter, *http.Request) {})
+	h := CaseInsensitiveARM(BuildRouteTrie(r))(r)
+
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/subscriptions/s/resourceGroups/x/logs", nil))
+
+	if rec.Code != http.StatusOK || !rec.Flushed {
+		t.Fatalf("status=%d flushed=%v", rec.Code, rec.Flushed)
+	}
+	want := "one /resourceGroups/x\ntwo /resourceGroups/x\n"
+	if rec.Body.String() != want {
+		t.Fatalf("body=%q want %q", rec.Body.String(), want)
+	}
+}
+
+func TestRouter_MethodNotAllowedStays405(t *testing.T) {
+	r := chi.NewRouter()
+	r.Get("/subscriptions/{sub}/resourceGroups/{rg}", func(http.ResponseWriter, *http.Request) {})
+	r.NotFound(armNotFound)
+	r.MethodNotAllowed(armMethodNotAllowed)
+	h := CaseInsensitiveARM(BuildRouteTrie(r))(r)
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/subscriptions/s/RESOURCEGROUPS/x", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status=%d want 405", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `"MethodNotAllowed"`) {
+		t.Fatalf("body=%q", rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/subscriptions/s/nope/x", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status=%d want 404", rec.Code)
 	}
 }

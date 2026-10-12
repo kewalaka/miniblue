@@ -35,6 +35,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/moabukar/miniblue/internal/azerr"
 )
 
 // ----- trie -----
@@ -283,7 +284,9 @@ func isBlobDataPlanePath(path string) bool {
 
 // caseMirrorWriter buffers the response so we can rewrite literal segments
 // back to the client's original casing on flush. Headers are rewritten in
-// place via WriteHeader.
+// place via WriteHeader. When the handler calls Flush (streaming responses
+// such as `logs?follow=true`) the buffer is committed and the writer switches
+// to mirroring each chunk straight through.
 type caseMirrorWriter struct {
 	http.ResponseWriter
 	pairs       [][2]string
@@ -291,6 +294,23 @@ type caseMirrorWriter struct {
 	status      int
 	wroteHeader bool
 	flushed     bool
+	streaming   bool
+}
+
+// Unwrap exposes the underlying writer to http.ResponseController.
+func (w *caseMirrorWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// Flush implements http.Flusher so streaming handlers keep working behind
+// the middleware.
+func (w *caseMirrorWriter) Flush() {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	w.flush()
+	w.streaming = true
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 func (w *caseMirrorWriter) WriteHeader(status int) {
@@ -316,6 +336,12 @@ func (w *caseMirrorWriter) Write(p []byte) (int, error) {
 	if !w.wroteHeader {
 		// Mirror the implicit 200 path through WriteHeader for header rewriting.
 		w.WriteHeader(http.StatusOK)
+	}
+	if w.streaming {
+		if _, err := w.ResponseWriter.Write(mirrorBytes(p, w.pairs)); err != nil {
+			return 0, err
+		}
+		return len(p), nil
 	}
 	return w.buf.Write(p)
 }
@@ -444,6 +470,12 @@ func BuildRouteTrie(r chi.Router) *routeTrie {
 }
 
 // ----- ARM JSON 404 -----
+
+// armMethodNotAllowed keeps chi's 405 for a known path hit with the wrong
+// method, using the standard ARM error envelope.
+func armMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
+	azerr.MethodNotAllowed(w, r.Method)
+}
 
 // armNotFound returns the standard ARM error envelope for unmatched routes.
 // The `azurerm` Terraform provider relies on this shape to surface a typed

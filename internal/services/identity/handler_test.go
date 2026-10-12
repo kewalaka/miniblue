@@ -13,8 +13,10 @@ import (
 
 func newTestServer(t *testing.T) http.Handler {
 	t.Helper()
+	s := store.New()
+	s.Set("rg:sub1:rg1", map[string]interface{}{"name": "rg1"})
 	r := chi.NewRouter()
-	NewHandler(store.New()).Register(r)
+	NewHandler(s).Register(r)
 	return r
 }
 
@@ -105,8 +107,8 @@ func TestUserAssignedIdentityLifecycleAndPatchTags(t *testing.T) {
 	}
 
 	del := do(t, h, "DELETE", base, nil)
-	if del.Code != http.StatusAccepted {
-		t.Fatalf("DELETE: want 202, got %d", del.Code)
+	if del.Code != http.StatusNoContent {
+		t.Fatalf("DELETE: want 204, got %d", del.Code)
 	}
 	missing := do(t, h, "GET", base, nil)
 	if missing.Code != http.StatusNotFound {

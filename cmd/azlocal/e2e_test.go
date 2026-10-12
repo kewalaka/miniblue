@@ -343,6 +343,7 @@ func TestIdentityCreateShowUpdateListDelete(t *testing.T) {
 	ts := setupMiniblue()
 	defer ts.Close()
 
+	runAzlocal(ts, "group", "create", "--name", "myRG", "--location", "eastus")
 	createOut, _, code := runAzlocal(ts, "identity", "create",
 		"--resource-group", "myRG",
 		"--name", "id1",
@@ -566,15 +567,18 @@ func TestCosmosDBTableCommands(t *testing.T) {
 // --- vm ---
 
 func TestVMCreateShowListDelete(t *testing.T) {
+	t.Setenv("MINIBLUE_DISABLE_DOCKER", "1")
 	ts := setupMiniblue()
 	defer ts.Close()
+
+	runAzlocal(ts, "group", "create", "--name", "myRG", "--location", "eastus")
 
 	createOut, _, code := runAzlocal(ts, "vm", "create",
 		"--resource-group", "myRG",
 		"--name", "vm1",
 		"--location", "westus2",
 		"--size", "Standard_B1s",
-		"--image", "Ubuntu2204",
+		"--image", "ubuntu:22.04",
 		"--admin-username", "azureuser")
 	if code != 0 {
 		t.Fatalf("vm create failed: %s", createOut)
@@ -607,9 +611,11 @@ func TestVMCreateShowListDelete(t *testing.T) {
 }
 
 func TestVMPowerActionsAndInstanceView(t *testing.T) {
+	t.Setenv("MINIBLUE_DISABLE_DOCKER", "1")
 	ts := setupMiniblue()
 	defer ts.Close()
 
+	runAzlocal(ts, "group", "create", "--name", "myRG", "--location", "eastus")
 	runAzlocal(ts, "vm", "create", "--resource-group", "myRG", "--name", "vm1")
 
 	stopOut, _, code := runAzlocal(ts, "vm", "stop", "--resource-group", "myRG", "--name", "vm1")
@@ -631,9 +637,11 @@ func TestVMPowerActionsAndInstanceView(t *testing.T) {
 }
 
 func TestVMExtensionLifecycle(t *testing.T) {
+	t.Setenv("MINIBLUE_DISABLE_DOCKER", "1")
 	ts := setupMiniblue()
 	defer ts.Close()
 
+	runAzlocal(ts, "group", "create", "--name", "myRG", "--location", "eastus")
 	runAzlocal(ts, "vm", "create", "--resource-group", "myRG", "--name", "vm1")
 
 	setOut, _, code := runAzlocal(ts, "vm", "extension", "set",

@@ -5,9 +5,14 @@ import (
 	"testing"
 )
 
+// ARM-fidelity tests for the VM handler: replay of what the client sent,
+// defaults Azure adds on GET, and disk/NIC back-references. They run in stub
+// mode (see setupVMServer).
+
 func TestVirtualMachineLifecycleReferencesActionsAndSensitiveFields(t *testing.T) {
-	ts := setupServer()
+	ts := setupVMServer(t)
 	defer ts.Close()
+	createRG(t, ts, "sub1", "rg1")
 
 	av := "?api-version=2023-09-01"
 	sub := ts.URL + "/subscriptions/sub1"
@@ -127,31 +132,23 @@ func TestVirtualMachineLifecycleReferencesActionsAndSensitiveFields(t *testing.T
 	assertVMResponseShape(t, patched)
 
 	resp = doRequest(t, "POST", compute+"/virtualMachines/vm1/powerOff"+av, `{}`)
-	expectStatus(t, resp, 202)
-	resp.Body.Close()
-	resp = doRequest(t, "GET", compute+"/virtualMachines/vm1/instanceView"+av, "")
 	expectStatus(t, resp, 200)
-	instanceView := decodeJSON(t, resp)
 	resp.Body.Close()
-	statuses := instanceView["statuses"].([]interface{})
-	if statuses[len(statuses)-1].(map[string]interface{})["code"] != "PowerState/stopped" {
-		t.Fatalf("expected powerOff to set PowerState/stopped, got %v", statuses)
+	assertVMPowerState(t, compute+"/virtualMachines/vm1/instanceView"+av, "PowerState/stopped")
+	for _, step := range []struct{ action, state string }{
+		{"start", "PowerState/running"},
+		{"restart", "PowerState/running"},
+		{"deallocate", "PowerState/deallocated"},
+		{"redeploy", "PowerState/running"},
+	} {
+		resp = doRequest(t, "POST", compute+"/virtualMachines/vm1/"+step.action+av, `{}`)
+		expectStatus(t, resp, 200)
+		resp.Body.Close()
+		assertVMPowerState(t, compute+"/virtualMachines/vm1/instanceView"+av, step.state)
 	}
-	resp = doRequest(t, "POST", compute+"/virtualMachines/vm1/start"+av, `{}`)
-	expectStatus(t, resp, 202)
-	resp.Body.Close()
-	resp = doRequest(t, "POST", compute+"/virtualMachines/vm1/restart"+av, `{}`)
-	expectStatus(t, resp, 202)
-	resp.Body.Close()
-	resp = doRequest(t, "POST", compute+"/virtualMachines/vm1/deallocate"+av, `{}`)
-	expectStatus(t, resp, 202)
-	resp.Body.Close()
-	resp = doRequest(t, "POST", compute+"/virtualMachines/vm1/redeploy"+av, `{}`)
-	expectStatus(t, resp, 202)
-	resp.Body.Close()
 
 	resp = doRequest(t, "PUT", compute+"/virtualMachines/vm1/extensions/customScript"+av,
-		`{"location":"eastus","properties":{"publisher":"Microsoft.Azure.Extensions","type":"CustomScript","typeHandlerVersion":"2.1","settings":{"commandToExecute":"echo ok"}}}`)
+		`{"location":"eastus","properties":{"publisher":"Microsoft.Azure.Extensions","type":"CustomScript","typeHandlerVersion":"2.1","settings":{"commandToExecute":"echo ok"},"protectedSettings":{"token":"s3cret"}}}`)
 	expectStatus(t, resp, 201)
 	resp.Body.Close()
 	resp = doRequest(t, "GET", compute+"/virtualMachines/vm1/extensions"+av, "")
@@ -160,6 +157,9 @@ func TestVirtualMachineLifecycleReferencesActionsAndSensitiveFields(t *testing.T
 	resp.Body.Close()
 	if len(extensions["value"].([]interface{})) != 1 {
 		t.Fatalf("expected one VM extension")
+	}
+	if ext := extensions["value"].([]interface{})[0].(map[string]interface{}); ext["properties"].(map[string]interface{})["protectedSettings"] != nil {
+		t.Fatalf("protectedSettings must never be returned, got %v", ext["properties"])
 	}
 
 	resp = doRequest(t, "GET", compute+"/virtualMachines"+av, "")
@@ -178,7 +178,7 @@ func TestVirtualMachineLifecycleReferencesActionsAndSensitiveFields(t *testing.T
 	}
 
 	resp = doRequest(t, "DELETE", compute+"/virtualMachines/vm1"+av, "")
-	expectStatus(t, resp, 202)
+	expectStatus(t, resp, 204)
 	resp.Body.Close()
 	resp = doRequest(t, "GET", compute+"/virtualMachines/vm1"+av, "")
 	expectStatus(t, resp, 404)
@@ -224,8 +224,9 @@ func assertVMResponseShape(t *testing.T, vm map[string]interface{}) {
 }
 
 func TestVirtualMachineFromImageDefaults(t *testing.T) {
-	ts := setupServer()
+	ts := setupVMServer(t)
 	defer ts.Close()
+	createRG(t, ts, "sub1", "rg1")
 
 	av := "?api-version=2023-09-01"
 	compute := ts.URL + "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute"
@@ -276,8 +277,9 @@ func TestVirtualMachineFromImageDefaults(t *testing.T) {
 }
 
 func TestVirtualMachineAdditionalCapabilitiesReplay(t *testing.T) {
-	ts := setupServer()
+	ts := setupVMServer(t)
 	defer ts.Close()
+	createRG(t, ts, "sub1", "rg1")
 
 	av := "?api-version=2023-09-01"
 	compute := ts.URL + "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute"
@@ -363,8 +365,9 @@ func TestVirtualMachineAdditionalCapabilitiesReplay(t *testing.T) {
 }
 
 func TestVirtualMachinePatchPreservesAdditionalCapabilities(t *testing.T) {
-	ts := setupServer()
+	ts := setupVMServer(t)
 	defer ts.Close()
+	createRG(t, ts, "sub1", "rg1")
 
 	av := "?api-version=2023-09-01"
 	compute := ts.URL + "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute"
@@ -410,8 +413,9 @@ func TestVirtualMachinePatchPreservesAdditionalCapabilities(t *testing.T) {
 }
 
 func TestVirtualMachineDeleteDoesNotRemoveAttachedUserDisk(t *testing.T) {
-	ts := setupServer()
+	ts := setupVMServer(t)
 	defer ts.Close()
+	createRG(t, ts, "sub1", "rg1")
 
 	av := "?api-version=2023-09-01"
 	sub := ts.URL + "/subscriptions/sub1"
@@ -444,7 +448,7 @@ func TestVirtualMachineDeleteDoesNotRemoveAttachedUserDisk(t *testing.T) {
 	resp.Body.Close()
 
 	resp = doRequest(t, "DELETE", compute+"/virtualMachines/vm-attach"+av, "")
-	expectStatus(t, resp, 202)
+	expectStatus(t, resp, 204)
 	resp.Body.Close()
 
 	resp = doRequest(t, "GET", compute+"/disks/user-osdisk"+av, "")
@@ -457,6 +461,18 @@ func TestVirtualMachineDeleteDoesNotRemoveAttachedUserDisk(t *testing.T) {
 	}
 	if props["diskState"] != "Unattached" {
 		t.Fatalf("expected attached user disk to remain and be detached, got state=%v", props["diskState"])
+	}
+}
+
+func assertVMPowerState(t *testing.T, instanceViewURL, want string) {
+	t.Helper()
+	resp := doRequest(t, "GET", instanceViewURL, "")
+	expectStatus(t, resp, 200)
+	view := decodeJSON(t, resp)
+	resp.Body.Close()
+	statuses := view["statuses"].([]interface{})
+	if got := statuses[len(statuses)-1].(map[string]interface{})["code"]; got != want {
+		t.Fatalf("expected %s, got %v", want, statuses)
 	}
 }
 

@@ -76,15 +76,29 @@ func provisionEvents(rec map[string]interface{}) []string {
 	return out
 }
 
-// publicView returns a copy of a stored record with internal fields (those
-// prefixed by "_") stripped, suitable for API responses.
+// publicView returns a deep copy of a stored record suitable for API
+// responses: internal fields (prefixed by "_") and write-only secrets are
+// stripped.
 func publicView(rec map[string]interface{}) map[string]interface{} {
 	out := make(map[string]interface{}, len(rec))
 	for k, v := range rec {
 		if strings.HasPrefix(k, "_") {
 			continue
 		}
-		out[k] = v
+		out[k] = recursiveCopy(v)
+	}
+	delete(asMap(asMap(out["properties"])["osProfile"]), "adminPassword")
+	return out
+}
+
+// vmView is publicView plus the instance view when the caller asked for it
+// with $expand=instanceView.
+func vmView(rec map[string]interface{}, expandInstanceView bool) map[string]interface{} {
+	out := publicView(rec)
+	if expandInstanceView {
+		if props := asMap(out["properties"]); props != nil {
+			props["instanceView"] = instanceViewFor(powerState(rec))
+		}
 	}
 	return out
 }
@@ -114,40 +128,52 @@ func powerState(rec map[string]interface{}) string {
 	return s
 }
 
-// buildVMRecord assembles the stored VM record from the request input,
-// echoing the accepted subset of the ARM shape and adding miniblue fields.
-func buildVMRecord(sub, rg, name string, input map[string]interface{}, image string) map[string]interface{} {
-	location, _ := input["location"].(string)
-	if location == "" {
-		location = "eastus"
-	}
-	inProps, _ := input["properties"].(map[string]interface{})
-	if inProps == nil {
-		inProps = map[string]interface{}{}
-	}
+// buildVMRecord assembles the stored VM record from a PUT/PATCH body. The
+// request is replayed as sent (see vmProperties); on update, omitted fields
+// keep their stored values and the miniblue runtime block, identity and
+// internal "_" fields carry over from existing. image is recorded only for
+// new VMs (an update never re-images the container) and may be empty when no
+// container image could be resolved (stub mode).
+func buildVMRecord(sub, rg, name string, input, existing map[string]interface{}, image string) map[string]interface{} {
+	existingProps := asMap(existing["properties"])
+	props := vmProperties(sub, rg, name, asMap(input["properties"]), existingProps)
 
-	props := map[string]interface{}{
-		"provisioningState": "Succeeded",
-		"miniblue": map[string]interface{}{
-			"image":         image,
-			"powerState":    "running",
+	mb := asMap(recursiveCopy(existingProps["miniblue"]))
+	if mb == nil {
+		mb = map[string]interface{}{
+			"powerState":    stateRunning,
 			"containerName": vmContainerName(rg, name),
-		},
-	}
-	for _, k := range []string{"hardwareProfile", "storageProfile", "osProfile"} {
-		if v, ok := inProps[k]; ok {
-			props[k] = v
+		}
+		if image != "" {
+			mb["image"] = image
 		}
 	}
-	if props["hardwareProfile"] == nil {
-		props["hardwareProfile"] = map[string]interface{}{"vmSize": "Standard_B1s"}
-	}
+	props["miniblue"] = mb
 
-	return map[string]interface{}{
+	rec := map[string]interface{}{
 		"id":         vmARMID(sub, rg, name),
 		"name":       name,
 		"type":       "Microsoft.Compute/virtualMachines",
-		"location":   location,
+		"location":   firstString(input["location"], existing["location"], "eastus"),
+		"tags":       map[string]interface{}{},
 		"properties": props,
 	}
+	if tags := asMap(input["tags"]); tags != nil {
+		rec["tags"] = tags
+	} else if tags := asMap(existing["tags"]); tags != nil {
+		rec["tags"] = tags
+	}
+	for _, k := range []string{"plan", "sku", "zones", "extendedLocation"} {
+		if v, ok := input[k]; ok {
+			rec[k] = v
+		} else if v, ok := existing[k]; ok {
+			rec[k] = v
+		}
+	}
+	for k, v := range existing {
+		if strings.HasPrefix(k, "_") || k == "identity" {
+			rec[k] = v
+		}
+	}
+	return rec
 }

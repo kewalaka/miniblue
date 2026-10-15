@@ -116,29 +116,54 @@ func expectPair(t *testing.T, pairs [][2]string, canonical, original string) {
 	t.Fatalf("missing pair (%q,%q) in %v", canonical, original, pairs)
 }
 
-// ---------- boundaryReplace unit tests ----------
+// ---------- ARM path mirroring unit tests ----------
 
-func TestBoundaryReplace(t *testing.T) {
+func TestReplaceSegment(t *testing.T) {
 	cases := []struct {
 		in, old, new, want string
 	}{
-		{`{"id":"/a/resourceGroups/x"}`, "resourceGroups", "RESOURCEGROUPS",
-			`{"id":"/a/RESOURCEGROUPS/x"}`},
-		{"/a/resourceGroups?api-version=1", "resourceGroups", "RESOURCEGROUPS",
-			"/a/RESOURCEGROUPS?api-version=1"},
-		// Must NOT match inside an identifier (no boundary).
-		{"xresourceGroupsy", "resourceGroups", "RESOURCEGROUPS", "xresourceGroupsy"},
-		// Dotted RP namespace as a single token.
-		{"/providers/Microsoft.Network/", "Microsoft.Network", "microsoft.network",
-			"/providers/microsoft.network/"},
-		// `Microsoft` alone shouldn't match inside `Microsoft.Network`.
-		{"/providers/Microsoft.Network/", "Microsoft", "MICROSOFT",
-			"/providers/Microsoft.Network/"},
+		{"/a/resourceGroups/x", "resourceGroups", "RESOURCEGROUPS", "/a/RESOURCEGROUPS/x"},
+		{"/a/resourceGroups?api-version=1", "resourceGroups", "RESOURCEGROUPS", "/a/RESOURCEGROUPS?api-version=1"},
+		{"/a/resourceGroups#frag", "resourceGroups", "RESOURCEGROUPS", "/a/RESOURCEGROUPS#frag"},
+		{"/a/resourceGroups", "resourceGroups", "RESOURCEGROUPS", "/a/RESOURCEGROUPS"},
+		// Must NOT match when it is only part of a longer segment.
+		{"/a/xresourceGroups/y", "resourceGroups", "RESOURCEGROUPS", "/a/xresourceGroups/y"},
+		{"/a/resourceGroupsy/y", "resourceGroups", "RESOURCEGROUPS", "/a/resourceGroupsy/y"},
+		{"/a/resourceGroups.v2/y", "resourceGroups", "RESOURCEGROUPS", "/a/resourceGroups.v2/y"},
+		// Must NOT match when it is not a whole segment.
+		{"/a/b-resourceGroups/y", "resourceGroups", "RESOURCEGROUPS", "/a/b-resourceGroups/y"},
+		// Dotted RP namespace as a single segment.
+		{"/providers/Microsoft.Network/", "Microsoft.Network", "microsoft.network", "/providers/microsoft.network/"},
+		{"/providers/Microsoft.Network/", "Microsoft", "MICROSOFT", "/providers/Microsoft.Network/"},
 	}
 	for _, c := range cases {
-		got := boundaryReplace(c.in, c.old, c.new)
-		if got != c.want {
-			t.Errorf("boundaryReplace(%q,%q,%q)=%q want %q", c.in, c.old, c.new, got, c.want)
+		if got := replaceSegment(c.in, c.old, c.new); got != c.want {
+			t.Errorf("replaceSegment(%q,%q,%q)=%q want %q", c.in, c.old, c.new, got, c.want)
+		}
+	}
+}
+
+func TestMirrorJSON(t *testing.T) {
+	pairs := [][2]string{{"resourceGroups", "RESOURCEGROUPS"}}
+	cases := []struct {
+		name, in, want string
+	}{
+		{"user data is untouched", `{"tags":{"resourceGroups":"resourceGroups"},"n":"a/resourceGroups/b"}`,
+			`{"tags":{"resourceGroups":"resourceGroups"},"n":"a/resourceGroups/b"}`},
+		{"values and keys", ` { "/s/resourceGroups/k" : "/s/resourceGroups/v" } `,
+			` { "/s/RESOURCEGROUPS/k" : "/s/RESOURCEGROUPS/v" } `},
+		{"absolute URL", `"https://h/s/resourceGroups/x?a=1"`, `"https://h/s/RESOURCEGROUPS/x?a=1"`},
+		{"escaped quote does not desync the scanner", `{"a":"say \"hi\" /resourceGroups","id":"/s/resourceGroups/x"}`,
+			`{"a":"say \"hi\" /resourceGroups","id":"/s/RESOURCEGROUPS/x"}`},
+		{"escapes are preserved", `"https://h/s/resourceGroups/x?a=1\u0026b=2"`, `"https://h/s/RESOURCEGROUPS/x?a=1\u0026b=2"`},
+		{"escaped slashes", `"\/s\/resourceGroups\/x"`, `"/s/RESOURCEGROUPS/x"`},
+		{"unterminated trailing literal", `{"id":"/s/resourceGroups/x","b":"/s/resourceGroups/y`,
+			`{"id":"/s/RESOURCEGROUPS/x","b":"/s/resourceGroups/y`},
+		{"not JSON", "one /resourceGroups/x\n", "one /resourceGroups/x\n"},
+	}
+	for _, c := range cases {
+		if got := string(mirrorJSON([]byte(c.in), pairs)); got != c.want {
+			t.Errorf("%s: mirrorJSON(%s)=%s want %s", c.name, c.in, got, c.want)
 		}
 	}
 }
@@ -172,6 +197,45 @@ func TestMiddleware_BodyMirrorsClientCase(t *testing.T) {
 	wantLoc := "/subscriptions/abc/RESOURCEGROUPS/x/operationresults/123"
 	if rec.Header().Get("Location") != wantLoc {
 		t.Fatalf("Location=%q want %q", rec.Header().Get("Location"), wantLoc)
+	}
+}
+
+// Mirroring only rewrites ARM paths: user data that merely equals an ARM
+// literal (tag keys/values, settings) must round-trip untouched, while IDs,
+// ARM-ID map keys and the async headers still echo the client's casing.
+func TestMiddleware_MirrorsOnlyARMPaths(t *testing.T) {
+	r := chi.NewRouter()
+	r.Get("/subscriptions/{sub}/resourceGroups/{rg}", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "https://localhost:4566/subscriptions/abc/resourceGroups/x/operationresults/1?api-version=1")
+		w.Header().Set("Azure-AsyncOperation", "/subscriptions/abc/resourceGroups/x/operationresults/1")
+		_, _ = w.Write([]byte(`{"id":"/subscriptions/abc/resourceGroups/x",` +
+			`"name":"resourceGroups",` +
+			`"tags":{"resourceGroups":"resourceGroups","providers":"Microsoft.Network"},` +
+			`"properties":{"settings":{"path":"a/resourceGroups/b","note":"resourceGroups"},` +
+			`"vnet":{"id":"/subscriptions/abc/resourceGroups/x/providers/Microsoft.Network/virtualNetworks/v"}},` +
+			`"identity":{"userAssignedIdentities":{"/subscriptions/abc/resourceGroups/x/providers/Microsoft.ManagedIdentity/userAssignedIdentities/i":{}}},` +
+			`"nextLink":"https://localhost:4566/subscriptions/abc/resourceGroups/x/vms?a=1\u0026b=2"}`))
+	})
+	h := CaseInsensitiveARM(BuildRouteTrie(r))(r)
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/subscriptions/abc/RESOURCEGROUPS/x", nil))
+
+	want := `{"id":"/subscriptions/abc/RESOURCEGROUPS/x",` +
+		`"name":"resourceGroups",` +
+		`"tags":{"resourceGroups":"resourceGroups","providers":"Microsoft.Network"},` +
+		`"properties":{"settings":{"path":"a/resourceGroups/b","note":"resourceGroups"},` +
+		`"vnet":{"id":"/subscriptions/abc/RESOURCEGROUPS/x/providers/Microsoft.Network/virtualNetworks/v"}},` +
+		`"identity":{"userAssignedIdentities":{"/subscriptions/abc/RESOURCEGROUPS/x/providers/Microsoft.ManagedIdentity/userAssignedIdentities/i":{}}},` +
+		`"nextLink":"https://localhost:4566/subscriptions/abc/RESOURCEGROUPS/x/vms?a=1\u0026b=2"}`
+	if got := rec.Body.String(); got != want {
+		t.Fatalf("body=%s\nwant=%s", got, want)
+	}
+	if got, want := rec.Header().Get("Location"), "https://localhost:4566/subscriptions/abc/RESOURCEGROUPS/x/operationresults/1?api-version=1"; got != want {
+		t.Fatalf("Location=%q want %q", got, want)
+	}
+	if got, want := rec.Header().Get("Azure-AsyncOperation"), "/subscriptions/abc/RESOURCEGROUPS/x/operationresults/1"; got != want {
+		t.Fatalf("Azure-AsyncOperation=%q want %q", got, want)
 	}
 }
 
@@ -253,12 +317,12 @@ func TestMiddleware_StreamingFlushNotBuffered(t *testing.T) {
 			t.Error("wrapped writer must implement http.Flusher")
 			return
 		}
-		_, _ = w.Write([]byte("one /resourcegroups/x\n"))
+		_, _ = w.Write([]byte(`{"id":"/resourcegroups/x"}` + "\n"))
 		f.Flush()
 		if rec.Body.Len() == 0 {
 			t.Error("first chunk was not streamed before handler returned")
 		}
-		_, _ = w.Write([]byte("two /resourcegroups/x\n"))
+		_, _ = w.Write([]byte(`{"id":"/resourcegroups/y"}` + "\n"))
 		f.Flush()
 	})
 	r.Get("/subscriptions/{sub}/resourceGroups/{rg}/other", func(http.ResponseWriter, *http.Request) {})
@@ -269,9 +333,26 @@ func TestMiddleware_StreamingFlushNotBuffered(t *testing.T) {
 	if rec.Code != http.StatusOK || !rec.Flushed {
 		t.Fatalf("status=%d flushed=%v", rec.Code, rec.Flushed)
 	}
-	want := "one /resourceGroups/x\ntwo /resourceGroups/x\n"
+	want := `{"id":"/resourceGroups/x"}` + "\n" + `{"id":"/resourceGroups/y"}` + "\n"
 	if rec.Body.String() != want {
 		t.Fatalf("body=%q want %q", rec.Body.String(), want)
+	}
+}
+
+// Bodies declared as something other than JSON (container logs, blobs) are
+// opaque data and must not be rewritten.
+func TestMiddleware_NonJSONBodyUntouched(t *testing.T) {
+	r := chi.NewRouter()
+	r.Get("/subscriptions/{sub}/resourceGroups/{rg}", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write([]byte(`"/subscriptions/abc/resourceGroups/x"`))
+	})
+	h := CaseInsensitiveARM(BuildRouteTrie(r))(r)
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/subscriptions/abc/RESOURCEGROUPS/x", nil))
+	if got, want := rec.Body.String(), `"/subscriptions/abc/resourceGroups/x"`; got != want {
+		t.Fatalf("body=%q want %q", got, want)
 	}
 }
 

@@ -44,12 +44,22 @@ func NewHandler(s *store.Store) *Handler {
 
 func (h *Handler) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(strings.ToLower(r.URL.Path), authorizationProviderMarker) {
+		if isARMScopePath(r.URL.Path) && strings.Contains(strings.ToLower(r.URL.Path), authorizationProviderMarker) {
 			h.Dispatch(w, r)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isARMScopePath reports whether path is rooted at an ARM scope. Every ARM
+// resource ID starts with /subscriptions or /providers (the latter covers
+// management groups), which no data-plane route (blob, queue, keyvault, ...)
+// does, so a data-plane key that merely contains the RBAC segment is not
+// mistaken for an authorization request.
+func isARMScopePath(path string) bool {
+	root, _, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
+	return strings.EqualFold(root, "subscriptions") || strings.EqualFold(root, "providers")
 }
 
 func (h *Handler) Register(r chi.Router) {

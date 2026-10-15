@@ -198,6 +198,26 @@ func TestAuthorizationMiddlewareBypassesFutureLiteralService(t *testing.T) {
 	assertOKWithBody(t, get, http.StatusOK, "GET fake-scope role assignment")
 }
 
+func TestAuthorizationMiddlewareOnlyHandlesARMScopes(t *testing.T) {
+	r := chi.NewRouter()
+	r.Use(authorization.NewHandler(store.New()).Middleware)
+	// chi only runs middleware once at least one route is registered.
+	r.Get("/health", func(http.ResponseWriter, *http.Request) {})
+	r.NotFound(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
+
+	for path, want := range map[string]int{
+		"/SUBSCRIPTIONS/sub1/PROVIDERS/MICROSOFT.AUTHORIZATION/ROLEDEFINITIONS":                                  http.StatusOK,
+		"/providers/Microsoft.Management/managementGroups/mg1/providers/Microsoft.Authorization/roleDefinitions": http.StatusOK,
+		"/blob/acct/c1/providers/Microsoft.Authorization/roleDefinitions":                                        http.StatusTeapot,
+		"/appconfig/store/kv/subscriptions/sub1/providers/Microsoft.Authorization/roleAssignments/x":             http.StatusTeapot,
+		"/keyvault/vault1/secrets/providers/microsoft.authorization/roleassignments":                             http.StatusTeapot,
+	} {
+		if got := do(t, r, http.MethodGet, path, nil).Code; got != want {
+			t.Errorf("GET %s: want %d, got %d", path, want, got)
+		}
+	}
+}
+
 func assertOKWithBody(t *testing.T, rr *httptest.ResponseRecorder, want int, op string) {
 	t.Helper()
 	if rr.Code != want {

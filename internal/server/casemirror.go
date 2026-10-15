@@ -18,9 +18,11 @@
 //   - RESPONSE side: the writer is wrapped to buffer the body and intercept
 //     the `Location` and `Azure-AsyncOperation` headers. Whenever the
 //     normalizer rewrote a literal segment, the wrapper substitutes the
-//     canonical literal back to the case the client originally sent — at
-//     boundary-safe positions only — so JSON `id` fields, nested IDs, and
-//     async-op URLs echo back exactly the casing the client used.
+//     canonical literal back to the case the client originally sent. Only
+//     ARM paths are touched: JSON string literals (keys and values) and
+//     headers that start with `/` or `http(s)://`, and only whole `/`-delimited
+//     segments within them. Everything else in the body (tags, settings,
+//     secrets, ...) is user data and is passed through verbatim.
 //
 // This is registered as router-level middleware, so it applies globally to
 // every endpoint without any per-handler changes.
@@ -237,8 +239,9 @@ func (t *routeTrie) match(segs []string, out *[]string, pairs *[][2]string) bool
 
 // CaseInsensitiveARM returns middleware that normalizes the incoming request
 // path to one of the canonical casings learned from chi's registered routes,
-// then wraps the response so any canonical literals in the body / Location
-// header are rewritten back to the case the client originally used.
+// then wraps the response so canonical literals in ARM paths (JSON body
+// strings and the Location-style headers) are rewritten back to the case the
+// client originally used.
 //
 // Resource name segments (anything that lands on a chi parameter or wildcard)
 // are passed through untouched, so case-sensitive storage keys still work.
@@ -323,7 +326,7 @@ func (w *caseMirrorWriter) WriteHeader(status int) {
 	// expected case even if the body is empty.
 	for _, h := range []string{"Location", "Azure-AsyncOperation"} {
 		if v := w.ResponseWriter.Header().Get(h); v != "" {
-			w.ResponseWriter.Header().Set(h, mirrorString(v, w.pairs))
+			w.ResponseWriter.Header().Set(h, mirrorPath(v, w.pairs))
 		}
 	}
 	// Defer the actual WriteHeader until flush so we can fix Content-Length
@@ -338,12 +341,21 @@ func (w *caseMirrorWriter) Write(p []byte) (int, error) {
 		w.WriteHeader(http.StatusOK)
 	}
 	if w.streaming {
-		if _, err := w.ResponseWriter.Write(mirrorBytes(p, w.pairs)); err != nil {
+		if _, err := w.ResponseWriter.Write(w.mirrorBody(p)); err != nil {
 			return 0, err
 		}
 		return len(p), nil
 	}
 	return w.buf.Write(p)
+}
+
+// mirrorBody mirrors the client's casing into a JSON body. A body declared as
+// any other content type (logs, blobs, ...) is opaque data and is left as is.
+func (w *caseMirrorWriter) mirrorBody(b []byte) []byte {
+	if ct := w.Header().Get("Content-Type"); ct != "" && !strings.Contains(ct, "json") {
+		return b
+	}
+	return mirrorJSON(b, w.pairs)
 }
 
 // flush writes the buffered, case-mirrored body to the underlying writer.
@@ -363,7 +375,7 @@ func (w *caseMirrorWriter) flush() {
 
 	body := w.buf.Bytes()
 	if len(body) > 0 {
-		body = mirrorBytes(body, w.pairs)
+		body = w.mirrorBody(body)
 		// Drop any pre-existing Content-Length: handlers like json.Encoder
 		// don't usually set one, but if anything does, our rewrite may
 		// invalidate it.
@@ -382,77 +394,105 @@ func (w *caseMirrorWriter) Header() http.Header {
 
 // ----- string rewriting -----
 
-// mirrorString applies all (canonical, original) substitutions to s at safe
-// boundary positions. A boundary is any non-letter/-digit character or the
-// end of the string. This avoids matching canonical literals that happen to
-// appear inside larger identifiers (e.g. a tag value).
-func mirrorString(s string, pairs [][2]string) string {
-	for _, p := range pairs {
-		canon, orig := p[0], p[1]
-		if canon == orig || canon == "" {
+// mirrorJSON rewrites the ARM paths inside the JSON string literals of b (keys
+// and values alike, e.g. userAssignedIdentities maps are keyed by ARM ID),
+// copying every other byte through as is so formatting and key order survive.
+// An unterminated trailing literal (a streamed chunk cut mid-string) is left
+// untouched.
+func mirrorJSON(b []byte, pairs [][2]string) []byte {
+	var out []byte
+	last := 0
+	for i := 0; i < len(b); i++ {
+		if b[i] != '"' {
 			continue
 		}
-		s = boundaryReplace(s, canon, orig)
+		end := jsonStringEnd(b, i+1)
+		if end < 0 {
+			break
+		}
+		if lit := mirrorLiteral(b[i:end+1], pairs); lit != nil {
+			out = append(append(out, b[last:i]...), lit...)
+			last = end + 1
+		}
+		i = end
+	}
+	if last == 0 {
+		return b
+	}
+	return append(out, b[last:]...)
+}
+
+// jsonStringEnd returns the index of the quote closing the JSON string whose
+// content starts at i, or -1 if there is none.
+func jsonStringEnd(b []byte, i int) int {
+	for ; i < len(b); i++ {
+		switch b[i] {
+		case '\\':
+			i++
+		case '"':
+			return i
+		}
+	}
+	return -1
+}
+
+// mirrorLiteral mirrors the client's casing into one quoted JSON string and
+// returns the rewritten literal, or nil if nothing changed. Plain literals are
+// spliced in place; escaped ones are decoded first so that e.g. `\/`
+// separators are understood, and re-encoded only when something changed.
+func mirrorLiteral(lit []byte, pairs [][2]string) []byte {
+	s := string(lit[1 : len(lit)-1])
+	escaped := strings.Contains(s, `\`)
+	if escaped && json.Unmarshal(lit, &s) != nil {
+		return nil
+	}
+	mirrored := mirrorPath(s, pairs)
+	switch {
+	case mirrored == s:
+		return nil
+	case escaped:
+		out, _ := json.Marshal(mirrored)
+		return out
+	}
+	return []byte(`"` + mirrored + `"`)
+}
+
+// mirrorPath substitutes the client's casing into s if it is ARM-path shaped
+// (an absolute path or URL); any other string is user data and is returned
+// as is.
+func mirrorPath(s string, pairs [][2]string) string {
+	if !strings.HasPrefix(s, "/") && !strings.HasPrefix(s, "http://") && !strings.HasPrefix(s, "https://") {
+		return s
+	}
+	for _, p := range pairs {
+		s = replaceSegment(s, p[0], p[1])
 	}
 	return s
 }
 
-func mirrorBytes(b []byte, pairs [][2]string) []byte {
-	// Operate on a string to keep replacement logic in one place; payloads
-	// are typically small JSON bodies so the allocation cost is acceptable.
-	return []byte(mirrorString(string(b), pairs))
-}
-
-// boundaryReplace replaces every occurrence of `old` in s with `new` provided
-// the match is bordered on the left and right by something that cannot extend
-// an ARM URL segment — i.e. not an ASCII letter, digit, '-', '_' or '.'.
-//
-// "." is treated as part of an identifier so that `Microsoft.Network` matches
-// when prefixed by `/` and followed by `/` (without the dot rule, the `Microsoft`
-// portion of `Microsoft.Network` would match independently). The full
-// dotted RP namespace is registered as a single segment by chi, so it always
-// arrives here as a single token surrounded by `/`.
-func boundaryReplace(s, old, new string) string {
-	if old == "" {
-		return s
-	}
+// replaceSegment replaces every whole path segment of s equal to old with
+// new. A segment starts after a '/' and ends at the next '/', '?', '#' or the
+// end of s, so `Microsoft.Network` is only matched as a full namespace and
+// never inside a longer name.
+func replaceSegment(s, old, new string) string {
+	needle := "/" + old
 	var b strings.Builder
-	b.Grow(len(s))
-	i := 0
-	for i < len(s) {
-		j := strings.Index(s[i:], old)
-		if j < 0 {
-			b.WriteString(s[i:])
+	for {
+		i := strings.Index(s, needle)
+		if i < 0 {
 			break
 		}
-		start := i + j
-		end := start + len(old)
-		// Boundary checks.
-		leftOK := start == 0 || !isIdentRune(s[start-1])
-		rightOK := end == len(s) || !isIdentRune(s[end])
-		b.WriteString(s[i:start])
-		if leftOK && rightOK {
+		end := i + len(needle)
+		b.WriteString(s[:i+1])
+		if end == len(s) || strings.IndexByte("/?#", s[end]) >= 0 {
 			b.WriteString(new)
 		} else {
 			b.WriteString(old)
 		}
-		i = end
+		s = s[end:]
 	}
+	b.WriteString(s)
 	return b.String()
-}
-
-func isIdentRune(c byte) bool {
-	switch {
-	case c >= 'a' && c <= 'z':
-		return true
-	case c >= 'A' && c <= 'Z':
-		return true
-	case c >= '0' && c <= '9':
-		return true
-	case c == '-' || c == '_' || c == '.':
-		return true
-	}
-	return false
 }
 
 // ----- trie construction from chi -----

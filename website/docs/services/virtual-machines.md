@@ -89,8 +89,8 @@ Response (`201 Created`) follows the ARM envelope with `provisioningState: Succe
 So Terraform sees no drift after `apply`, a `GET` returns what was `PUT` plus the values Azure fills in:
 
 - `hardwareProfile.vmSize` defaults to `Standard_B1s`; `vmId` is deterministic per VM.
-- `storageProfile.osDisk` gains `diskSizeGB` (30, or 127 for a Windows image), a name of the form `<vm>_OsDisk_<hash>` and a `managedDisk.id`.
-- The OS disk is persisted in the [managed disk](managed-disks.md) store with `managedBy` set to the VM. A disk you pass via `osDisk.managedDisk.id` or `storageProfile.dataDisks` is left alone and only back-referenced.
+- `storageProfile.osDisk` gains `diskSizeGB` (30, or 127 for a Windows image), a name of the form `<vm>_OsDisk_<hash>` and a `managedDisk.id`. Windows images are recognised by their publisher (`MicrosoftWindowsServer`, `MicrosoftWindowsDesktop`); a `smalldisk` SKU defaults to 30.
+- The OS disk is persisted in the [managed disk](managed-disks.md) store with `managedBy` set to the VM. A disk you pass via `osDisk.managedDisk.id` or `storageProfile.dataDisks` is left alone and only back-referenced. If a managed disk with the auto-generated OS disk name already exists and the VM did not create it, the `PUT` fails with `409 OperationNotAllowed` (Azure only allows `createOption: Attach` for an existing disk).
 - NICs in `networkProfile.networkInterfaces` get `properties.virtualMachine` set; references are released on update and delete.
 - SSH keys, `additionalCapabilities` and the other `osProfile`/`securityProfile` sections are replayed verbatim. An empty `additionalCapabilities` is dropped, as in Azure.
 - `PATCH` replaces top-level fields (`tags`, `identity`, ...) and merges `properties` one level deep. `tags` default to `{}`.
@@ -199,5 +199,5 @@ azlocal identity create|list|show|update|delete
 - The VM is a Linux container, not a real virtual machine. There is no kernel isolation, no Windows images in Docker mode and no cloud-init.
 - The keep-alive container runs `sleep`; extensions, custom-data scripts and boot diagnostics are stored but not executed.
 - Without Docker, ARM lifecycle and power state work on recorded state, but `runCommand`, `logs`, service deploy and `vm ssh` return `409 DockerUnavailable`.
-- Only user-assigned identities can be attached to a VM; `SystemAssigned` is rejected.
+- Only user-assigned identities can be attached to a VM; `SystemAssigned` (alone or combined with `UserAssigned`) is rejected with `400`. See [Managed Identity](managed-identity.md#limitations).
 - Container and network names are derived from the resource group and VM name, so those must be valid Docker identifiers.

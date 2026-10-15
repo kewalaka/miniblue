@@ -77,5 +77,11 @@ azlocal identity delete --resource-group myRG --name myid
   signed.
 - Federated identity credentials (`federatedIdentityCredentials`) are not
   implemented.
-- System-assigned identities on VMs and other resources are echoed back on
-  PUT/GET but not modelled as separate resources.
+- Virtual machines accept user-assigned identities only: a `SystemAssigned`
+  identity (alone or combined with `UserAssigned`) is rejected with `400`.
+  See [Virtual Machines](virtual-machines.md#managed-identity-attestation).
+- System-assigned identities are not modelled for any resource. Storage
+  accounts and AKS clusters echo the `identity` block they were sent without
+  validating or resolving it (AKS adds a placeholder `SystemAssigned` identity
+  when none is sent), and the token endpoint only issues identity-bound
+  tokens for user-assigned identities on VMs.

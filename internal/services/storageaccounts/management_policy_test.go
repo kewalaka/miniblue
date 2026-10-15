@@ -71,11 +71,21 @@ func TestManagementPolicyPutGetDeleteEchoesPolicy(t *testing.T) {
 
 func putJSON(t *testing.T, url string, body map[string]interface{}) map[string]interface{} {
 	t.Helper()
+	return sendJSON(t, http.MethodPut, url, body)
+}
+
+func patchJSON(t *testing.T, url string, body map[string]interface{}) map[string]interface{} {
+	t.Helper()
+	return sendJSON(t, http.MethodPatch, url, body)
+}
+
+func sendJSON(t *testing.T, method, url string, body map[string]interface{}) map[string]interface{} {
+	t.Helper()
 	data, err := json.Marshal(body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(data))
+	req, err := http.NewRequest(method, url, bytes.NewReader(data))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +96,7 @@ func putJSON(t *testing.T, url string, body map[string]interface{}) map[string]i
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("PUT %s status = %d, want %d", url, resp.StatusCode, http.StatusOK)
+		t.Fatalf("%s %s status = %d, want %d", method, url, resp.StatusCode, http.StatusOK)
 	}
 	var out map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {

@@ -119,6 +119,10 @@ func (h *Handler) DeleteStorageAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	storageauth.DeleteSharedKeyContext(h.store, name)
+	// Drop the account's ARM sub-resources so a recreated account starts clean.
+	for _, kind := range []string{"armcontainer", "managementpolicy", "svcprops"} {
+		h.store.DeleteByPrefix("blob:" + kind + ":" + sub + ":" + rg + ":" + name + ":")
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -170,6 +174,40 @@ func (h *Handler) servicePropsKey(sub, rg, account, serviceType string) string {
 
 func writeServiceNotFound(w http.ResponseWriter, resourceType, name string) {
 	azerr.NotFound(w, resourceType, name)
+}
+
+// patchServiceProperties implements PATCH on {blob,file,queue,table}Services/default.
+// Unlike PUT, which rebuilds the record from defaults, a property omitted from
+// the body keeps its stored value (or its default when nothing was stored yet).
+func (h *Handler) patchServiceProperties(w http.ResponseWriter, r *http.Request, serviceType string) {
+	sub := chi.URLParam(r, "subscriptionId")
+	rg := chi.URLParam(r, "resourceGroupName")
+	account := chi.URLParam(r, "accountName")
+
+	if _, ok := h.store.Get(h.storageAccountKey(sub, rg, account)); !ok {
+		writeServiceNotFound(w, "Microsoft.Storage/storageAccounts/"+serviceType, account)
+		return
+	}
+
+	var input map[string]interface{}
+	json.NewDecoder(r.Body).Decode(&input)
+
+	resp := h.buildServicePropertiesResponse(sub, rg, account, serviceType, input)
+	if stored, ok := h.store.Get(h.servicePropsKey(sub, rg, account, serviceType)); ok {
+		storedRecord, _ := stored.(map[string]interface{})
+		storedProps, _ := storedRecord["properties"].(map[string]interface{})
+		patch, _ := input["properties"].(map[string]interface{})
+		props := resp["properties"].(map[string]interface{})
+		for k, v := range storedProps {
+			if _, patched := patch[k]; !patched {
+				props[k] = v
+			}
+		}
+	}
+	h.store.Set(h.servicePropsKey(sub, rg, account, serviceType), resp)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 
 // deriveSkuTier returns the tier ("Standard" or "Premium") implied by an Azure

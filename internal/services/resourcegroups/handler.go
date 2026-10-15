@@ -184,6 +184,8 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	h.store.DeleteByPrefix("appgw:" + p)
 	h.store.DeleteByPrefix("blob:account:" + p)
 	h.store.DeleteByPrefix("blob:armcontainer:" + p)
+	h.store.DeleteByPrefix("blob:managementpolicy:" + p)
+	h.store.DeleteByPrefix("blob:svcprops:" + p)
 	h.store.DeleteByPrefix("cosmos:account:" + p)
 	h.store.DeleteByPrefix("cosmos:sqldb:" + p)
 	h.store.DeleteByPrefix("cosmos:container:" + p)

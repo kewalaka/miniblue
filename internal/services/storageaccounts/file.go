@@ -45,21 +45,5 @@ func (h *Handler) SetFileServiceProperties(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *Handler) PatchFileServiceProperties(w http.ResponseWriter, r *http.Request) {
-	sub := chi.URLParam(r, "subscriptionId")
-	rg := chi.URLParam(r, "resourceGroupName")
-	account := chi.URLParam(r, "accountName")
-
-	if _, ok := h.store.Get(h.storageAccountKey(sub, rg, account)); !ok {
-		writeServiceNotFound(w, "Microsoft.Storage/storageAccounts/fileServices", account)
-		return
-	}
-
-	var input map[string]interface{}
-	json.NewDecoder(r.Body).Decode(&input)
-
-	resp := h.buildServicePropertiesResponse(sub, rg, account, "fileServices", input)
-	h.store.Set(h.servicePropsKey(sub, rg, account, "fileServices"), resp)
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	h.patchServiceProperties(w, r, "fileServices")
 }

@@ -47,23 +47,7 @@ func (h *Handler) SetBlobServiceProperties(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *Handler) PatchBlobServiceProperties(w http.ResponseWriter, r *http.Request) {
-	sub := chi.URLParam(r, "subscriptionId")
-	rg := chi.URLParam(r, "resourceGroupName")
-	account := chi.URLParam(r, "accountName")
-
-	if _, ok := h.store.Get(h.storageAccountKey(sub, rg, account)); !ok {
-		writeServiceNotFound(w, "Microsoft.Storage/storageAccounts/blobServices", account)
-		return
-	}
-
-	var input map[string]interface{}
-	json.NewDecoder(r.Body).Decode(&input)
-
-	resp := h.buildServicePropertiesResponse(sub, rg, account, "blobServices", input)
-	h.store.Set(h.servicePropsKey(sub, rg, account, "blobServices"), resp)
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	h.patchServiceProperties(w, r, "blobServices")
 }
 
 func (h *Handler) armContainerKey(sub, rg, account, name string) string {

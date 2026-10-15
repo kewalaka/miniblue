@@ -36,7 +36,12 @@ func TestDeleteStorageAccountIsSynchronous(t *testing.T) {
 
 func doDelete(t *testing.T, url string) int {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	return requestStatus(t, http.MethodDelete, url)
+}
+
+func requestStatus(t *testing.T, method, url string) int {
+	t.Helper()
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

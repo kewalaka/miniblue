@@ -174,14 +174,25 @@ func diskARMID(sub, rg, name string) string {
 // imageOSAndDefaultDiskSize returns the OS type and Azure's default OS disk
 // size (GB) for an imageReference.
 func imageOSAndDefaultDiskSize(imageRef map[string]interface{}) (string, float64) {
-	osType, ok := compute.LookupImage(firstString(imageRef["publisher"]), firstString(imageRef["offer"]), firstString(imageRef["sku"]))
-	if ok && strings.EqualFold(osType, "Windows") {
-		if strings.Contains(strings.ToLower(firstString(imageRef["sku"])), "smalldisk") {
-			return "Windows", 30
-		}
-		return "Windows", 127
+	if !isWindowsImage(imageRef) {
+		return "Linux", 30
 	}
-	return "Linux", 30
+	if strings.Contains(strings.ToLower(firstString(imageRef["sku"])), "smalldisk") {
+		return "Windows", 30
+	}
+	return "Windows", 127
+}
+
+// isWindowsImage consults the compute catalog first, then falls back to the
+// publisher: stub mode accepts references the catalog does not list (for
+// example Windows Server 2022 or Windows 11), and Windows publishers all start
+// with "MicrosoftWindows".
+func isWindowsImage(imageRef map[string]interface{}) bool {
+	publisher := firstString(imageRef["publisher"])
+	if osType, ok := compute.LookupImage(publisher, firstString(imageRef["offer"]), firstString(imageRef["sku"])); ok {
+		return strings.EqualFold(osType, "Windows")
+	}
+	return strings.HasPrefix(strings.ToLower(publisher), "microsoftwindows")
 }
 
 // normalizeAdditionalCapabilities replays the client's payload faithfully:

@@ -119,6 +119,17 @@ func TestVMIdentityAssignment(t *testing.T) {
 	if _, has := m["identity"]; has {
 		t.Fatal("expected identity block cleared after type None")
 	}
+
+	// System-assigned identities are not modelled: rejected, and nothing persisted.
+	for _, idType := range []string{"SystemAssigned", "SystemAssigned, UserAssigned"} {
+		resp = doRequest(t, "PUT", vmURL(ts, "sub1", "rg1", "sysid")+vmAV,
+			`{"location":"eastus","identity":{"type":"`+idType+`"}}`)
+		expectStatus(t, resp, 400)
+		resp.Body.Close()
+	}
+	resp = doRequest(t, "GET", vmURL(ts, "sub1", "rg1", "sysid")+vmAV, "")
+	expectStatus(t, resp, 404)
+	resp.Body.Close()
 }
 
 // ---------------------------------------------------------------------------

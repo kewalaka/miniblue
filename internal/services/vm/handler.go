@@ -208,6 +208,11 @@ func (h *Handler) writeVM(w http.ResponseWriter, r *http.Request, patch bool) {
 	}
 
 	rec := buildVMRecord(sub, rg, name, input, existing, image)
+	if disk := osDiskConflict(h.store, sub, rg, suppliedManagedDisk, rec); disk != "" {
+		azerr.WriteError(w, http.StatusConflict, "OperationNotAllowed",
+			"Disk "+disk+" already exists in resource group "+rg+". Only CreateOption.Attach is supported.")
+		return
+	}
 	if hasIdentity {
 		if identityBlock == nil {
 			delete(rec, "identity")

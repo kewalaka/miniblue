@@ -128,6 +128,39 @@ func TestVMImageMapping(t *testing.T) {
 	}
 }
 
+// An image outside the compute catalog is still accepted in stub mode, so its
+// OS and default OS disk size must come from the publisher, not the catalog.
+func TestVMWindowsImageOutsideCatalogGetsWindowsOSDisk(t *testing.T) {
+	ts := setupVMServer(t)
+	defer ts.Close()
+	createRG(t, ts, "sub1", "rg1")
+
+	resp := doRequest(t, "PUT", vmURL(ts, "sub1", "rg1", "win1")+vmAV, `{
+		"location":"eastus",
+		"properties":{"storageProfile":{
+			"imageReference":{"publisher":"MicrosoftWindowsServer","offer":"WindowsServer","sku":"2022-datacenter","version":"latest"},
+			"osDisk":{"createOption":"FromImage"}
+		}}
+	}`)
+	expectStatus(t, resp, 201)
+	vm := decodeJSON(t, resp)
+	resp.Body.Close()
+
+	osDisk := vm["properties"].(map[string]interface{})["storageProfile"].(map[string]interface{})["osDisk"].(map[string]interface{})
+	if osDisk["diskSizeGB"] != float64(127) {
+		t.Fatalf("expected default Windows osDisk.diskSizeGB to be 127, got %v", osDisk["diskSizeGB"])
+	}
+
+	resp = doRequest(t, "GET", ts.URL+"/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/disks/"+osDisk["name"].(string)+vmAV, "")
+	expectStatus(t, resp, 200)
+	disk := decodeJSON(t, resp)
+	resp.Body.Close()
+	diskProps := disk["properties"].(map[string]interface{})
+	if diskProps["osType"] != "Windows" || diskProps["diskSizeGB"] != float64(127) {
+		t.Fatalf("expected Windows/127 OS disk, got osType=%v diskSizeGB=%v", diskProps["osType"], diskProps["diskSizeGB"])
+	}
+}
+
 func TestVMListAndDelete(t *testing.T) {
 	ts := setupVMServer(t)
 	defer ts.Close()

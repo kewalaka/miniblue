@@ -41,32 +41,60 @@ func removeDependencies(s *store.Store, sub, rg string, rec map[string]interface
 		return
 	}
 	k := diskKey(sub, rg, osDiskName)
-	if disk, ok := s.Get(k); ok && strings.EqualFold(firstString(asMap(disk)["_autoCreatedBy"]), firstString(rec["id"])) {
+	if disk, ok := s.Get(k); ok && autoCreatedBy(disk, firstString(rec["id"])) {
 		s.Delete(k)
 	}
 }
 
-func ensureAutoManagedOSDisk(s *store.Store, sub, rg string, requestSuppliedManagedDisk bool, rec map[string]interface{}) {
-	storageProfile := asMap(asMap(rec["properties"])["storageProfile"])
-	osDisk := asMap(storageProfile["osDisk"])
-	if osDisk == nil || requestSuppliedManagedDisk || !strings.EqualFold(firstString(osDisk["createOption"]), "FromImage") {
-		return
+// autoCreatedBy reports whether the stored disk is the OS disk the given VM
+// auto-created. A disk with no recorded creator was made through the managed
+// disk API and never belongs to a VM.
+func autoCreatedBy(disk interface{}, vmID string) bool {
+	owner := firstString(asMap(disk)["_autoCreatedBy"])
+	return owner != "" && strings.EqualFold(owner, vmID)
+}
+
+// autoOSDiskName returns the name of the OS disk Azure creates for the VM
+// (createOption FromImage without a supplied managed disk), or "" if none.
+func autoOSDiskName(requestSuppliedManagedDisk bool, rec map[string]interface{}) string {
+	osDisk := asMap(asMap(asMap(rec["properties"])["storageProfile"])["osDisk"])
+	if requestSuppliedManagedDisk || !strings.EqualFold(firstString(osDisk["createOption"]), "FromImage") {
+		return ""
 	}
-	name := firstString(osDisk["name"])
+	return firstString(osDisk["name"])
+}
+
+// osDiskConflict returns the name of the VM's auto-created OS disk when a
+// disk of that name already exists and the VM did not create it. Azure
+// rejects such a request rather than adopting the existing disk.
+func osDiskConflict(s *store.Store, sub, rg string, requestSuppliedManagedDisk bool, rec map[string]interface{}) string {
+	name := autoOSDiskName(requestSuppliedManagedDisk, rec)
+	if name == "" {
+		return ""
+	}
+	if disk, ok := s.Get(diskKey(sub, rg, name)); ok && !autoCreatedBy(disk, firstString(rec["id"])) {
+		return name
+	}
+	return ""
+}
+
+func ensureAutoManagedOSDisk(s *store.Store, sub, rg string, requestSuppliedManagedDisk bool, rec map[string]interface{}) {
+	name := autoOSDiskName(requestSuppliedManagedDisk, rec)
 	if name == "" {
 		return
 	}
+	storageProfile := asMap(asMap(rec["properties"])["storageProfile"])
+	osDisk := asMap(storageProfile["osDisk"])
 
 	vmID := firstString(rec["id"])
 	k := diskKey(sub, rg, name)
 	var existingProps map[string]interface{}
 	if v, ok := s.Get(k); ok {
-		existing := asMap(v)
-		// Never take over a disk someone else created.
-		if owner := firstString(existing["_autoCreatedBy"]); owner != "" && !strings.EqualFold(owner, vmID) {
+		// Never take over a disk this VM did not create.
+		if !autoCreatedBy(v, vmID) {
 			return
 		}
-		existingProps = asMap(existing["properties"])
+		existingProps = asMap(asMap(v)["properties"])
 	}
 
 	managedDisk := asMap(osDisk["managedDisk"])
@@ -110,7 +138,7 @@ func setReferences(s *store.Store, sub string, rec map[string]interface{}) {
 	props := asMap(rec["properties"])
 	for _, nic := range asArray(asMap(props["networkProfile"])["networkInterfaces"]) {
 		if nicID := idFromRef(nic); nicID != "" {
-			updateByID(s, "nic:"+sub+":", nicID, func(p map[string]interface{}) {
+			updateResources(s, "nic:"+sub+":", hasID(nicID), func(p map[string]interface{}) {
 				p["virtualMachine"] = map[string]interface{}{"id": vmID}
 			})
 		}
@@ -125,7 +153,7 @@ func setReferences(s *store.Store, sub string, rec map[string]interface{}) {
 		if diskID == "" {
 			continue
 		}
-		updateByID(s, "disk:"+sub+":", diskID, func(p map[string]interface{}) {
+		updateResources(s, "disk:"+sub+":", hasID(diskID), func(p map[string]interface{}) {
 			p["managedBy"] = vmID
 			p["diskState"] = "Attached"
 		})
@@ -135,45 +163,42 @@ func setReferences(s *store.Store, sub string, rec map[string]interface{}) {
 // clearReferences detaches every NIC and disk currently pointing at the VM.
 func clearReferences(s *store.Store, sub string, rec map[string]interface{}) {
 	vmID := firstString(rec["id"])
-	for _, k := range s.ListKeysByPrefix("nic:" + sub + ":") {
-		if v, ok := s.Get(k); ok {
-			nic := asMap(v)
-			props := asMap(nic["properties"])
-			if strings.EqualFold(idFromRef(props["virtualMachine"]), vmID) {
-				delete(props, "virtualMachine")
-				s.Set(k, nic)
-			}
-		}
-	}
-	for _, k := range s.ListKeysByPrefix("disk:" + sub + ":") {
-		if v, ok := s.Get(k); ok {
-			disk := asMap(v)
-			props := asMap(disk["properties"])
-			if strings.EqualFold(firstString(props["managedBy"]), vmID) {
-				props["managedBy"] = ""
-				props["diskState"] = "Unattached"
-				s.Set(k, disk)
-			}
-		}
+	updateResources(s, "nic:"+sub+":", func(nic map[string]interface{}) bool {
+		return strings.EqualFold(idFromRef(asMap(nic["properties"])["virtualMachine"]), vmID)
+	}, func(p map[string]interface{}) {
+		delete(p, "virtualMachine")
+	})
+	updateResources(s, "disk:"+sub+":", func(disk map[string]interface{}) bool {
+		return strings.EqualFold(firstString(asMap(disk["properties"])["managedBy"]), vmID)
+	}, func(p map[string]interface{}) {
+		p["managedBy"] = ""
+		p["diskState"] = "Unattached"
+	})
+}
+
+func hasID(id string) func(resource map[string]interface{}) bool {
+	return func(resource map[string]interface{}) bool {
+		return strings.EqualFold(firstString(resource["id"]), id)
 	}
 }
 
-// updateByID applies fn to the properties of the stored resource under prefix
-// whose ARM id matches (case-insensitively).
-func updateByID(s *store.Store, prefix, id string, fn func(props map[string]interface{})) {
+// updateResources applies fn to the properties of every stored resource under
+// prefix that match accepts. Handlers encode stored maps without locking, so
+// the change is made on a deep copy that replaces the stored value.
+func updateResources(s *store.Store, prefix string, match func(resource map[string]interface{}) bool, fn func(props map[string]interface{})) {
 	for _, k := range s.ListKeysByPrefix(prefix) {
 		v, ok := s.Get(k)
 		if !ok {
 			continue
 		}
 		resource := asMap(v)
-		if !strings.EqualFold(firstString(resource["id"]), id) {
+		if resource == nil || !match(resource) {
 			continue
 		}
-		if props := asMap(resource["properties"]); props != nil {
+		updated := asMap(recursiveCopy(resource))
+		if props := asMap(updated["properties"]); props != nil {
 			fn(props)
-			s.Set(k, resource)
+			s.Set(k, updated)
 		}
-		return
 	}
 }

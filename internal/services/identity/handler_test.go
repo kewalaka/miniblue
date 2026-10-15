@@ -42,6 +42,33 @@ func decodeMap(t *testing.T, rr *httptest.ResponseRecorder) map[string]interface
 	return got
 }
 
+// Store.Get hands out the stored map and handlers encode it without a lock,
+// so PATCH must publish a new record rather than mutate the one readers hold.
+func TestUpdateIdentityDoesNotMutatePublishedRecord(t *testing.T) {
+	s := store.New()
+	s.Set("rg:sub1:rg1", map[string]interface{}{"name": "rg1"})
+	r := chi.NewRouter()
+	NewHandler(s).Register(r)
+	base := "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id1"
+
+	do(t, r, "PUT", base, map[string]interface{}{"location": "eastus", "tags": map[string]interface{}{"env": "test"}})
+	v, _ := s.Get(identityKey("sub1", "rg1", "id1"))
+	published := v.(map[string]interface{})
+
+	patch := do(t, r, "PATCH", base, map[string]interface{}{"tags": map[string]interface{}{"env": "patched"}})
+	if patch.Code != http.StatusOK {
+		t.Fatalf("PATCH: want 200, got %d: %s", patch.Code, patch.Body.String())
+	}
+
+	if tags := published["tags"].(map[string]interface{}); tags["env"] != "test" {
+		t.Fatalf("PATCH mutated the previously published record in place: tags=%#v", tags)
+	}
+	got := decodeMap(t, do(t, r, "GET", base, nil))
+	if tags := got["tags"].(map[string]interface{}); tags["env"] != "patched" {
+		t.Fatalf("tags not patched: %#v", tags)
+	}
+}
+
 func TestUserAssignedIdentityLifecycleAndPatchTags(t *testing.T) {
 	h := newTestServer(t)
 	base := "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id1"

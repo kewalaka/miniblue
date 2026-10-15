@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -141,9 +142,11 @@ func (h *Handler) UpdateIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if tags, ok := patch["tags"].(map[string]interface{}); ok {
+		// Readers hold the stored map unlocked: publish a copy, never mutate it.
+		rec = maps.Clone(rec)
 		rec["tags"] = tags
+		h.store.Set(key, rec)
 	}
-	h.store.Set(key, rec)
 	json.NewEncoder(w).Encode(rec)
 }
 

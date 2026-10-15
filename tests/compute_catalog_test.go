@@ -1,6 +1,10 @@
 package tests
 
-import "testing"
+import (
+	"encoding/json"
+	"net/http"
+	"testing"
+)
 
 func TestComputeStaticCatalogEndpoints(t *testing.T) {
 	ts := setupServer()
@@ -29,37 +33,36 @@ func TestComputeStaticCatalogEndpoints(t *testing.T) {
 		t.Fatal("expected skus to include static values")
 	}
 
+	// The VM image listings return a bare JSON array, unlike vmSizes and skus.
 	resp = doRequest(t, "GET", base+"/locations/eastus/publishers"+av, "")
 	defer resp.Body.Close()
 	expectStatus(t, resp, 200)
-	publishers := decodeJSON(t, resp)
-	if len(listValue(t, publishers)) == 0 {
+	publishers := decodeJSONArray(t, resp)
+	if len(publishers) == 0 {
 		t.Fatal("expected publishers to include static values")
 	}
 
 	resp = doRequest(t, "GET", base+"/locations/eastus/publishers/Canonical/artifacttypes/vmimage/offers"+av, "")
 	defer resp.Body.Close()
 	expectStatus(t, resp, 200)
-	offers := decodeJSON(t, resp)
-	offerItems := listValue(t, offers)
-	if len(offerItems) == 0 || itemName(t, offerItems, 0) != "0001-com-ubuntu-server-jammy" {
-		t.Fatalf("expected Ubuntu offer, got %v", offers["value"])
+	offers := decodeJSONArray(t, resp)
+	if len(offers) == 0 || itemName(t, offers, 0) != "0001-com-ubuntu-server-jammy" {
+		t.Fatalf("expected Ubuntu offer, got %v", offers)
 	}
 
 	resp = doRequest(t, "GET", base+"/locations/eastus/publishers/Canonical/artifacttypes/vmimage/offers/0001-com-ubuntu-server-jammy/skus"+av, "")
 	defer resp.Body.Close()
 	expectStatus(t, resp, 200)
-	imageSkus := decodeJSON(t, resp)
-	imageSkuItems := listValue(t, imageSkus)
-	if len(imageSkuItems) == 0 || itemName(t, imageSkuItems, 0) != "22_04-lts" {
-		t.Fatalf("expected Ubuntu image sku, got %v", imageSkus["value"])
+	imageSkus := decodeJSONArray(t, resp)
+	if len(imageSkus) == 0 || itemName(t, imageSkus, 0) != "22_04-lts" {
+		t.Fatalf("expected Ubuntu image sku, got %v", imageSkus)
 	}
 
 	resp = doRequest(t, "GET", base+"/locations/eastus/publishers/Canonical/artifacttypes/vmimage/offers/0001-com-ubuntu-server-jammy/skus/22_04-lts/versions"+av, "")
 	defer resp.Body.Close()
 	expectStatus(t, resp, 200)
-	versions := decodeJSON(t, resp)
-	if len(listValue(t, versions)) == 0 {
+	versions := decodeJSONArray(t, resp)
+	if len(versions) == 0 {
 		t.Fatal("expected versions to include static values")
 	}
 
@@ -70,6 +73,27 @@ func TestComputeStaticCatalogEndpoints(t *testing.T) {
 	if version["name"] != "latest" {
 		t.Fatalf("expected latest image version, got %v", version["name"])
 	}
+	// osDiskImage and dataDiskImages sit directly under properties.
+	props, _ := version["properties"].(map[string]interface{})
+	osDiskImage, _ := props["osDiskImage"].(map[string]interface{})
+	if osDiskImage["operatingSystem"] != "Linux" {
+		t.Fatalf("expected properties.osDiskImage.operatingSystem Linux, got %v", version["properties"])
+	}
+	if _, ok := props["dataDiskImages"].([]interface{}); !ok {
+		t.Fatalf("expected properties.dataDiskImages to be a list, got %v", version["properties"])
+	}
+	if _, ok := props["storageProfile"]; ok {
+		t.Fatalf("image properties must not be wrapped in storageProfile, got %v", version["properties"])
+	}
+}
+
+func decodeJSONArray(t *testing.T, resp *http.Response) []interface{} {
+	t.Helper()
+	var items []interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		t.Fatalf("expected a bare JSON array: %v", err)
+	}
+	return items
 }
 
 func listValue(t *testing.T, body map[string]interface{}) []interface{} {

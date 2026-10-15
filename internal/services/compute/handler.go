@@ -67,12 +67,13 @@ func (h *Handler) ListSKUs(w http.ResponseWriter, _ *http.Request) {
 	}})
 }
 
+// The four VM image list operations return a bare JSON array, not a value envelope.
 func (h *Handler) ListPublishers(w http.ResponseWriter, r *http.Request) {
 	items := []interface{}{}
 	for _, img := range imageCatalog() {
 		items = append(items, catalogItem(r, img.publisher))
 	}
-	writeJSON(w, map[string]interface{}{"value": items})
+	writeJSON(w, items)
 }
 
 func (h *Handler) ListOffers(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +84,7 @@ func (h *Handler) ListOffers(w http.ResponseWriter, r *http.Request) {
 			items = append(items, catalogItem(r, img.offer))
 		}
 	}
-	writeJSON(w, map[string]interface{}{"value": items})
+	writeJSON(w, items)
 }
 
 func (h *Handler) ListImageSKUs(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +96,7 @@ func (h *Handler) ListImageSKUs(w http.ResponseWriter, r *http.Request) {
 			items = append(items, catalogItem(r, img.sku))
 		}
 	}
-	writeJSON(w, map[string]interface{}{"value": items})
+	writeJSON(w, items)
 }
 
 func (h *Handler) ListImageVersions(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +113,7 @@ func (h *Handler) ListImageVersions(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	writeJSON(w, map[string]interface{}{"value": items})
+	writeJSON(w, items)
 }
 
 func (h *Handler) GetImageVersion(w http.ResponseWriter, r *http.Request) {
@@ -202,10 +203,8 @@ func imageVersion(r *http.Request, img imageRef, version string) map[string]inte
 		"location": chi.URLParam(r, "location"),
 		"id":       imageVersionID(r, img, version),
 		"properties": map[string]interface{}{
-			"storageProfile": map[string]interface{}{
-				"osDiskImage":    map[string]interface{}{"operatingSystem": img.osType},
-				"dataDiskImages": []interface{}{},
-			},
+			"osDiskImage":    map[string]interface{}{"operatingSystem": img.osType},
+			"dataDiskImages": []interface{}{},
 		},
 	}
 }

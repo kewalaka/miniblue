@@ -43,6 +43,7 @@ nav:
     - Configuration: getting-started/configuration.md
   - Guides:
     - Terraform: guides/terraform.md
+    - Terraform acceptance tests: guides/acceptance-tests.md
     - Pulumi: guides/pulumi.md
     - SDKs (Python, Go, JS): guides/sdk.md
     - azlocal CLI: guides/azlocal.md

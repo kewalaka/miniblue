@@ -26,7 +26,7 @@ sys() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo -n "$@"; fi; }
 
 name=${1:?usage: run.sh <fixture>}
 if [ -d "$here/$name" ]; then target=$here/$name; elif [ -d "$name" ]; then target=$(cd "$name" && pwd); else die "no such fixture: $name"; fi
-[ -f "$target/.terraform.lock.hcl" ] || die "$target has no .terraform.lock.hcl (see tests/terraform/azurerm/README.md)"
+[ -f "$target/.terraform.lock.hcl" ] || die "$target has no .terraform.lock.hcl (see website/docs/guides/acceptance-tests.md)"
 [ -f "$target/acc.env" ] && . "$target/acc.env"
 
 PORT=${PORT:-4566}

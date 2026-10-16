@@ -48,6 +48,7 @@ func (h *Handler) Register(r chi.Router) {
 	r.Route("/subscriptions/{subscriptionId}/providers/Microsoft.KeyVault/locations/{location}/deletedVaults/{vaultName}", func(r chi.Router) {
 		r.Get("/", h.GetDeletedVault)
 		r.Delete("/", h.PurgeDeletedVault)
+		r.Post("/purge", h.BeginPurgeDeletedVault)
 	})
 
 	r.Route("/keyvault/{vaultName}/secrets", func(r chi.Router) {
@@ -365,7 +366,8 @@ func (h *Handler) DeleteVault(w http.ResponseWriter, r *http.Request) {
 	}
 	h.store.Delete(k)
 	setOperationHeaders(w, r, sub, location)
-	w.WriteHeader(http.StatusAccepted)
+	// The vaults SDK only accepts 200/204 on the initial DELETE response.
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) ListVaultsByResourceGroup(w http.ResponseWriter, r *http.Request) {
@@ -519,14 +521,28 @@ func (h *Handler) GetDeletedVault(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) PurgeDeletedVault(w http.ResponseWriter, r *http.Request) {
+	if h.purgeDeleted(w, r) {
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// BeginPurgeDeletedVault is the long-running ARM form (POST .../purge) that azurerm uses.
+func (h *Handler) BeginPurgeDeletedVault(w http.ResponseWriter, r *http.Request) {
+	if h.purgeDeleted(w, r) {
+		setOperationHeaders(w, r, chi.URLParam(r, "subscriptionId"), chi.URLParam(r, "location"))
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+func (h *Handler) purgeDeleted(w http.ResponseWriter, r *http.Request) bool {
 	sub := chi.URLParam(r, "subscriptionId")
 	location := chi.URLParam(r, "location")
 	name := chi.URLParam(r, "vaultName")
 	if !h.store.Delete(h.deletedVaultKey(sub, location, name)) {
 		azerr.NotFound(w, "Microsoft.KeyVault/locations/deletedVaults", name)
-		return
+		return false
 	}
-	w.WriteHeader(http.StatusNoContent)
+	return true
 }
 
 func requestVaultName(r *http.Request) string {

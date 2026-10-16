@@ -199,13 +199,26 @@ func TestKeyVaultARMVaultCRUDAndAccessPolicies(t *testing.T) {
 
 	resp = doRequest(t, "DELETE", base, "")
 	defer resp.Body.Close()
-	expectStatus(t, resp, 202)
+	expectStatus(t, resp, 200)
 
 	resp = doRequest(t, "GET", base, "")
 	defer resp.Body.Close()
 	expectStatus(t, resp, 404)
 
-	resp = doRequest(t, "GET", ts.URL+"/subscriptions/"+sub+"/providers/Microsoft.KeyVault/locations/eastus/deletedVaults/kvtest?api-version=2023-07-01", "")
+	deleted := ts.URL + "/subscriptions/" + sub + "/providers/Microsoft.KeyVault/locations/eastus/deletedVaults/kvtest"
+	resp = doRequest(t, "GET", deleted+"?api-version=2023-07-01", "")
 	defer resp.Body.Close()
 	expectStatus(t, resp, 200)
+
+	// azurerm purges via the long-running POST .../purge.
+	resp = doRequest(t, "POST", deleted+"/purge?api-version=2023-07-01", "")
+	defer resp.Body.Close()
+	expectStatus(t, resp, 202)
+	if resp.Header.Get("Azure-AsyncOperation") == "" {
+		t.Fatal("expected Azure-AsyncOperation header on purge")
+	}
+
+	resp = doRequest(t, "GET", deleted+"?api-version=2023-07-01", "")
+	defer resp.Body.Close()
+	expectStatus(t, resp, 404)
 }

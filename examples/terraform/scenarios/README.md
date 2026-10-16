@@ -2,6 +2,8 @@
 
 Example architectures you can test locally with miniblue.
 
+> **Note:** these scenarios (and `../aks`) still pin azurerm `~> 3.0` and are not covered by CI. The CI-gated azurerm v5 example is [`../`](../). To use a scenario with azurerm v4+, replace `skip_provider_registration = true` with `resource_provider_registrations = "none"` in its `provider.tf`.
+
 ## Scenarios
 
 | Scenario | Description | Resources |

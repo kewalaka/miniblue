@@ -1,0 +1,57 @@
+name: Acceptance (Terraform)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  azapi-policy-definition:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26"
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.16.6
+          terraform_wrapper: false
+
+      - name: Build miniblue
+        run: go build -o miniblue ./cmd/miniblue
+
+      - name: Start miniblue
+        run: |
+          echo "LOCAL_AZURE_CERT_DIR=$RUNNER_TEMP/miniblue-certs" >> "$GITHUB_ENV"
+          export LOCAL_AZURE_CERT_DIR="$RUNNER_TEMP/miniblue-certs"
+          nohup ./miniblue > "$RUNNER_TEMP/miniblue.log" 2>&1 &
+          for _ in $(seq 60); do
+            if curl -sf --cacert "$LOCAL_AZURE_CERT_DIR/cert.pem" https://localhost:4567/health > /dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 0.5
+          done
+          cat "$RUNNER_TEMP/miniblue.log"
+          exit 1
+
+      - name: azapi policyDefinition (apply, no drift, case-insensitive GET, destroy)
+        run: SSL_CERT_FILE="$LOCAL_AZURE_CERT_DIR/cert.pem" ./tests/terraform/azapi/policy_definition/run.sh
+
+      - name: Upload miniblue log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: miniblue-log
+          path: ${{ runner.temp }}/miniblue.log

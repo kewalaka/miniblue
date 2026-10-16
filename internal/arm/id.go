@@ -78,9 +78,6 @@ func parseSegments(segs []string) (ID, error) {
 		if err != nil {
 			return ID{}, err
 		}
-		if s.IsCollection() {
-			return ID{}, fmt.Errorf("%w: scope %q is not a resource", ErrInvalidID, strings.Join(segs[:p], "/"))
-		}
 		scope = &s
 	}
 	ns, rest := segs[p+1], segs[p+2:]
@@ -101,11 +98,14 @@ func parseSegments(segs []string) (ID, error) {
 	return id, nil
 }
 
-// lastProviders returns the index of the last "providers" segment that is
-// followed by a namespace, or -1.
+// lastProviders returns the index of the last "providers" delimiter that is
+// followed by a namespace, or -1. Resource names always sit at odd positions
+// (the built-in prefixes and every "providers/{ns}/{type}/{name}..." group
+// start on an even one), so only even positions can be a delimiter and a
+// resource named "providers" is not mistaken for one.
 func lastProviders(segs []string) int {
 	for i := len(segs) - 2; i >= 0; i-- {
-		if strings.EqualFold(segs[i], "providers") {
+		if i%2 == 0 && strings.EqualFold(segs[i], "providers") {
 			return i
 		}
 	}

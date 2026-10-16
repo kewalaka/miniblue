@@ -205,6 +205,21 @@ func TestEngineChildTypes(t *testing.T) {
 	want(t, do(h, http.MethodGet, parent+"x/parts/p1"+apiV, ""), http.StatusOK)
 }
 
+func TestEngineParentNamedProviders(t *testing.T) {
+	h := newHandler(t)
+	parent := subScope + "/providers/Microsoft.Test/widgets/providers"
+	want(t, do(h, http.MethodPut, parent+apiV, `{}`), http.StatusCreated)
+	want(t, do(h, http.MethodPut, parent+"/parts/p1"+apiV, `{}`), http.StatusCreated)
+	if m := decode(t, do(h, http.MethodGet, strings.ToUpper(parent)+"/PARTS/p1"+apiV, "")); m["name"] != "p1" || m["type"] != "Microsoft.Test/widgets/parts" {
+		t.Fatalf("child = %v", m)
+	}
+	w := do(h, http.MethodGet, parent+"/parts"+apiV, "")
+	want(t, w, http.StatusOK)
+	if n := len(decode(t, w)["value"].([]interface{})); n != 1 {
+		t.Fatalf("parts = %d, want 1", n)
+	}
+}
+
 func TestEngineHooks(t *testing.T) {
 	h := newHandler(t)
 	path := subScope + "/providers/Microsoft.Test/gadgets/g"

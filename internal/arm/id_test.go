@@ -106,6 +106,27 @@ func TestParseID(t *testing.T) {
 			parent: "/providers/Microsoft.Management/managementGroups/Mg1/providers/Microsoft.Authorization/roleAssignments/Ra",
 		},
 		{
+			name:     "child of a parent named providers",
+			path:     "/subscriptions/A1B2/providers/Microsoft.Test/widgets/providers/parts/P",
+			str:      sub + "/providers/Microsoft.Test/widgets/providers/parts/P",
+			typeName: "Microsoft.Test/widgets/parts", resName: "P", scope: ScopeSubscription,
+			parent: sub + "/providers/Microsoft.Test/widgets/providers",
+		},
+		{
+			name:     "extension resource on a resource named providers",
+			path:     "/subscriptions/A1B2/providers/Microsoft.Test/widgets/providers/providers/Microsoft.Authorization/locks/L",
+			str:      sub + "/providers/Microsoft.Test/widgets/providers/providers/Microsoft.Authorization/locks/L",
+			typeName: "Microsoft.Authorization/locks", resName: "L", scope: ScopeResource,
+			parent: sub + "/providers/Microsoft.Test/widgets/providers",
+		},
+		{
+			name:     "resource group named providers",
+			path:     "/subscriptions/A1B2/resourceGroups/providers/providers/Microsoft.Network/virtualNetworks/V",
+			str:      sub + "/resourceGroups/providers/providers/Microsoft.Network/virtualNetworks/V",
+			typeName: "Microsoft.Network/virtualNetworks", resName: "V", scope: ScopeResourceGroup,
+			parent: sub + "/resourceGroups/providers",
+		},
+		{
 			name:     "trailing slash and mangled keywords",
 			path:     "/Subscriptions/A1B2/PROVIDERS/microsoft.authorization/POLICYDEFINITIONS/Pd/",
 			str:      sub + "/providers/microsoft.authorization/POLICYDEFINITIONS/Pd",
@@ -171,7 +192,8 @@ func TestParseIDInvalid(t *testing.T) {
 		"/subscriptions/a/resourceGroups/rg/deployments/d",
 		"/subscriptions/a/locations",
 		"/health",
-		"/subscriptions/a/providers/Microsoft.Authorization/policyDefinitions/providers/Microsoft.Authorization/locks/l",
+		"/subscriptions/a/foo/providers/Microsoft.Authorization/policyDefinitions/pd", // "providers" in a name position
+		"/subscriptions/a/resourceGroups/rg/providers",
 	} {
 		if id, err := ParseID(path); err == nil {
 			t.Errorf("ParseID(%q) = %v, want error", path, id)

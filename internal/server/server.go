@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/moabukar/miniblue/internal/arm"
 	"github.com/moabukar/miniblue/internal/services/aci"
 	"github.com/moabukar/miniblue/internal/services/acr"
 	"github.com/moabukar/miniblue/internal/services/aks"
@@ -36,6 +37,7 @@ import (
 	"github.com/moabukar/miniblue/internal/services/network"
 	"github.com/moabukar/miniblue/internal/services/networkinterfaces"
 	"github.com/moabukar/miniblue/internal/services/nsg"
+	"github.com/moabukar/miniblue/internal/services/policy"
 	"github.com/moabukar/miniblue/internal/services/publicip"
 	"github.com/moabukar/miniblue/internal/services/queue"
 	"github.com/moabukar/miniblue/internal/services/redis"
@@ -168,6 +170,16 @@ func parseServicesFilter() map[string]bool {
 
 func (s *Server) setupRoutes() {
 	allowed := parseServicesFilter()
+
+	// The ARM engine serves only the types registered here and passes every
+	// other path on. It must come before the authorization middleware, which
+	// 404s Microsoft.Authorization paths it does not know.
+	armTypes := arm.NewRegistry()
+	if serviceEnabled("policy", allowed) {
+		policy.Register(armTypes)
+	}
+	s.router.Use(arm.NewEngine(armTypes, arm.NewStore(s.store)).Middleware)
+
 	var authorizationHandler *authorization.Handler
 	if serviceEnabled("authorization", allowed) {
 		authorizationHandler = authorization.NewHandler(s.store)
@@ -251,6 +263,9 @@ func (s *Server) setupRoutes() {
 	if serviceEnabled("authorization", allowed) {
 		authorizationHandler.Register(s.router)
 		s.services = append(s.services, "authorization")
+	}
+	if serviceEnabled("policy", allowed) {
+		s.services = append(s.services, "policy")
 	}
 }
 

@@ -36,6 +36,7 @@ miniblue emulates 32 Azure services on a single port. All services use in-memory
 | [Managed Disks](managed-disks.md) | `Microsoft.Compute` | Done | Yes | -- |
 | [Managed Identity](managed-identity.md) (user-assigned) | `Microsoft.ManagedIdentity` | Done | Yes | -- |
 | [RBAC](rbac.md) | `Microsoft.Authorization` | Done | Yes | -- |
+| Policy Definitions | `Microsoft.Authorization` | Done (custom definitions, subscription scope) | Yes | -- |
 
 ### What "ARM API" and "Data Plane" mean
 
@@ -77,6 +78,12 @@ The following resources work with the `hashicorp/azurerm` provider (v3.x and v4.
 
 See the [Terraform guide](../guides/terraform.md) for a full working example.
 
+The `Azure/azapi` provider (`azapi_resource`) is used for resource types served by the [ARM engine](../architecture/arm-engine.md):
+
+| azapi resource type | miniblue Service |
+|---------------------|-----------------|
+| `Microsoft.Authorization/policyDefinitions@2023-04-01` (subscription scope) | Policy Definitions |
+
 ## API patterns
 
 All ARM-style endpoints follow the Azure REST API convention:
@@ -97,7 +104,7 @@ POST /cosmosdb/{account}/dbs/{db}/colls/{coll}/docs
 
 | Parameter | Notes |
 |-----------|-------|
-| `api-version` | Accepted but not enforced. miniblue responds the same regardless of version. |
+| `api-version` | Accepted but not enforced, except for types served by the [ARM engine](../architecture/arm-engine.md) (e.g. Policy Definitions), which reject versions they do not list with `400 InvalidApiVersionParameter`. |
 
 ## Error format
 

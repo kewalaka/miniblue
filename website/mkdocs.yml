@@ -84,6 +84,7 @@ nav:
   - Architecture:
     - Overview: architecture/overview.md
     - Scope and Philosophy: architecture/scope.md
+    - ARM Resource Engine: architecture/arm-engine.md
   - Contributing: contributing.md
 
 markdown_extensions:

@@ -37,6 +37,7 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | Compute Catalog (VM sizes, SKUs, images) | -- | Full | Full | -- | -- | Static catalog used by Terraform plan |
 | User-Assigned Managed Identities | Full | Full | Full | Full | Full (PATCH) | Deterministic `principalId`/`clientId`/`tenantId` |
 | RBAC (role assignments + definitions) | Full | Full | Full | Full | - | Stored only — no access is enforced |
+| Policy Definitions (`Microsoft.Authorization/policyDefinitions@2023-04-01`) | Full | Full | Full | Full | - | Custom definitions at subscription scope only, served by the [ARM engine](../architecture/arm-engine.md) as raw passthrough. No built-in definitions, not evaluated |
 | Key Vault Vaults | Full | Full | Full | Full | Full (PATCH) | `checkNameAvailability`, access policy updates, soft-deleted vault lookup/purge, and synchronous LRO headers |
 | Cosmos DB SQL Databases & Containers (ARM) | Full | Full | Full | Full | - | |
 | Cosmos DB Table API (ARM) | Full | Full | Full | Full | - | Throughput settings supported |
@@ -78,7 +79,7 @@ These Azure services have no emulation:
 - Azure App Service
 - Azure Monitor / Log Analytics
 - Azure Active Directory (beyond mock tokens)
-- Azure Policy
+- Azure Policy (assignments, initiatives, built-in definitions, evaluation, management-group scope)
 - Azure Key Vault (keys, certificates)
 - Azure Cosmos DB (Mongo, Cassandra, Gremlin APIs)
 - Azure Service Bus (subscriptions, dead-letter)

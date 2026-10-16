@@ -179,6 +179,60 @@ terraform destroy -auto-approve
 
 All resources are removed from miniblue. Since miniblue uses in-memory storage, stopping the server also clears everything.
 
+## Using the azapi provider
+
+Resource types served by the [ARM engine](../architecture/arm-engine.md) (currently `Microsoft.Authorization/policyDefinitions@2023-04-01` at subscription scope) work with the `Azure/azapi` provider. The settings differ from azurerm:
+
+```hcl
+terraform {
+  required_providers {
+    azapi = {
+      source  = "Azure/azapi"
+      version = "= 2.13.0"
+    }
+  }
+}
+
+provider "azapi" {
+  # An attribute list, not a block
+  endpoint = [{
+    resource_manager_endpoint       = "https://localhost:4567"
+    active_directory_authority_host = "https://localhost:4567"
+    resource_manager_audience       = "https://management.azure.com/"
+  }]
+
+  # Without this the Azure SDK calls an instance-discovery endpoint miniblue does not serve
+  disable_instance_discovery = true
+  use_cli                    = false
+
+  subscription_id = "00000000-0000-0000-0000-000000000000"
+  tenant_id       = "00000000-0000-0000-0000-000000000001"
+  client_id       = "miniblue"
+  client_secret   = "miniblue"
+}
+
+resource "azapi_resource" "policy" {
+  type      = "Microsoft.Authorization/policyDefinitions@2023-04-01"
+  name      = "deny-locations"
+  parent_id = "/subscriptions/00000000-0000-0000-0000-000000000000"
+  body = {
+    properties = {
+      policyType = "Custom"
+      mode       = "All"
+      policyRule = {
+        if   = { not = { field = "location", in = ["westeurope"] } }
+        then = { effect = "deny" }
+      }
+    }
+  }
+}
+```
+
+- azapi has no `metadata_host`, and it must use the HTTPS port (4567): the Azure SDK refuses plain HTTP credentials.
+- Certificate trust is the same as above (`SSL_CERT_FILE`), with one caveat: Go on **Windows ignores `SSL_CERT_FILE`**, so on Windows add miniblue's certificate to the system store or run Terraform from WSL/Linux.
+- The same settings can be supplied as environment variables: `ARM_RESOURCE_MANAGER_ENDPOINT`, `ARM_ACTIVE_DIRECTORY_AUTHORITY_HOST`, `ARM_RESOURCE_MANAGER_AUDIENCE`, `ARM_DISABLE_INSTANCE_DISCOVERY`, `ARM_USE_CLI`.
+- Working fixture: `tests/terraform/azapi/policy_definition`.
+
 ## CI/CD usage
 
 Use miniblue in your CI pipeline to test Terraform plans without an Azure account:

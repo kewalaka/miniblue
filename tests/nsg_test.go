@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -227,4 +228,59 @@ func TestNSGUpdateReturns200(t *testing.T) {
 	}
 
 	doRequest(t, "DELETE", base+"/nsg-upd"+av, "").Body.Close()
+}
+
+// azurerm_network_security_group with inline security_rule blocks sends rules in the NSG PUT.
+func TestNSGInlineSecurityRules(t *testing.T) {
+	ts := setupServer()
+	defer ts.Close()
+	base := ts.URL + "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups"
+	av := "?api-version=2023-09-01"
+
+	ruleNames := func(path string) []string {
+		t.Helper()
+		resp := doRequest(t, "GET", path, "")
+		expectStatus(t, resp, 200)
+		defer resp.Body.Close()
+		var names []string
+		for _, r := range decodeJSON(t, resp)["properties"].(map[string]interface{})["securityRules"].([]interface{}) {
+			names = append(names, r.(map[string]interface{})["name"].(string))
+		}
+		return names
+	}
+	rule := func(name string, priority int) string {
+		return fmt.Sprintf(`{"name":%q,"properties":{"priority":%d,"direction":"Inbound","access":"Allow","protocol":"Tcp","sourcePortRange":"*","destinationPortRange":"80","sourceAddressPrefix":"*","destinationAddressPrefix":"*"}}`, name, priority)
+	}
+
+	resp := doRequest(t, "PUT", base+"/nsg-inline"+av,
+		`{"location":"eastus","properties":{"securityRules":[`+rule("a", 100)+`,`+rule("b", 110)+`]}}`)
+	expectStatus(t, resp, 201)
+	resp.Body.Close()
+	if got := ruleNames(base + "/nsg-inline" + av); len(got) != 2 {
+		t.Fatalf("expected inline rules a,b persisted, got %v", got)
+	}
+
+	resp = doRequest(t, "GET", base+"/nsg-inline/securityRules/a"+av, "")
+	expectStatus(t, resp, 200)
+	resp.Body.Close()
+
+	// Omitting securityRules keeps the existing set.
+	resp = doRequest(t, "PUT", base+"/nsg-inline"+av, `{"location":"eastus","tags":{"k":"v"}}`)
+	expectStatus(t, resp, 200)
+	resp.Body.Close()
+	if got := ruleNames(base + "/nsg-inline" + av); len(got) != 2 {
+		t.Fatalf("expected rules kept when securityRules omitted, got %v", got)
+	}
+
+	// A new inline set replaces the old one.
+	resp = doRequest(t, "PUT", base+"/nsg-inline"+av,
+		`{"location":"eastus","properties":{"securityRules":[`+rule("c", 120)+`]}}`)
+	expectStatus(t, resp, 200)
+	resp.Body.Close()
+	if got := ruleNames(base + "/nsg-inline" + av); len(got) != 1 || got[0] != "c" {
+		t.Fatalf("expected inline set replaced by c, got %v", got)
+	}
+	resp = doRequest(t, "GET", base+"/nsg-inline/securityRules/a"+av, "")
+	expectStatus(t, resp, 404)
+	resp.Body.Close()
 }

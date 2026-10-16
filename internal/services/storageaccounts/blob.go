@@ -150,7 +150,8 @@ func (h *Handler) DeleteContainerARM(w http.ResponseWriter, r *http.Request) {
 		writeServiceNotFound(w, "Microsoft.Storage/storageAccounts/blobServices/containers", name)
 		return
 	}
-	w.WriteHeader(http.StatusAccepted)
+	// The containers SDK only accepts 200/204 for DELETE; 202 fails the destroy.
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) ListContainersARM(w http.ResponseWriter, r *http.Request) {

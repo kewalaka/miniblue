@@ -194,11 +194,33 @@ func TestBlobARMContainerCRUD(t *testing.T) {
 	// Delete container
 	resp4 := doRequest(t, "DELETE", cBase, "")
 	defer resp4.Body.Close()
-	expectStatus(t, resp4, 202)
+	expectStatus(t, resp4, 200)
 
 	resp5 := doRequest(t, "GET", cBase, "")
 	defer resp5.Body.Close()
 	expectStatus(t, resp5, 404)
+}
+
+// azurerm reads accountMigrations/default on every storage account read.
+func TestBlobARMAccountMigration(t *testing.T) {
+	ts := setupServer()
+	defer ts.Close()
+	acctBase := blobARMBase(ts) + "/" + blobAcct
+	mBase := acctBase + "/accountMigrations/default"
+
+	resp := doRequest(t, "GET", mBase, "")
+	expectStatus(t, resp, 404)
+	resp.Body.Close()
+
+	doRequest(t, "PUT", acctBase, `{"sku":{"name":"Standard_GRS"}}`).Body.Close()
+	resp = doRequest(t, "GET", mBase, "")
+	defer resp.Body.Close()
+	expectStatus(t, resp, 200)
+	m := decodeJSON(t, resp)
+	props := m["properties"].(map[string]interface{})
+	if props["migrationStatus"] != "Complete" || props["targetSkuName"] != "Standard_GRS" {
+		t.Fatalf("unexpected migration properties: %v", props)
+	}
 }
 
 func TestBlobARMResponseHasID(t *testing.T) {

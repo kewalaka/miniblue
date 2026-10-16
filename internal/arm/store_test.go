@@ -2,14 +2,16 @@ package arm
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/moabukar/miniblue/internal/store"
 )
 
 // jsonBackend mimics the Postgres backend: values are JSON round-tripped, so
-// maps come back as map[string]interface{} with float64 numbers.
+// structured values come back as map[string]interface{} with float64 numbers.
 type jsonBackend struct{ *store.MemoryBackend }
 
 func (b jsonBackend) Set(key string, value interface{}) error {
@@ -82,9 +84,49 @@ func TestStoreCopiesValues(t *testing.T) {
 	got, _ := s.Get(id)
 	got["properties"].(map[string]interface{})["n"] = 42
 	again, _ := s.Get(id)
-	if n := again["properties"].(map[string]interface{})["n"]; n != 1 {
+	if n := again["properties"].(map[string]interface{})["n"]; n != json.Number("1") {
 		t.Errorf("store state mutated through caller copies: n=%v", n)
 	}
+}
+
+func TestStoreKeepsNumbersExact(t *testing.T) {
+	id := mustID(t, "/subscriptions/a1/providers/Microsoft.Authorization/policyDefinitions/p")
+	in, err := decodeObject(strings.NewReader(
+		`{"properties":{"big":9007199254740993,"min":-9223372036854775808,"dec":1.10,"exp":1e400}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(t *testing.T, s *Store) {
+		t.Helper()
+		got, ok := s.Get(id)
+		if !ok {
+			t.Fatal("missing")
+		}
+		props := got["properties"].(map[string]interface{})
+		for k, want := range map[string]json.Number{
+			"big": "9007199254740993", "min": "-9223372036854775808", "dec": "1.10", "exp": "1e400",
+		} {
+			if props[k] != want {
+				t.Errorf("%s = %v, want %v", k, props[k], want)
+			}
+		}
+	}
+	for name, mk := range backends() {
+		t.Run(name, func(t *testing.T) {
+			s := NewStore(mk())
+			s.Put(id, in)
+			check(t, s)
+		})
+	}
+	t.Run("file reload", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "state.json")
+		fb := store.NewFileBackend(path)
+		NewStore(store.NewWithBackend(fb)).Put(id, in)
+		if err := fb.Save(); err != nil {
+			t.Fatal(err)
+		}
+		check(t, NewStore(store.NewWithBackend(store.NewFileBackend(path))))
+	})
 }
 
 func TestStoreList(t *testing.T) {

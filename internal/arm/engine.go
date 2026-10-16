@@ -150,8 +150,8 @@ func (e *Engine) patchTags(w http.ResponseWriter, r *http.Request, id ID) {
 }
 
 func readObject(w http.ResponseWriter, r *http.Request) (map[string]interface{}, bool) {
-	var body map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body == nil {
+	body, err := decodeObject(r.Body)
+	if err != nil || body == nil {
 		azerr.BadRequest(w, "The request content is not a valid JSON object.")
 		return nil, false
 	}

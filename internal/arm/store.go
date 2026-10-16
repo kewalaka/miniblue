@@ -1,6 +1,8 @@
 package arm
 
 import (
+	"encoding/json"
+	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -14,8 +16,14 @@ import (
 //
 // Layout:
 //
-//	arm:r:<lower id>                   -> resource document
+//	arm:r:<lower id>                   -> resource document (JSON text)
 //	arm:i:<lower parent>|<lower type>  -> sorted list of child resource keys
+//
+// Documents are stored as JSON text, not as maps: the file and Postgres
+// backends decode stored values into interface{}, which turns every number
+// into a float64 and silently changes integers beyond 2^53. A string survives
+// every backend unchanged, and is decoded here with json.Number for the same
+// reason. It also means callers never share state with the backend.
 //
 // The child index makes listing O(children) instead of a ListByPrefix scan of
 // the whole backend (O(n), see upstream issue #95). Only DeleteTree scans by
@@ -34,23 +42,26 @@ func idxKey(id ID) string {
 	return "arm:i:" + strings.ToLower(id.Parent().String()) + "|" + strings.ToLower(id.TypeName())
 }
 
-// Get returns a copy of the document stored for id.
+// Get returns the document stored for id. Numbers are json.Number.
 func (s *Store) Get(id ID) (map[string]interface{}, bool) {
 	v, ok := s.s.Get(resKey(id))
 	if !ok {
 		return nil, false
 	}
-	doc, _ := deepCopy(v).(map[string]interface{})
-	return doc, doc != nil
+	return decodeDoc(v)
 }
 
-// Put stores a copy of doc under id and reports whether it was newly created.
+// Put stores doc under id and reports whether it was newly created.
 func (s *Store) Put(id ID, doc map[string]interface{}) (created bool) {
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		panic("arm: document is not JSON-encodable: " + err.Error())
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := resKey(id)
 	created = !s.s.Exists(key)
-	s.s.Set(key, deepCopy(doc))
+	s.s.Set(key, string(raw))
 	if created {
 		s.indexAdd(idxKey(id), key)
 	}
@@ -86,12 +97,12 @@ func (s *Store) DeleteTree(id ID) bool {
 	return existed
 }
 
-// List returns copies of the resources in a collection, ordered by ID.
+// List returns the resources in a collection, ordered by ID.
 func (s *Store) List(collection ID) []map[string]interface{} {
 	out := []map[string]interface{}{}
 	for _, key := range s.index(idxKey(collection)) {
 		if v, ok := s.s.Get(key); ok {
-			if doc, _ := deepCopy(v).(map[string]interface{}); doc != nil {
+			if doc, ok := decodeDoc(v); ok {
 				out = append(out, doc)
 			}
 		}
@@ -147,23 +158,23 @@ func (s *Store) indexRemove(idx, key string) {
 	s.writeIndex(idx, append(keys[:i], keys[i+1:]...))
 }
 
-// deepCopy copies JSON-shaped values. The memory backend stores values by
-// reference, so without copies callers could mutate stored state.
-func deepCopy(v interface{}) interface{} {
-	switch t := v.(type) {
-	case map[string]interface{}:
-		m := make(map[string]interface{}, len(t))
-		for k, e := range t {
-			m[k] = deepCopy(e)
-		}
-		return m
-	case []interface{}:
-		a := make([]interface{}, len(t))
-		for i, e := range t {
-			a[i] = deepCopy(e)
-		}
-		return a
-	default:
-		return v
+// decodeObject decodes a JSON object keeping numbers as json.Number, so
+// integers beyond float64 precision round-trip unchanged.
+func decodeObject(r io.Reader) (map[string]interface{}, error) {
+	var m map[string]interface{}
+	dec := json.NewDecoder(r)
+	dec.UseNumber()
+	if err := dec.Decode(&m); err != nil {
+		return nil, err
 	}
+	return m, nil
+}
+
+func decodeDoc(v interface{}) (map[string]interface{}, bool) {
+	raw, ok := v.(string)
+	if !ok {
+		return nil, false
+	}
+	doc, err := decodeObject(strings.NewReader(raw))
+	return doc, err == nil && doc != nil
 }

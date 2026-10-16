@@ -149,6 +149,25 @@ func TestEnginePassthroughWithoutHooks(t *testing.T) {
 	}
 }
 
+func TestEngineKeepsNumbersExact(t *testing.T) {
+	h := newHandler(t)
+	path := subScope + "/providers/Microsoft.Test/widgets/w"
+	want(t, do(h, http.MethodPut, path+apiV, `{"tags":{"a":"1"},"properties":{"big":9007199254740993,"dec":1.10}}`), http.StatusCreated)
+
+	for name, w := range map[string]*httptest.ResponseRecorder{
+		"get":   do(h, http.MethodGet, path+apiV, ""),
+		"list":  do(h, http.MethodGet, subScope+"/providers/Microsoft.Test/widgets"+apiV, ""),
+		"patch": do(h, http.MethodPatch, path+apiV, `{"tags":{"b":"2"}}`),
+	} {
+		want(t, w, http.StatusOK)
+		for _, num := range []string{`"big":9007199254740993`, `"dec":1.10`} {
+			if !strings.Contains(w.Body.String(), num) {
+				t.Errorf("%s: %s not preserved in %s", name, num, w.Body.String())
+			}
+		}
+	}
+}
+
 func TestEngineList(t *testing.T) {
 	h := newHandler(t)
 	rg := subScope + "/resourceGroups/rg1"

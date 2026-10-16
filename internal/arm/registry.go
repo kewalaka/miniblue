@@ -25,7 +25,8 @@ type Type struct {
 }
 
 // Hooks are optional per-type behaviour. The engine is pure passthrough
-// without them: the body is stored as sent plus id, name and type.
+// without them: the body is stored as sent plus id, name and type. Numbers in
+// the body are json.Number, not float64, so large integers are not altered.
 type Hooks struct {
 	// Validate rejects a PUT body; the error text becomes a 400 response.
 	Validate func(id ID, body map[string]interface{}) error

@@ -2,13 +2,16 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -40,12 +43,20 @@ func main() {
 		handleStorage(args[1:])
 	case "network":
 		handleNetwork(args[1:])
+	case "vm":
+		handleVM(args[1:])
 	case "cosmosdb":
 		handleCosmosDB(args[1:])
 	case "servicebus":
 		handleServiceBus(args[1:])
 	case "appconfig":
 		handleAppConfig(args[1:])
+	case "identity":
+		handleIdentity(args[1:])
+	case "role":
+		handleRole(args[1:])
+	case "provider":
+		handleProvider(args[1:])
 	case "functionapp":
 		handleFunctions(args[1:])
 	case "dns":
@@ -72,10 +83,6 @@ func main() {
 		handleTable(args[1:])
 	case "queue":
 		handleQueue(args[1:])
-	case "vm":
-		handleVM(args[1:])
-	case "identity":
-		handleIdentity(args[1:])
 	case "reset":
 		doPost("/_miniblue/reset", nil)
 	case "health":
@@ -97,12 +104,16 @@ Usage:
 
 Commands:
   group        Resource group operations
-  keyvault     Key Vault secret operations
+  keyvault     Key Vault vault and secret operations
   storage      Blob storage operations
   network      Virtual network operations
+  vm           Virtual machine operations
   cosmosdb     Cosmos DB operations
   servicebus   Service Bus operations
   appconfig    App Configuration operations
+  identity     User-assigned managed identity operations
+  role         Azure RBAC role assignment and definition operations
+  provider     Azure resource provider operations
   functionapp  Azure Functions operations
   dns          DNS zone and record operations
   eventgrid    Event Grid topic operations
@@ -116,8 +127,6 @@ Commands:
   containerapp Azure Container Apps operations
   table        Azure Table Storage operations
   queue        Azure Queue Storage operations
-  vm           Virtual Machine operations
-  identity     Managed identity operations
   reset        Reset all miniblue state
   health       Check miniblue health
 
@@ -127,6 +136,10 @@ Examples:
   azlocal group show --name myRG --subscription sub1
   azlocal group delete --name myRG --subscription sub1
 
+  azlocal keyvault vault create --resource-group myRG --name myvault --location eastus
+  azlocal keyvault vault list --resource-group myRG
+  azlocal keyvault vault show --resource-group myRG --name myvault
+  azlocal keyvault vault delete --resource-group myRG --name myvault
   azlocal keyvault secret set --vault myvault --name dbpass --value secret123
   azlocal keyvault secret show --vault myvault --name dbpass
   azlocal keyvault secret list --vault myvault
@@ -137,16 +150,56 @@ Examples:
   azlocal storage account list-keys --resource-group myRG --name myaccount
   azlocal storage account delete --resource-group myRG --name myaccount
 
+  azlocal appconfig store create --resource-group myRG --name myconfig --sku free
+  azlocal appconfig store list --resource-group myRG
+  azlocal appconfig store list-keys --resource-group myRG --name myconfig
+
   azlocal storage container create --account myaccount --name mycontainer
   azlocal storage blob upload --account myaccount --container mycontainer --name hello.txt --data "Hello!"
   azlocal storage blob download --account myaccount --container mycontainer --name hello.txt
   azlocal storage blob list --account myaccount --container mycontainer
+
+  azlocal network vnet create --resource-group myRG --name myvnet --address-prefix 10.0.0.0/16
+  azlocal network vnet subnet create --resource-group myRG --vnet-name myvnet --name mysubnet --address-prefixes 10.0.1.0/24
+  azlocal network vnet subnet list   --resource-group myRG --vnet-name myvnet
+  azlocal network vnet subnet show   --resource-group myRG --vnet-name myvnet --name mysubnet
+  azlocal network vnet subnet delete --resource-group myRG --vnet-name myvnet --name mysubnet
+  azlocal network nsg create --resource-group myRG --name mynsg
+  azlocal network nsg list   --resource-group myRG
+  azlocal network nsg show   --resource-group myRG --name mynsg
+  azlocal network nsg rule list --resource-group myRG --nsg-name mynsg
+  azlocal network lb create  --resource-group myRG --name mylb --sku Standard
+  azlocal network lb list    --resource-group myRG
+  azlocal network lb show    --resource-group myRG --name mylb
+  azlocal network lb rule list  --resource-group myRG --lb-name mylb
+  azlocal network lb probe list --resource-group myRG --lb-name mylb
+
+  azlocal cosmosdb create --resource-group myRG --name myaccount --location eastus
+  azlocal cosmosdb list   --resource-group myRG
+  azlocal cosmosdb show   --resource-group myRG --name myaccount
+  azlocal cosmosdb delete --resource-group myRG --name myaccount
+
+  azlocal vm create --resource-group myRG --name myvm --image ubuntu:24.04 --size Standard_B1s
+  azlocal vm update --resource-group myRG --name myvm --size Standard_B2s
+  azlocal vm list --resource-group myRG
+  azlocal vm show --resource-group myRG --name myvm [--show-details]
+  azlocal vm stop|start|restart|deallocate|redeploy --resource-group myRG --name myvm
+  azlocal vm get-instance-view --resource-group myRG --name myvm
+  azlocal vm extension set --resource-group myRG --vm-name myvm --name ext --publisher P --type T
+  azlocal vm run-command --resource-group myRG --name myvm --command 'uname -a'
+  azlocal vm delete --resource-group myRG --name myvm
 
   azlocal dns zone create --resource-group myRG --name example.com
   azlocal dns record create --resource-group myRG --zone example.com --type A --name www --data '{"properties":{"TTL":300,"ARecords":[{"ipv4Address":"1.2.3.4"}]}}'
 
   azlocal eventgrid topic create --resource-group myRG --name mytopic --location eastus
   azlocal eventgrid topic list --resource-group myRG
+
+  azlocal identity create --resource-group myRG --name myidentity --location eastus
+  azlocal identity show --resource-group myRG --name myidentity
+
+  azlocal provider show --namespace Microsoft.Storage
+  azlocal provider list
 
   azlocal acr create --resource-group myRG --name myregistry --location eastus
   azlocal acr list --resource-group myRG
@@ -220,6 +273,17 @@ func requireFlag(args []string, name string) string {
 	return v
 }
 
+func parseTags(raw string) map[string]interface{} {
+	tags := map[string]interface{}{}
+	for _, part := range strings.FieldsFunc(raw, func(r rune) bool { return r == ',' || r == ' ' }) {
+		key, value, ok := strings.Cut(part, "=")
+		if ok && key != "" {
+			tags[key] = value
+		}
+	}
+	return tags
+}
+
 func sub(args []string) string {
 	s := getFlag(args, "subscription")
 	if s == "" {
@@ -266,6 +330,23 @@ func doPut(path string, body interface{}) {
 	printResponse(resp)
 }
 
+func doPatch(path string, body interface{}) {
+	data, err := json.Marshal(body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to encode request body: %v\n", err)
+		os.Exit(1)
+	}
+	req, _ := http.NewRequest("PATCH", baseURL+armPath(path), bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	printResponse(resp)
+}
+
 func doPutRaw(path string, contentType string, data []byte) {
 	req, _ := http.NewRequest("PUT", baseURL+armPath(path), bytes.NewReader(data))
 	req.Header.Set("Content-Type", contentType)
@@ -280,6 +361,18 @@ func doPutRaw(path string, contentType string, data []byte) {
 	} else {
 		printResponse(resp)
 	}
+}
+
+func doPutRawResponse(path string, contentType string, data []byte) {
+	req, _ := http.NewRequest("PUT", baseURL+armPath(path), bytes.NewReader(data))
+	req.Header.Set("Content-Type", contentType)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	printResponse(resp)
 }
 
 func doDelete(path string) {
@@ -316,17 +409,19 @@ func printResponse(resp *http.Response) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to read response: %v\n", err)
-		return
+		os.Exit(1)
 	}
-	if len(body) == 0 {
-		return
+	if len(body) > 0 {
+		// Pretty print JSON
+		var out bytes.Buffer
+		if json.Indent(&out, body, "", "  ") == nil {
+			fmt.Println(out.String())
+		} else {
+			fmt.Println(string(body))
+		}
 	}
-	// Pretty print JSON
-	var out bytes.Buffer
-	if json.Indent(&out, body, "", "  ") == nil {
-		fmt.Println(out.String())
-	} else {
-		fmt.Println(string(body))
+	if resp.StatusCode >= 400 {
+		os.Exit(1)
 	}
 }
 
@@ -368,15 +463,72 @@ func handleGroup(args []string) {
 // --- Key Vault ---
 
 func handleKeyVault(args []string) {
-	if len(args) < 2 {
+	if len(args) < 1 {
+		fmt.Println("Usage: azlocal keyvault <vault|secret> <subcommand> [flags]")
+		return
+	}
+	switch args[0] {
+	case "vault":
+		handleKeyVaultVault(args[1:])
+	case "secret":
+		handleKeyVaultSecret(args[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: keyvault %s\n", args[0])
+	}
+}
+
+func handleKeyVaultVault(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: azlocal keyvault vault <create|show|list|delete|update> [flags]")
+		return
+	}
+	s := sub(args)
+	rg := requireFlag(args, "resource-group")
+	switch args[0] {
+	case "create":
+		name := requireFlag(args, "name")
+		location := getFlag(args, "location")
+		if location == "" {
+			location = "eastus"
+		}
+		body := map[string]interface{}{
+			"location": location,
+			"tags":     parseTags(getFlag(args, "tags")),
+			"properties": map[string]interface{}{
+				"tenantId":                  "00000000-0000-0000-0000-000000000000",
+				"sku":                       map[string]interface{}{"family": "A", "name": "standard"},
+				"accessPolicies":            []interface{}{},
+				"enableSoftDelete":          true,
+				"softDeleteRetentionInDays": 90,
+			},
+		}
+		doPut("/subscriptions/"+s+"/resourceGroups/"+rg+"/providers/Microsoft.KeyVault/vaults/"+name, body)
+	case "update":
+		name := requireFlag(args, "name")
+		body := map[string]interface{}{}
+		if tags := getFlag(args, "tags"); tags != "" {
+			body["tags"] = parseTags(tags)
+		}
+		doPatch("/subscriptions/"+s+"/resourceGroups/"+rg+"/providers/Microsoft.KeyVault/vaults/"+name, body)
+	case "show":
+		name := requireFlag(args, "name")
+		doGet("/subscriptions/" + s + "/resourceGroups/" + rg + "/providers/Microsoft.KeyVault/vaults/" + name)
+	case "list":
+		doGet("/subscriptions/" + s + "/resourceGroups/" + rg + "/providers/Microsoft.KeyVault/vaults")
+	case "delete":
+		name := requireFlag(args, "name")
+		doDelete("/subscriptions/" + s + "/resourceGroups/" + rg + "/providers/Microsoft.KeyVault/vaults/" + name)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: keyvault vault %s\n", args[0])
+	}
+}
+
+func handleKeyVaultSecret(args []string) {
+	if len(args) < 1 {
 		fmt.Println("Usage: azlocal keyvault secret <set|show|list|delete> [flags]")
 		return
 	}
-	if args[0] != "secret" {
-		fmt.Fprintf(os.Stderr, "Unknown subcommand: keyvault %s\n", args[0])
-		return
-	}
-	switch args[1] {
+	switch args[0] {
 	case "set":
 		vault := requireFlag(args, "vault")
 		name := requireFlag(args, "name")
@@ -393,6 +545,8 @@ func handleKeyVault(args []string) {
 		vault := requireFlag(args, "vault")
 		name := requireFlag(args, "name")
 		doDelete("/keyvault/" + vault + "/secrets/" + name)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: keyvault secret %s\n", args[0])
 	}
 }
 
@@ -473,7 +627,7 @@ func handleStorageBlob(args []string) {
 
 func handleStorageAccount(args []string) {
 	if len(args) == 0 {
-		fmt.Println(`Usage: azlocal storage account <create|list|show|delete|list-keys> [flags]`)
+		fmt.Println(`Usage: azlocal storage account <create|list|show|delete|list-keys|management-policy> [flags]`)
 		return
 	}
 	rg := requireFlag(args, "resource-group")
@@ -509,9 +663,56 @@ func handleStorageAccount(args []string) {
 	case "list-keys":
 		name := requireFlag(args, "name")
 		doPost(base+"/"+name+"/listKeys", nil)
+	case "management-policy":
+		handleStorageAccountManagementPolicy(args[1:], base)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown subcommand: storage account %s\n", args[0])
 	}
+}
+
+func handleStorageAccountManagementPolicy(args []string, accountBase string) {
+	if len(args) == 0 {
+		fmt.Println(`Usage: azlocal storage account management-policy <create|update|show|delete> [flags]`)
+		return
+	}
+
+	account := getFlag(args, "account-name")
+	if account == "" {
+		account = requireFlag(args, "name")
+	}
+	path := accountBase + "/" + account + "/managementPolicies/default"
+
+	switch args[0] {
+	case "create", "update":
+		policy := requireFlag(args, "policy")
+		doPutRawResponse(path, "application/json", readPolicyJSON(policy))
+	case "show":
+		doGet(path)
+	case "delete":
+		doDelete(path)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: storage account management-policy %s\n", args[0])
+	}
+}
+
+func readPolicyJSON(policy string) []byte {
+	if strings.HasPrefix(policy, "@") {
+		data, err := os.ReadFile(strings.TrimPrefix(policy, "@"))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading policy: %v\n", err)
+			os.Exit(1)
+		}
+		return data
+	}
+	if _, err := os.Stat(policy); err == nil {
+		data, err := os.ReadFile(policy)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading policy: %v\n", err)
+			os.Exit(1)
+		}
+		return data
+	}
+	return []byte(policy)
 }
 
 // --- Network ---
@@ -519,12 +720,34 @@ func handleStorageAccount(args []string) {
 func handleNetwork(args []string) {
 	if len(args) < 2 {
 		fmt.Println("Usage: azlocal network vnet <create|show|list|delete> [flags]")
+		fmt.Println("       azlocal network vnet subnet <create|show|list|delete|update> [flags]")
+		fmt.Println("       azlocal network nsg <create|show|list|delete> [flags]")
+		fmt.Println("       azlocal network nsg rule <create|show|list|delete> [flags]")
+		fmt.Println("       azlocal network lb <create|show|list|delete> [flags]")
+		fmt.Println("       azlocal network lb rule|probe <list|show> [flags]")
 		return
 	}
-	if args[0] != "vnet" {
+	switch args[0] {
+	case "nsg":
+		handleNetworkNSG(args[1:])
+		return
+	case "lb":
+		handleNetworkLB(args[1:])
+		return
+	case "vnet":
+		// handled below
+	default:
 		fmt.Fprintf(os.Stderr, "Unknown subcommand: network %s\n", args[0])
+		os.Exit(1)
+	}
+
+	// Dispatch the `subnet` subcommand group before consuming the vnet flags,
+	// because subnet commands use --vnet-name (not --name) to identify the parent VNet.
+	if args[1] == "subnet" {
+		handleNetworkSubnet(args[2:])
 		return
 	}
+
 	rg := requireFlag(args, "resource-group")
 	s := sub(args)
 	base := "/subscriptions/" + s + "/resourceGroups/" + rg + "/providers/Microsoft.Network/virtualNetworks"
@@ -552,18 +775,264 @@ func handleNetwork(args []string) {
 	case "delete":
 		name := requireFlag(args, "name")
 		doDelete(base + "/" + name)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: network vnet %s\n", args[1])
+		os.Exit(1)
+	}
+}
+
+// handleNetworkSubnet implements `azlocal network vnet subnet <action>`,
+// mirroring the upstream `az network vnet subnet` flag names.
+func handleNetworkSubnet(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: azlocal network vnet subnet <create|show|list|delete|update> [flags]")
+		return
+	}
+	rg := requireFlag(args, "resource-group")
+	vnet := requireFlag(args, "vnet-name")
+	s := sub(args)
+	base := "/subscriptions/" + s + "/resourceGroups/" + rg +
+		"/providers/Microsoft.Network/virtualNetworks/" + vnet + "/subnets"
+
+	switch args[0] {
+	case "create", "update":
+		name := requireFlag(args, "name")
+		prefixes := getFlag(args, "address-prefixes")
+		props := map[string]interface{}{}
+		if prefixes != "" {
+			// `az` accepts a space-separated list of CIDRs; mimic that here.
+			parts := strings.Fields(prefixes)
+			props["addressPrefixes"] = parts
+			if len(parts) > 0 {
+				props["addressPrefix"] = parts[0]
+			}
+		} else if args[0] == "create" {
+			fmt.Fprintln(os.Stderr, "Error: --address-prefixes is required")
+			os.Exit(1)
+		}
+		doPut(base+"/"+name, map[string]interface{}{
+			"properties": props,
+		})
+	case "show":
+		name := requireFlag(args, "name")
+		doGet(base + "/" + name)
+	case "list":
+		doGet(base)
+	case "delete":
+		name := requireFlag(args, "name")
+		doDelete(base + "/" + name)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: network vnet subnet %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+// handleNetworkNSG implements `azlocal network nsg <action>`,
+// mirroring upstream `az network nsg`. The `rule` subgroup is dispatched
+// to handleNetworkNSGRule because it uses --nsg-name (not --name) to
+// identify the parent NSG.
+func handleNetworkNSG(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: azlocal network nsg <create|show|list|delete> [flags]")
+		fmt.Println("       azlocal network nsg rule <create|show|list|delete> [flags]")
+		return
+	}
+	if args[0] == "rule" {
+		handleNetworkNSGRule(args[1:])
+		return
+	}
+
+	rg := requireFlag(args, "resource-group")
+	s := sub(args)
+	base := "/subscriptions/" + s + "/resourceGroups/" + rg +
+		"/providers/Microsoft.Network/networkSecurityGroups"
+
+	switch args[0] {
+	case "create":
+		name := requireFlag(args, "name")
+		body := map[string]interface{}{
+			"location":   getFlag(args, "location"),
+			"properties": map[string]interface{}{},
+		}
+		doPut(base+"/"+name, body)
+	case "show":
+		name := requireFlag(args, "name")
+		doGet(base + "/" + name)
+	case "list":
+		doGet(base)
+	case "delete":
+		name := requireFlag(args, "name")
+		doDelete(base + "/" + name)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: network nsg %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+// handleNetworkNSGRule implements `azlocal network nsg rule <action>`,
+// mirroring upstream `az network nsg rule` flag names.
+func handleNetworkNSGRule(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: azlocal network nsg rule <create|show|list|delete> [flags]")
+		return
+	}
+	rg := requireFlag(args, "resource-group")
+	nsg := requireFlag(args, "nsg-name")
+	s := sub(args)
+	base := "/subscriptions/" + s + "/resourceGroups/" + rg +
+		"/providers/Microsoft.Network/networkSecurityGroups/" + nsg + "/securityRules"
+
+	switch args[0] {
+	case "create":
+		name := requireFlag(args, "name")
+		doPut(base+"/"+name, map[string]interface{}{
+			"properties": map[string]interface{}{},
+		})
+	case "show":
+		name := requireFlag(args, "name")
+		doGet(base + "/" + name)
+	case "list":
+		doGet(base)
+	case "delete":
+		name := requireFlag(args, "name")
+		doDelete(base + "/" + name)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: network nsg rule %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+// handleNetworkLB implements `azlocal network lb <action>`, mirroring
+// upstream `az network lb`. The `rule` and `probe` subgroups use
+// --lb-name (not --name) to identify the parent load balancer, so they
+// are dispatched separately.
+func handleNetworkLB(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: azlocal network lb <create|show|list|delete> [flags]")
+		fmt.Println("       azlocal network lb rule|probe <list|show> [flags]")
+		return
+	}
+	switch args[0] {
+	case "rule":
+		handleNetworkLBChild(args[1:], "loadBalancingRules", "network lb rule")
+		return
+	case "probe":
+		handleNetworkLBChild(args[1:], "probes", "network lb probe")
+		return
+	}
+
+	rg := requireFlag(args, "resource-group")
+	s := sub(args)
+	base := "/subscriptions/" + s + "/resourceGroups/" + rg +
+		"/providers/Microsoft.Network/loadBalancers"
+
+	switch args[0] {
+	case "create":
+		name := requireFlag(args, "name")
+		body := map[string]interface{}{
+			"location":   getFlag(args, "location"),
+			"properties": map[string]interface{}{},
+		}
+		if sku := getFlag(args, "sku"); sku != "" {
+			body["sku"] = map[string]string{"name": sku}
+		}
+		doPut(base+"/"+name, body)
+	case "show":
+		name := requireFlag(args, "name")
+		doGet(base + "/" + name)
+	case "list":
+		doGet(base)
+	case "delete":
+		name := requireFlag(args, "name")
+		doDelete(base + "/" + name)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: network lb %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+// handleNetworkLBChild implements the `rule` and `probe` LB subgroups,
+// which both follow the same {sub-path}/{name} pattern under the parent LB.
+func handleNetworkLBChild(args []string, subPath, label string) {
+	if len(args) == 0 {
+		fmt.Printf("Usage: azlocal %s <list|show> [flags]\n", label)
+		return
+	}
+	rg := requireFlag(args, "resource-group")
+	lb := requireFlag(args, "lb-name")
+	s := sub(args)
+	base := "/subscriptions/" + s + "/resourceGroups/" + rg +
+		"/providers/Microsoft.Network/loadBalancers/" + lb + "/" + subPath
+
+	switch args[0] {
+	case "list":
+		doGet(base)
+	case "show":
+		name := requireFlag(args, "name")
+		doGet(base + "/" + name)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: %s %s\n", label, args[0])
+		os.Exit(1)
 	}
 }
 
 // --- Cosmos DB ---
 
 func handleCosmosDB(args []string) {
-	if len(args) < 2 {
-		fmt.Println("Usage: azlocal cosmosdb doc <create|show|list|delete> [flags]")
+	if len(args) == 0 {
+		fmt.Println(`Usage:
+  azlocal cosmosdb <create|show|list|delete> [flags]
+  azlocal cosmosdb doc <create|show|list|delete> [flags]
+  azlocal cosmosdb table <create|show|list|delete> [flags]
+  azlocal cosmosdb table throughput <show|update> [flags]`)
 		return
 	}
-	if args[0] != "doc" {
+	switch args[0] {
+	case "doc":
+		handleCosmosDBDoc(args[1:])
+	case "table":
+		handleCosmosDBTable(args[1:])
+	case "create", "show", "list", "delete":
+		handleCosmosDBAccount(args)
+	default:
 		fmt.Fprintf(os.Stderr, "Unknown subcommand: cosmosdb %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+// handleCosmosDBAccount implements account-level `azlocal cosmosdb
+// <create|show|list|delete>`, mirroring upstream `az cosmosdb`.
+func handleCosmosDBAccount(args []string) {
+	rg := requireFlag(args, "resource-group")
+	s := sub(args)
+	base := "/subscriptions/" + s + "/resourceGroups/" + rg +
+		"/providers/Microsoft.DocumentDB/databaseAccounts"
+
+	switch args[0] {
+	case "create":
+		name := requireFlag(args, "name")
+		body := map[string]interface{}{
+			"location":   getFlag(args, "location"),
+			"properties": map[string]interface{}{},
+		}
+		if kind := getFlag(args, "kind"); kind != "" {
+			body["kind"] = kind
+		}
+		doPut(base+"/"+name, body)
+	case "show":
+		name := requireFlag(args, "name")
+		doGet(base + "/" + name)
+	case "list":
+		doGet(base)
+	case "delete":
+		name := requireFlag(args, "name")
+		doDelete(base + "/" + name)
+	}
+}
+
+func handleCosmosDBDoc(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: azlocal cosmosdb doc <create|show|list|delete> [flags]")
 		return
 	}
 	account := requireFlag(args, "account")
@@ -571,7 +1040,7 @@ func handleCosmosDB(args []string) {
 	coll := requireFlag(args, "collection")
 	base := "/cosmosdb/" + account + "/dbs/" + db + "/colls/" + coll + "/docs"
 
-	switch args[1] {
+	switch args[0] {
 	case "create":
 		id := requireFlag(args, "id")
 		data := getFlag(args, "data")
@@ -589,7 +1058,120 @@ func handleCosmosDB(args []string) {
 	case "delete":
 		id := requireFlag(args, "id")
 		doDelete(base + "/" + id)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: cosmosdb doc %s\n", args[0])
 	}
+}
+
+func handleCosmosDBTable(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: azlocal cosmosdb table <create|show|list|delete|throughput> [flags]")
+		return
+	}
+	if args[0] == "throughput" {
+		handleCosmosDBTableThroughput(args[1:])
+		return
+	}
+
+	rg := requireFlag(args, "resource-group")
+	account := requireFlag(args, "account")
+	base := "/subscriptions/" + sub(args) + "/resourceGroups/" + rg + "/providers/Microsoft.DocumentDB/databaseAccounts/" + account + "/tables"
+
+	switch args[0] {
+	case "create":
+		name := requireFlag(args, "name")
+		doPut(base+"/"+name, buildCosmosDBTableBody(args, name))
+	case "show":
+		name := requireFlag(args, "name")
+		doGet(base + "/" + name)
+	case "list":
+		doGet(base)
+	case "delete":
+		name := requireFlag(args, "name")
+		doDelete(base + "/" + name)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: cosmosdb table %s\n", args[0])
+	}
+}
+
+func buildCosmosDBTableBody(args []string, name string) map[string]interface{} {
+	body := map[string]interface{}{
+		"properties": map[string]interface{}{
+			"resource": map[string]interface{}{"id": name},
+		},
+	}
+	if data := getFlag(args, "data"); data != "" {
+		json.Unmarshal([]byte(data), &body)
+	}
+	if location := getFlag(args, "location"); location != "" {
+		body["location"] = location
+	}
+	if throughput := getFlag(args, "throughput"); throughput != "" {
+		props, _ := body["properties"].(map[string]interface{})
+		if props == nil {
+			props = map[string]interface{}{}
+			body["properties"] = props
+		}
+		options, _ := props["options"].(map[string]interface{})
+		if options == nil {
+			options = map[string]interface{}{}
+			props["options"] = options
+		}
+		options["throughput"] = parseIntFlag(throughput)
+	}
+	return body
+}
+
+func handleCosmosDBTableThroughput(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: azlocal cosmosdb table throughput <show|update> [flags]")
+		return
+	}
+	rg := requireFlag(args, "resource-group")
+	account := requireFlag(args, "account")
+	name := requireFlag(args, "name")
+	base := "/subscriptions/" + sub(args) + "/resourceGroups/" + rg + "/providers/Microsoft.DocumentDB/databaseAccounts/" + account + "/tables/" + name + "/throughputSettings/default"
+
+	switch args[0] {
+	case "show":
+		doGet(base)
+	case "update":
+		doPut(base, buildCosmosDBTableThroughputBody(args))
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: cosmosdb table throughput %s\n", args[0])
+	}
+}
+
+func buildCosmosDBTableThroughputBody(args []string) map[string]interface{} {
+	body := map[string]interface{}{
+		"properties": map[string]interface{}{
+			"resource": map[string]interface{}{},
+		},
+	}
+	if data := getFlag(args, "data"); data != "" {
+		json.Unmarshal([]byte(data), &body)
+	}
+	if throughput := getFlag(args, "throughput"); throughput != "" {
+		props, _ := body["properties"].(map[string]interface{})
+		if props == nil {
+			props = map[string]interface{}{}
+			body["properties"] = props
+		}
+		resource, _ := props["resource"].(map[string]interface{})
+		if resource == nil {
+			resource = map[string]interface{}{}
+			props["resource"] = resource
+		}
+		resource["throughput"] = parseIntFlag(throughput)
+	}
+	return body
+}
+
+func parseIntFlag(value string) interface{} {
+	if i, err := strconv.Atoi(value); err == nil {
+		return i
+	}
+	return value
 }
 
 // --- Service Bus ---
@@ -637,12 +1219,20 @@ func handleServiceBus(args []string) {
 // --- App Config ---
 
 func handleAppConfig(args []string) {
-	if len(args) < 2 {
-		fmt.Println("Usage: azlocal appconfig kv <set|show|list|delete> [flags]")
+	if len(args) == 0 {
+		fmt.Println("Usage: azlocal appconfig <store|kv> <operation> [flags]")
+		return
+	}
+	if args[0] == "store" {
+		handleAppConfigStore(args[1:])
 		return
 	}
 	if args[0] != "kv" {
 		fmt.Fprintf(os.Stderr, "Unknown subcommand: appconfig %s\n", args[0])
+		return
+	}
+	if len(args) < 2 {
+		fmt.Println("Usage: azlocal appconfig kv <set|show|list|delete> [flags]")
 		return
 	}
 	store := requireFlag(args, "store")
@@ -662,6 +1252,215 @@ func handleAppConfig(args []string) {
 		key := requireFlag(args, "key")
 		doDelete(base + "/" + key)
 	}
+}
+
+func handleAppConfigStore(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: azlocal appconfig store <create|list|show|delete|list-keys> [flags]")
+		return
+	}
+	rg := requireFlag(args, "resource-group")
+	base := "/subscriptions/" + sub(args) + "/resourceGroups/" + rg + "/providers/Microsoft.AppConfiguration/configurationStores"
+
+	switch args[0] {
+	case "create":
+		name := requireFlag(args, "name")
+		location := getFlag(args, "location")
+		if location == "" {
+			location = "eastus"
+		}
+		sku := getFlag(args, "sku")
+		if sku == "" {
+			sku = "free"
+		}
+		doPut(base+"/"+name, map[string]interface{}{
+			"location": location,
+			"sku": map[string]string{
+				"name": sku,
+			},
+		})
+	case "list":
+		doGet(base)
+	case "show":
+		name := requireFlag(args, "name")
+		doGet(base + "/" + name)
+	case "delete":
+		name := requireFlag(args, "name")
+		doDelete(base + "/" + name)
+	case "list-keys":
+		name := requireFlag(args, "name")
+		doPost(base+"/"+name+"/listKeys", nil)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: appconfig store %s\n", args[0])
+	}
+}
+
+// --- Resource Providers ---
+
+func handleProvider(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: azlocal provider <list|show|register> [flags]")
+		return
+	}
+	s := sub(args)
+	switch args[0] {
+	case "list":
+		doGet("/subscriptions/" + s + "/providers")
+	case "show":
+		namespace := requireFlag(args, "namespace")
+		doGet("/subscriptions/" + s + "/providers/" + namespace)
+	case "register":
+		namespace := requireFlag(args, "namespace")
+		doPost("/subscriptions/"+s+"/providers/"+namespace+"/register", nil)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: provider %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+// --- RBAC ---
+
+var builtinRoleDefinitionIDs = map[string]string{
+	"reader":                        "acdd72a7-3385-48ef-bd42-f606fba81ae7",
+	"contributor":                   "b24988ac-6180-42a0-ab88-20f7382dd24c",
+	"owner":                         "8e3af657-a8ff-443c-a75c-2fe8c4bcb635",
+	"storage blob data reader":      "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1",
+	"storage blob data contributor": "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+	"key vault secrets user":        "4633458b-17de-408a-b874-0445c86b69e6",
+	"key vault secrets officer":     "b86a8fe4-44ce-4948-aee5-eccb2c155cd7",
+	"app configuration data reader": "516239f1-63e1-4d78-a4de-a74fb236a071",
+	"cosmos db account reader role": "fbdf93bf-df7d-467e-a4d2-9458aa1360c8",
+}
+
+func handleRole(args []string) {
+	if len(args) < 2 {
+		fmt.Println("Usage: azlocal role <assignment|definition> <create|list|show|delete> [flags]")
+		return
+	}
+	switch args[0] {
+	case "assignment":
+		handleRoleAssignment(args[1:])
+	case "definition":
+		handleRoleDefinition(args[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: role %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+func handleRoleAssignment(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: azlocal role assignment <create|list|show|delete> [flags]")
+		return
+	}
+	scope := roleScope(args)
+	base := scope + "/providers/Microsoft.Authorization/roleAssignments"
+	switch args[0] {
+	case "create":
+		principalID := firstNonEmpty(getFlag(args, "assignee"), getFlag(args, "principal-id"))
+		if principalID == "" {
+			fmt.Fprintln(os.Stderr, "Error: --assignee is required")
+			os.Exit(1)
+		}
+		roleDefinitionID := roleDefinitionID(scope, firstNonEmpty(getFlag(args, "role-definition-id"), getFlag(args, "role")))
+		if roleDefinitionID == "" {
+			fmt.Fprintln(os.Stderr, "Error: --role or --role-definition-id is required")
+			os.Exit(1)
+		}
+		name := getFlag(args, "name")
+		if name == "" {
+			name = deterministicGUID(scope + "|" + principalID + "|" + roleDefinitionID)
+		}
+		principalType := getFlag(args, "principal-type")
+		if principalType == "" {
+			principalType = "ServicePrincipal"
+		}
+		doPut(base+"/"+name, map[string]interface{}{
+			"properties": map[string]interface{}{
+				"principalId":      principalID,
+				"principalType":    principalType,
+				"roleDefinitionId": roleDefinitionID,
+			},
+		})
+	case "list":
+		doGet(base)
+	case "show":
+		name := requireFlag(args, "name")
+		doGet(base + "/" + name)
+	case "delete":
+		name := requireFlag(args, "name")
+		doDelete(base + "/" + name)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: role assignment %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+func handleRoleDefinition(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: azlocal role definition <create|list|show|delete> [flags]")
+		return
+	}
+	scope := roleScope(args)
+	base := scope + "/providers/Microsoft.Authorization/roleDefinitions"
+	switch args[0] {
+	case "create":
+		name := requireFlag(args, "name")
+		roleName := firstNonEmpty(getFlag(args, "role-name"), name)
+		doPut(base+"/"+name, map[string]interface{}{
+			"properties": map[string]interface{}{
+				"roleName":         roleName,
+				"type":             "CustomRole",
+				"description":      getFlag(args, "description"),
+				"assignableScopes": []interface{}{scope},
+				"permissions":      []interface{}{},
+			},
+		})
+	case "list":
+		path := base
+		if name := getFlag(args, "name"); name != "" {
+			path += "?$filter=" + url.QueryEscape("roleName eq '"+name+"'")
+		}
+		doGet(path)
+	case "show":
+		name := requireFlag(args, "name")
+		if id := builtinRoleDefinitionIDs[strings.ToLower(name)]; id != "" {
+			name = id
+		}
+		doGet(base + "/" + name)
+	case "delete":
+		name := requireFlag(args, "name")
+		doDelete(base + "/" + name)
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: role definition %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+func roleScope(args []string) string {
+	if scope := getFlag(args, "scope"); scope != "" {
+		return scope
+	}
+	return "/subscriptions/" + sub(args)
+}
+
+func roleDefinitionID(scope, role string) string {
+	if role == "" {
+		return ""
+	}
+	if strings.HasPrefix(role, "/") {
+		return role
+	}
+	id := builtinRoleDefinitionIDs[strings.ToLower(role)]
+	if id == "" {
+		id = role
+	}
+	return scope + "/providers/Microsoft.Authorization/roleDefinitions/" + id
+}
+
+func deterministicGUID(seed string) string {
+	sum := sha1.Sum([]byte(seed))
+	return fmt.Sprintf("%x-%x-%x-%x-%x", sum[0:4], sum[4:6], sum[6:8], sum[8:10], sum[10:16])
 }
 
 // --- Functions ---

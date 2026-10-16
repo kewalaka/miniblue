@@ -95,6 +95,7 @@ var supportedProviders = []string{
 	"Microsoft.Resources",
 	"Microsoft.Storage",
 	"Microsoft.Network",
+	"Microsoft.Compute",
 	"Microsoft.KeyVault",
 	"Microsoft.DocumentDB",
 	"Microsoft.ServiceBus",
@@ -115,6 +116,60 @@ func providerEntry(namespace string) map[string]interface{} {
 		"id":                "/subscriptions/00000000-0000-0000-0000-000000000000/providers/" + namespace,
 		"namespace":         namespace,
 		"registrationState": "Registered",
-		"resourceTypes":     []interface{}{},
+		"resourceTypes":     providerResourceTypes(namespace),
+	}
+}
+
+func providerResourceTypes(namespace string) []interface{} {
+	switch namespace {
+	case "Microsoft.Storage":
+		return []interface{}{
+			map[string]interface{}{
+				"resourceType": "storageAccounts",
+				"locations":    []interface{}{"eastus", "westus2"},
+				"apiVersions": []interface{}{
+					"2023-05-01",
+					"2023-01-01",
+					"2022-05-01-preview",
+				},
+			},
+		}
+	case "Microsoft.KeyVault":
+		return []interface{}{
+			map[string]interface{}{
+				"resourceType": "vaults",
+				"locations":    []interface{}{"eastus", "westus2"},
+				"apiVersions": []interface{}{
+					"2023-07-01",
+					"2023-02-01",
+				},
+			},
+		}
+	case "Microsoft.DocumentDB":
+		return []interface{}{
+			map[string]interface{}{
+				"resourceType": "databaseAccounts",
+				"locations":    []interface{}{"eastus", "westus2"},
+				"apiVersions": []interface{}{
+					"2023-04-15",
+				},
+			},
+			map[string]interface{}{
+				"resourceType": "databaseAccounts/tables",
+				"locations":    []interface{}{"eastus", "westus2"},
+				"apiVersions": []interface{}{
+					"2023-04-15",
+				},
+			},
+			map[string]interface{}{
+				"resourceType": "databaseAccounts/sqlDatabases",
+				"locations":    []interface{}{"eastus", "westus2"},
+				"apiVersions": []interface{}{
+					"2023-04-15",
+				},
+			},
+		}
+	default:
+		return []interface{}{}
 	}
 }

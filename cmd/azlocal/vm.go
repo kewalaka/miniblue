@@ -64,7 +64,11 @@ func vmFail(m map[string]interface{}, status int) {
 
 func handleVM(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: azlocal vm <create|list|show|delete|start|stop|restart|deploy|services|service-delete|logs|ssh|run-command|identity-assign|identity-remove> [flags]")
+		fmt.Println("Usage: azlocal vm <create|update|list|show|delete|start|stop|restart|deallocate|redeploy|get-instance-view|extension|deploy|services|service-delete|logs|ssh|run-command|identity-assign|identity-remove> [flags]")
+		return
+	}
+	if args[0] == "extension" {
+		handleVMExtension(args[1:])
 		return
 	}
 	s := sub(args)
@@ -73,32 +77,11 @@ func handleVM(args []string) {
 	case "create":
 		rg := requireFlag(args, "resource-group")
 		name := requireFlag(args, "name")
-		props := map[string]interface{}{}
-		if image := getFlag(args, "image"); image != "" {
-			props["miniblue"] = map[string]interface{}{"image": image}
-		}
-		if size := getFlag(args, "vm-size"); size != "" {
-			props["hardwareProfile"] = map[string]interface{}{"vmSize": size}
-		}
-		location := getFlag(args, "location")
-		if location == "" {
-			location = "eastus"
-		}
-		body := map[string]interface{}{
-			"location":   location,
-			"properties": props,
-		}
-		if ids := getFlagAll(args, "identity"); len(ids) > 0 {
-			assignments := map[string]interface{}{}
-			for _, id := range ids {
-				assignments[identityARMID(s, rg, id)] = map[string]interface{}{}
-			}
-			body["identity"] = map[string]interface{}{
-				"type":                   "UserAssigned",
-				"userAssignedIdentities": assignments,
-			}
-		}
-		doPut(vmBase(s, rg)+"/"+name, body)
+		doPut(vmBase(s, rg)+"/"+name, buildVMBody(s, rg, name, args, true))
+	case "update":
+		rg := requireFlag(args, "resource-group")
+		name := requireFlag(args, "name")
+		doPatch(vmBase(s, rg)+"/"+name, buildVMBody(s, rg, name, args, false))
 	case "list":
 		if rg := getFlag(args, "resource-group"); rg != "" {
 			doGet(vmBase(s, rg))
@@ -107,14 +90,21 @@ func handleVM(args []string) {
 		}
 	case "show":
 		rg := requireFlag(args, "resource-group")
-		doGet(vmBase(s, rg) + "/" + requireFlag(args, "name"))
+		path := vmBase(s, rg) + "/" + requireFlag(args, "name")
+		if hasFlag(args, "show-details") {
+			path += "?$expand=instanceView"
+		}
+		doGet(path)
+	case "get-instance-view":
+		rg := requireFlag(args, "resource-group")
+		doGet(vmBase(s, rg) + "/" + requireFlag(args, "name") + "/instanceView")
 	case "delete":
 		rg := requireFlag(args, "resource-group")
 		doDelete(vmBase(s, rg) + "/" + requireFlag(args, "name"))
-	case "start", "restart":
+	case "start", "restart", "deallocate", "redeploy":
 		rg := requireFlag(args, "resource-group")
 		doPost(vmBase(s, rg)+"/"+requireFlag(args, "name")+"/"+args[0], map[string]interface{}{})
-	case "stop":
+	case "stop", "power-off", "poweroff":
 		rg := requireFlag(args, "resource-group")
 		doPost(vmBase(s, rg)+"/"+requireFlag(args, "name")+"/powerOff", map[string]interface{}{})
 	case "deploy":
@@ -180,6 +170,125 @@ func handleVM(args []string) {
 		fmt.Fprintf(os.Stderr, "Unknown subcommand: vm %s\n", args[0])
 		os.Exit(1)
 	}
+}
+
+// buildVMBody builds a PUT (create=true) or PATCH (create=false) body from flags.
+// --image is a container image (properties.miniblue.image), not an Azure image reference.
+func buildVMBody(s, rg, name string, args []string, create bool) map[string]interface{} {
+	props := map[string]interface{}{}
+	if image := getFlag(args, "image"); image != "" {
+		props["miniblue"] = map[string]interface{}{"image": image}
+	}
+	if size := firstNonEmpty(getFlag(args, "vm-size"), getFlag(args, "size")); size != "" {
+		props["hardwareProfile"] = map[string]interface{}{"vmSize": size}
+	}
+	osProfile := map[string]interface{}{}
+	if create {
+		osProfile["computerName"] = name
+	}
+	if v := getFlag(args, "admin-username"); v != "" {
+		osProfile["adminUsername"] = v
+	}
+	if v := getFlag(args, "admin-password"); v != "" {
+		osProfile["adminPassword"] = v
+	}
+	if len(osProfile) > 0 {
+		props["osProfile"] = osProfile
+	}
+	if nics := firstNonEmpty(getFlag(args, "nics"), getFlag(args, "nic")); nics != "" {
+		props["networkProfile"] = map[string]interface{}{
+			"networkInterfaces": vmNICRefs(s, rg, nics),
+		}
+	}
+
+	body := map[string]interface{}{"properties": props}
+	if location := getFlag(args, "location"); location != "" {
+		body["location"] = location
+	} else if create {
+		body["location"] = "eastus"
+	}
+	if ids := getFlagAll(args, "identity"); len(ids) > 0 {
+		assignments := map[string]interface{}{}
+		for _, id := range ids {
+			assignments[identityARMID(s, rg, id)] = map[string]interface{}{}
+		}
+		body["identity"] = map[string]interface{}{
+			"type":                   "UserAssigned",
+			"userAssignedIdentities": assignments,
+		}
+	}
+	return body
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// vmNICRefs turns a comma/space separated list of NIC names or ARM ids into references.
+func vmNICRefs(s, rg, nics string) []interface{} {
+	refs := []interface{}{}
+	for _, nic := range strings.Fields(strings.ReplaceAll(nics, ",", " ")) {
+		id := nic
+		if !strings.HasPrefix(id, "/") {
+			id = "/subscriptions/" + s + "/resourceGroups/" + rg + "/providers/Microsoft.Network/networkInterfaces/" + nic
+		}
+		refs = append(refs, map[string]interface{}{"id": id})
+	}
+	return refs
+}
+
+func handleVMExtension(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: azlocal vm extension <set|update|show|list|delete> --resource-group RG --vm-name VM [flags]")
+		return
+	}
+	rg := requireFlag(args, "resource-group")
+	vmName := requireFlag(args, "vm-name")
+	base := vmBase(sub(args), rg) + "/" + vmName + "/extensions"
+
+	switch args[0] {
+	case "set":
+		doPut(base+"/"+requireFlag(args, "name"), buildVMExtensionBody(args))
+	case "update":
+		doPatch(base+"/"+requireFlag(args, "name"), buildVMExtensionBody(args))
+	case "show":
+		doGet(base + "/" + requireFlag(args, "name"))
+	case "list":
+		doGet(base)
+	case "delete":
+		doDelete(base + "/" + requireFlag(args, "name"))
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: vm extension %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+func buildVMExtensionBody(args []string) map[string]interface{} {
+	props := map[string]interface{}{}
+	for _, flag := range []string{"publisher", "type"} {
+		if v := getFlag(args, flag); v != "" {
+			props[flag] = v
+		}
+	}
+	if v := getFlag(args, "type-handler-version"); v != "" {
+		props["typeHandlerVersion"] = v
+	}
+	for flag, key := range map[string]string{"settings": "settings", "protected-settings": "protectedSettings"} {
+		var value interface{}
+		if raw := getFlag(args, flag); raw != "" && json.Unmarshal([]byte(raw), &value) == nil {
+			props[key] = value
+		}
+	}
+	body := map[string]interface{}{"properties": props}
+	if location := getFlag(args, "location"); location != "" {
+		body["location"] = location
+	}
+	return body
 }
 
 func vmLogs(s, rg, name string, args []string) {
@@ -318,7 +427,7 @@ func vmIdentityUpdate(s, rg, name, armID string, assign bool) {
 
 func handleIdentity(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: azlocal identity <create|list|show|delete> [flags]")
+		fmt.Println("Usage: azlocal identity <create|list|show|update|delete> [flags]")
 		return
 	}
 	s := sub(args)
@@ -332,11 +441,18 @@ func handleIdentity(args []string) {
 		if location == "" {
 			location = "eastus"
 		}
-		doPut(base+"/"+name, map[string]interface{}{"location": location})
+		doPut(base+"/"+name, map[string]interface{}{
+			"location": location,
+			"tags":     parseTags(getFlag(args, "tags")),
+		})
 	case "list":
 		doGet(base)
 	case "show":
 		doGet(base + "/" + requireFlag(args, "name"))
+	case "update":
+		doPatch(base+"/"+requireFlag(args, "name"), map[string]interface{}{
+			"tags": parseTags(getFlag(args, "tags")),
+		})
 	case "delete":
 		doDelete(base + "/" + requireFlag(args, "name"))
 	default:

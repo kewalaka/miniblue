@@ -115,11 +115,50 @@ func TestVMImageMapping(t *testing.T) {
 		t.Fatalf("expected ubuntu:22.04, got %v", mb["image"])
 	}
 
-	// Present but unmappable reference → 400.
+	// Present but unmappable reference: only Docker needs a container image,
+	// so stub mode still records the VM (just without miniblue.image).
 	resp = doRequest(t, "PUT", vmURL(ts, "sub1", "rg1", "weird")+vmAV,
 		`{"location":"eastus","properties":{"storageProfile":{"imageReference":{"publisher":"MicrosoftWindowsServer","offer":"WindowsServer","sku":"2022-datacenter"}}}}`)
-	expectStatus(t, resp, 400)
+	expectStatus(t, resp, 201)
+	m = decodeJSON(t, resp)
 	resp.Body.Close()
+	mb = m["properties"].(map[string]interface{})["miniblue"].(map[string]interface{})
+	if _, ok := mb["image"]; ok {
+		t.Fatalf("expected no miniblue.image for an unmappable reference, got %v", mb["image"])
+	}
+}
+
+// An image outside the compute catalog is still accepted in stub mode, so its
+// OS and default OS disk size must come from the publisher, not the catalog.
+func TestVMWindowsImageOutsideCatalogGetsWindowsOSDisk(t *testing.T) {
+	ts := setupVMServer(t)
+	defer ts.Close()
+	createRG(t, ts, "sub1", "rg1")
+
+	resp := doRequest(t, "PUT", vmURL(ts, "sub1", "rg1", "win1")+vmAV, `{
+		"location":"eastus",
+		"properties":{"storageProfile":{
+			"imageReference":{"publisher":"MicrosoftWindowsServer","offer":"WindowsServer","sku":"2022-datacenter","version":"latest"},
+			"osDisk":{"createOption":"FromImage"}
+		}}
+	}`)
+	expectStatus(t, resp, 201)
+	vm := decodeJSON(t, resp)
+	resp.Body.Close()
+
+	osDisk := vm["properties"].(map[string]interface{})["storageProfile"].(map[string]interface{})["osDisk"].(map[string]interface{})
+	if osDisk["diskSizeGB"] != float64(127) {
+		t.Fatalf("expected default Windows osDisk.diskSizeGB to be 127, got %v", osDisk["diskSizeGB"])
+	}
+
+	resp = doRequest(t, "GET", ts.URL+"/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/disks/"+osDisk["name"].(string)+vmAV, "")
+	expectStatus(t, resp, 200)
+	disk := decodeJSON(t, resp)
+	resp.Body.Close()
+	diskProps := disk["properties"].(map[string]interface{})
+	if diskProps["osType"] != "Windows" || diskProps["diskSizeGB"] != float64(127) {
+		t.Fatalf("expected Windows/127 OS disk, got osType=%v diskSizeGB=%v", diskProps["osType"], diskProps["diskSizeGB"])
+	}
 }
 
 func TestVMListAndDelete(t *testing.T) {
@@ -174,13 +213,11 @@ func TestVMRuntimeOperationsRequireDocker(t *testing.T) {
 	expectStatus(t, resp, 201)
 	resp.Body.Close()
 
-	// Every Docker-dependent operation returns 409 DockerUnavailable in stub mode.
+	// Container-dependent operations return 409 DockerUnavailable in stub
+	// mode. Power actions only change the recorded state and still succeed.
 	checks := []struct {
 		method, url, body string
 	}{
-		{"POST", vmURL(ts, "sub1", "rg1", "web") + "/start" + vmAV, ""},
-		{"POST", vmURL(ts, "sub1", "rg1", "web") + "/powerOff" + vmAV, ""},
-		{"POST", vmURL(ts, "sub1", "rg1", "web") + "/restart" + vmAV, ""},
 		{"POST", vmURL(ts, "sub1", "rg1", "web") + "/runCommand" + vmAV, `{"commandId":"RunShellScript","script":["echo hi"]}`},
 		{"GET", vmURL(ts, "sub1", "rg1", "web") + "/logs" + vmAV, ""},
 		{"PUT", vmURL(ts, "sub1", "rg1", "web") + "/services/api" + vmAV, `{"properties":{"image":"nginx:alpine"}}`},

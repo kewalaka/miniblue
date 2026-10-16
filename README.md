@@ -27,7 +27,7 @@
 brew tap moabukar/tap && brew install miniblue
 
 # Or Docker
-docker run -p 4566:4566 -p 4567:4567 moabukar/miniblue:latest
+docker run -p 4566:4566 -p 443:4567 -p 4567:4567 moabukar/miniblue:latest
 ```
 
 Then interact with it:
@@ -43,7 +43,7 @@ No Azure account or credentials needed.
 
 ## What it does
 
-28 Azure services emulated behind a single port. Works with Terraform, Pulumi, Azure SDKs, and curl.
+32 Azure services emulated behind a single port. Works with Terraform, Pulumi, Azure SDKs, and curl.
 
 | Service | Service | Service |
 |---------|---------|---------|
@@ -54,14 +54,15 @@ No Azure account or credentials needed.
 | App Configuration | Managed Identity | DB for PostgreSQL |
 | DB for MySQL | Azure SQL Database | Azure Cache for Redis |
 | Container Instances | Kubernetes Service (AKS) | Public IP Addresses |
-| Network Security Groups | Load Balancer | Application Gateway |
-| Storage Accounts | Virtual Machines | |
+| Network Security Groups | Network Interfaces | Load Balancer |
+| Application Gateway | Storage Accounts | Virtual Machines |
+| Managed Disks | User-Assigned Identities | RBAC |
 
 ## How it compares
 
 | | LocalStack (AWS) | MiniStack (AWS) | Azurite (Azure) | miniblue |
 |---|---|---|---|---|
-| Services | 80+ | 36 | 3 (storage only) | **28** |
+| Services | 80+ | 36 | 3 (storage only) | **32** |
 | Docker image | ~1GB | ~200MB | ~300MB | **~8MB** |
 | Startup | ~10s | ~5s | ~3s | **<1s** |
 | Real backends | DynamoDB Local | RDS, S3, SQS | No | **Postgres, Redis, Docker** |
@@ -106,7 +107,7 @@ Real backends shell out to the host Docker daemon. The default `moabukar/miniblu
 ```bash
 docker build --target=full -t miniblue:full .
 docker run -v /var/run/docker.sock:/var/run/docker.sock \
-  -p 4566:4566 -p 4567:4567 \
+  -p 4566:4566 -p 443:4567 -p 4567:4567 \
   -e AKS_BACKEND=k3s miniblue:full
 ```
 

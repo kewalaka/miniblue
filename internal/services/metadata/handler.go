@@ -33,8 +33,8 @@ func (h *Handler) Endpoints(w http.ResponseWriter, r *http.Request) {
 	// github.com/hashicorp/go-azure-sdk/sdk/internal/metadata/client.go
 	// The azurerm Terraform provider unmarshals this response using those exact JSON tags.
 	endpoints := map[string]interface{}{
-		"name":    "AzureCloud",
-		"portal":  httpBase,
+		"name":   "AzureCloud",
+		"portal": httpBase,
 		"authentication": map[string]interface{}{
 			"loginEndpoint":    httpBase,
 			"audiences":        []string{httpBase},
@@ -49,7 +49,7 @@ func (h *Handler) Endpoints(w http.ResponseWriter, r *http.Request) {
 			"acrLoginServer":                      "localhost",
 			"sqlServerHostname":                   "localhost",
 			"azureDataLakeAnalyticsCatalogAndJob": "localhost",
-			"keyVaultDns":                         "localhost",
+			"keyVaultDns":                         "vault.azure.net",
 			"storage":                             "localhost:" + httpPort,
 			"azureFrontDoorEndpointSuffix":        "localhost",
 			"storageSyncEndpointSuffix":           "localhost",

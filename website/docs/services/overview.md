@@ -1,6 +1,6 @@
 # Services Overview
 
-miniblue emulates 28 Azure services on a single port. All services use in-memory storage and require no authentication.
+miniblue emulates 32 Azure services on a single port. All services use in-memory storage (or optional file/Postgres persistence) and require no authentication.
 
 ## Service status
 
@@ -10,7 +10,7 @@ miniblue emulates 28 Azure services on a single port. All services use in-memory
 | [Blob Storage](blob-storage.md) | `Microsoft.Storage` | Done | -- | Yes |
 | Table Storage | `Microsoft.Storage` | Done | -- | Yes |
 | Queue Storage | `Microsoft.Storage` | Done | -- | Yes |
-| [Key Vault](key-vault.md) | `Microsoft.KeyVault` | Done | -- | Yes |
+| [Key Vault](key-vault.md) | `Microsoft.KeyVault` | Done | Yes | Yes |
 | [Cosmos DB](cosmos-db.md) | `Microsoft.DocumentDB` | Done | -- | Yes |
 | [Service Bus](service-bus.md) | `Microsoft.ServiceBus` | Done | -- | Yes |
 | Azure Functions | `Microsoft.Web` | Done | Yes | -- |
@@ -29,9 +29,13 @@ miniblue emulates 28 Azure services on a single port. All services use in-memory
 | [Virtual Machines](virtual-machines.md) | `Microsoft.Compute` | Done | Yes | Yes (real Docker, opt-in) |
 | Public IP Addresses | `Microsoft.Network` | Done | Yes | -- |
 | Network Security Groups | `Microsoft.Network` | Done | Yes | -- |
+| [Network Interfaces](network-interfaces.md) | `Microsoft.Network` | Done | Yes | -- |
 | Load Balancer | `Microsoft.Network` | Done | Yes | -- |
 | Application Gateway | `Microsoft.Network` | Done | Yes | -- |
 | Storage Accounts | `Microsoft.Storage` | Done | Yes | -- |
+| [Managed Disks](managed-disks.md) | `Microsoft.Compute` | Done | Yes | -- |
+| [Managed Identity](managed-identity.md) (user-assigned) | `Microsoft.ManagedIdentity` | Done | Yes | -- |
+| [RBAC](rbac.md) | `Microsoft.Authorization` | Done | Yes | -- |
 
 ### What "ARM API" and "Data Plane" mean
 
@@ -40,7 +44,7 @@ miniblue emulates 28 Azure services on a single port. All services use in-memory
 
 ## Terraform compatibility
 
-The following resources work with `hashicorp/azurerm` provider v3.x:
+The following resources work with the `hashicorp/azurerm` provider (v3.x and v4.x):
 
 | Terraform Resource | miniblue Service |
 |--------------------|-----------------|
@@ -52,13 +56,24 @@ The following resources work with `hashicorp/azurerm` provider v3.x:
 | `azurerm_public_ip` | Public IP Addresses |
 | `azurerm_network_security_group` | Network Security Groups |
 | `azurerm_network_security_rule` | Network Security Groups |
+| `azurerm_network_interface` | Network Interfaces |
 | `azurerm_lb` | Load Balancer |
 | `azurerm_lb_backend_address_pool` | Load Balancer |
 | `azurerm_lb_probe` | Load Balancer |
 | `azurerm_lb_rule` | Load Balancer |
 | `azurerm_application_gateway` | Application Gateway |
 | `azurerm_storage_account` | Storage Accounts |
+| `azurerm_storage_management_policy` | Storage Accounts |
 | `azurerm_kubernetes_cluster` | Kubernetes Service (AKS) |
+| `azurerm_linux_virtual_machine` / `azurerm_windows_virtual_machine` | Virtual Machines |
+| `azurerm_virtual_machine_extension` | Virtual Machines |
+| `azurerm_managed_disk` | Managed Disks |
+| `azurerm_user_assigned_identity` | Managed Identity |
+| `azurerm_role_definition` | RBAC |
+| `azurerm_role_assignment` | RBAC |
+| `azurerm_key_vault` | Key Vault |
+| `azurerm_key_vault_secret` | Key Vault |
+| `azurerm_cosmosdb_table` | Cosmos DB |
 
 See the [Terraform guide](../guides/terraform.md) for a full working example.
 

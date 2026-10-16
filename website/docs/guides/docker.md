@@ -8,6 +8,7 @@
     docker run -d \
       --name miniblue \
       -p 4566:4566 \
+      -p 443:4567 \
       -p 4567:4567 \
       moabukar/miniblue:latest
     ```
@@ -18,6 +19,7 @@
     docker run -d \
       --name miniblue \
       -p 4566:4566 \
+      -p 443:4567 \
       -p 4567:4567 \
       ghcr.io/moabukar/miniblue:latest
     ```
@@ -36,6 +38,7 @@ services:
     image: moabukar/miniblue:latest
     ports:
       - "4566:4566"
+      - "443:4567"
       - "4567:4567"
     environment:
       - PORT=4566
@@ -59,6 +62,7 @@ services:
     image: moabukar/miniblue:latest
     ports:
       - "4566:4566"
+      - "443:4567"
       - "4567:4567"
     healthcheck:
       test: ["CMD", "wget", "--no-check-certificate", "-q", "--spider", "http://localhost:4566/health"]
@@ -136,6 +140,7 @@ miniblue generates a self-signed certificate inside the container. To use it on 
 docker run -d \
   --name miniblue \
   -p 4566:4566 \
+  -p 443:4567 \
   -p 4567:4567 \
   -v ~/.miniblue:/root/.miniblue \
   moabukar/miniblue:latest
@@ -149,7 +154,7 @@ The certificate is now available at `~/.miniblue/cert.pem` on your host.
 git clone https://github.com/moabukar/miniblue.git
 cd miniblue
 docker build -t miniblue:local .
-docker run -p 4566:4566 -p 4567:4567 miniblue:local
+docker run -p 4566:4566 -p 443:4567 -p 4567:4567 miniblue:local
 ```
 
 Or via Make:

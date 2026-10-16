@@ -14,7 +14,7 @@ All calls go to `http://localhost:4566` using plain `HttpClient`. No real Azure 
 ## Start miniblue
 
 ```bash
-docker run -p 4566:4566 -p 4567:4567 moabukar/miniblue:latest
+docker run -p 4566:4566 -p 443:4567 -p 4567:4567 moabukar/miniblue:latest
 ```
 
 ## Run the example

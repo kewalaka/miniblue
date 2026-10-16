@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -45,13 +46,26 @@ func (h *Handler) Register(r chi.Router) {
 		r.Get("/", h.ListVMs)
 		r.Route("/{vmName}", func(r chi.Router) {
 			r.Put("/", h.CreateOrUpdateVM)
+			r.Patch("/", h.UpdateVM)
 			r.Get("/", h.GetVM)
 			r.Delete("/", h.DeleteVM)
+			r.Get("/instanceView", h.GetInstanceView)
 			r.Post("/start", h.StartVM)
 			r.Post("/powerOff", h.PowerOffVM)
 			r.Post("/restart", h.RestartVM)
+			r.Post("/deallocate", h.DeallocateVM)
+			r.Post("/redeploy", h.RedeployVM)
 			r.Post("/runCommand", h.RunCommand)
 			r.Get("/logs", h.GetLogs)
+			r.Route("/extensions", func(r chi.Router) {
+				r.Get("/", h.ListExtensions)
+				r.Route("/{extensionName}", func(r chi.Router) {
+					r.Put("/", h.CreateOrUpdateExtension)
+					r.Patch("/", h.UpdateExtension)
+					r.Get("/", h.GetExtension)
+					r.Delete("/", h.DeleteExtension)
+				})
+			})
 			r.Route("/services", func(r chi.Router) {
 				r.Get("/", h.ListServices)
 				r.Route("/{serviceName}", func(r chi.Router) {
@@ -80,7 +94,8 @@ func (h *Handler) getVM(sub, rg, name string) (map[string]interface{}, bool) {
 
 // refreshVM reconciles the stored power state with the real container state,
 // so the API never reports "running" for a container that no longer runs
-// (e.g. after an emulator or host restart).
+// (e.g. after an emulator or host restart). A stopped container keeps a
+// stored "deallocated": Docker cannot tell the two apart.
 func (h *Handler) refreshVM(rec map[string]interface{}) {
 	if !h.dockerAvail {
 		return
@@ -90,10 +105,11 @@ func (h *Handler) refreshVM(rec map[string]interface{}) {
 	if containerName == "" {
 		return
 	}
-	if dockerInspectRunning(containerName) {
-		mb["powerState"] = "running"
-	} else {
-		mb["powerState"] = "stopped"
+	switch {
+	case dockerInspectRunning(containerName):
+		mb["powerState"] = stateRunning
+	case powerState(rec) != stateDeallocated:
+		mb["powerState"] = stateStopped
 	}
 }
 
@@ -134,6 +150,16 @@ func decodeBody(r *http.Request) (map[string]interface{}, error) {
 // ---------------------------------------------------------------------------
 
 func (h *Handler) CreateOrUpdateVM(w http.ResponseWriter, r *http.Request) {
+	h.writeVM(w, r, false)
+}
+
+func (h *Handler) UpdateVM(w http.ResponseWriter, r *http.Request) {
+	h.writeVM(w, r, true)
+}
+
+// writeVM implements PUT (create or full update) and PATCH (merge into an
+// existing VM). Updates are in place: the backing container is not re-imaged.
+func (h *Handler) writeVM(w http.ResponseWriter, r *http.Request, patch bool) {
 	sub := chi.URLParam(r, "subscriptionId")
 	rg := chi.URLParam(r, "resourceGroupName")
 	name := chi.URLParam(r, "vmName")
@@ -150,13 +176,9 @@ func (h *Handler) CreateOrUpdateVM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inProps, _ := input["properties"].(map[string]interface{})
-	if inProps == nil {
-		inProps = map[string]interface{}{}
-	}
-	image, err := resolveImage(inProps)
-	if err != nil {
-		azerr.BadRequest(w, err.Error())
+	existing, exists := h.getVM(sub, rg, name)
+	if patch && !exists {
+		azerr.NotFound(w, "Microsoft.Compute/virtualMachines", name)
 		return
 	}
 
@@ -165,82 +187,93 @@ func (h *Handler) CreateOrUpdateVM(w http.ResponseWriter, r *http.Request) {
 		azerr.BadRequest(w, err.Error())
 		return
 	}
+	_, hasIdentity := input["identity"]
 
-	key := vmKey(sub, rg, name)
-	existing, exists := h.getVM(sub, rg, name)
-
+	var image string
+	if !exists {
+		// An unmappable image only blocks VMs that need a container; in stub
+		// mode the record is still accepted so ARM-only workflows (Windows
+		// images, Terraform plans) keep working.
+		if image, err = resolveImage(asMap(input["properties"])); err != nil && h.dockerAvail {
+			azerr.BadRequest(w, err.Error())
+			return
+		}
+	}
+	suppliedManagedDisk := requestHasManagedDiskID(input)
+	if patch {
+		input = mergePatch(existing, input)
+	}
 	if exists {
-		// Azure PUT semantics: update in place. The backing container is not
-		// re-imaged; metadata and identity assignments are refreshed.
-		rec := existing
-		if loc, ok := input["location"].(string); ok && loc != "" {
-			rec["location"] = loc
-		}
-		props := getProps(rec)
-		for _, k := range []string{"hardwareProfile", "storageProfile", "osProfile"} {
-			if v, ok := inProps[k]; ok {
-				props[k] = v
-			}
-		}
-		if _, hasBlock := input["identity"]; hasBlock {
-			if identityBlock == nil {
-				delete(rec, "identity")
-			} else {
-				rec["identity"] = identityBlock
-			}
-			appendProvisionEvent(rec, "identity assignments updated")
-		}
-		h.refreshVM(rec)
-		appendProvisionEvent(rec, "virtual machine updated")
-		h.store.Set(key, rec)
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(publicView(rec))
+		h.refreshVM(existing)
+	}
+
+	rec := buildVMRecord(sub, rg, name, input, existing, image)
+	if disk := osDiskConflict(h.store, sub, rg, suppliedManagedDisk, rec); disk != "" {
+		azerr.WriteError(w, http.StatusConflict, "OperationNotAllowed",
+			"Disk "+disk+" already exists in resource group "+rg+". Only CreateOption.Attach is supported.")
 		return
 	}
-
-	rec := buildVMRecord(sub, rg, name, input, image)
-	if identityBlock != nil {
-		rec["identity"] = identityBlock
+	if hasIdentity {
+		if identityBlock == nil {
+			delete(rec, "identity")
+		} else {
+			rec["identity"] = identityBlock
+		}
+		appendProvisionEvent(rec, "identity assignments updated")
 	}
-	secret := uuid.NewString()
-	rec["_identitySecret"] = secret
-	rec["_networkName"] = vmNetworkName(rg, name)
-	appendProvisionEvent(rec, "virtual machine created (image %s)", image)
 
-	if h.dockerAvail {
-		network := vmNetworkName(rg, name)
-		containerName := vmContainerName(rg, name)
-		if err := dockerNetworkCreate(network); err != nil {
-			azerr.WriteError(w, http.StatusConflict, "ContainerStartFailed", err.Error())
-			return
+	key := vmKey(sub, rg, name)
+	status := http.StatusOK
+	if exists {
+		appendProvisionEvent(rec, "virtual machine updated")
+	} else {
+		status = http.StatusCreated
+		secret := uuid.NewString()
+		rec["_identitySecret"] = secret
+		rec["_networkName"] = vmNetworkName(rg, name)
+		appendProvisionEvent(rec, "virtual machine created%s", imageSuffix(image))
+
+		if h.dockerAvail {
+			if err := h.startContainer(rg, name, image, secret); err != nil {
+				azerr.WriteError(w, http.StatusConflict, "ContainerStartFailed", err.Error())
+				return
+			}
+			appendProvisionEvent(rec, "compute environment started (container %s)", vmContainerName(rg, name))
 		}
-		// A stale container with the same name would make `docker run` fail;
-		// remove leftovers from a previous unclean delete first.
-		dockerRemove(containerName)
-		_, err := dockerRun(runOpts{
-			name:    containerName,
-			image:   image,
-			env:     identityEnv(secret),
-			network: network,
-			// Portable keep-alive: busybox sleep (alpine) rejects "infinity".
-			cmd: []string{"sh", "-c", "while true; do sleep 3600; done"},
-		})
-		if err != nil {
-			// Fail fast and leave nothing behind (unlike ACI's silent stub
-			// fallback): a VM whose compute environment never started must
-			// not exist.
-			dockerNetworkRemove(network)
-			azerr.WriteError(w, http.StatusConflict, "ContainerStartFailed", err.Error())
-			return
-		}
-		appendProvisionEvent(rec, "compute environment started (container %s)", containerName)
+		h.store.Set(secretKey(secret), map[string]interface{}{"vmKey": key})
 	}
 
 	h.store.Set(key, rec)
-	h.store.Set(secretKey(secret), map[string]interface{}{"vmKey": key})
+	syncDependencies(h.store, sub, rg, suppliedManagedDisk, rec)
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(publicView(rec))
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(vmView(rec, false))
+}
+
+// startContainer creates the VM's network and container. It fails fast and
+// leaves nothing behind (unlike ACI's silent stub fallback): a VM whose
+// compute environment never started must not exist.
+func (h *Handler) startContainer(rg, name, image, secret string) error {
+	network := vmNetworkName(rg, name)
+	containerName := vmContainerName(rg, name)
+	if err := dockerNetworkCreate(network); err != nil {
+		return err
+	}
+	// A stale container with the same name would make `docker run` fail;
+	// remove leftovers from a previous unclean delete first.
+	dockerRemove(containerName)
+	_, err := dockerRun(runOpts{
+		name:    containerName,
+		image:   image,
+		env:     identityEnv(secret),
+		network: network,
+		// Portable keep-alive: busybox sleep (alpine) rejects "infinity".
+		cmd: []string{"sh", "-c", "while true; do sleep 3600; done"},
+	})
+	if err != nil {
+		dockerNetworkRemove(network)
+	}
+	return err
 }
 
 func (h *Handler) GetVM(w http.ResponseWriter, r *http.Request) {
@@ -255,7 +288,22 @@ func (h *Handler) GetVM(w http.ResponseWriter, r *http.Request) {
 	}
 	h.refreshVM(rec)
 	h.store.Set(vmKey(sub, rg, name), rec)
-	json.NewEncoder(w).Encode(publicView(rec))
+	expand := strings.EqualFold(r.URL.Query().Get("$expand"), "instanceView")
+	json.NewEncoder(w).Encode(vmView(rec, expand))
+}
+
+func (h *Handler) GetInstanceView(w http.ResponseWriter, r *http.Request) {
+	sub := chi.URLParam(r, "subscriptionId")
+	rg := chi.URLParam(r, "resourceGroupName")
+	name := chi.URLParam(r, "vmName")
+
+	rec, ok := h.getVM(sub, rg, name)
+	if !ok {
+		azerr.NotFound(w, "Microsoft.Compute/virtualMachines", name)
+		return
+	}
+	h.refreshVM(rec)
+	json.NewEncoder(w).Encode(instanceViewFor(powerState(rec)))
 }
 
 func (h *Handler) listVMs(w http.ResponseWriter, prefix string) {
@@ -304,7 +352,11 @@ func (h *Handler) DeleteVM(w http.ResponseWriter, r *http.Request) {
 		dockerNetworkRemove(vmNetworkName(rg, name))
 	}
 
+	// Attached user disks and NICs survive the VM; only the auto-created OS
+	// disk goes with it.
+	removeDependencies(h.store, sub, rg, rec)
 	h.store.DeleteByPrefix("vmsvc:" + sub + ":" + rg + ":" + name + ":")
+	h.store.DeleteByPrefix(extensionKey(sub, rg, name, ""))
 	if secret, _ := rec["_identitySecret"].(string); secret != "" {
 		h.store.Delete(secretKey(secret))
 	}
@@ -317,6 +369,19 @@ func (h *Handler) DeleteVM(w http.ResponseWriter, r *http.Request) {
 // Power actions
 // ---------------------------------------------------------------------------
 
+// powerTargets maps each power action to the state the VM ends up in.
+var powerTargets = map[string]string{
+	"start":      stateRunning,
+	"powerOff":   stateStopped,
+	"deallocate": stateDeallocated,
+	"restart":    stateRunning,
+	"redeploy":   stateRunning,
+}
+
+// powerAction moves the VM to the action's target state. With Docker the
+// container is started/stopped for real; in stub mode only the recorded state
+// changes. Both return 200 with the VM, the contract the Docker backend
+// already shipped with.
 func (h *Handler) powerAction(w http.ResponseWriter, r *http.Request, action string) {
 	sub := chi.URLParam(r, "subscriptionId")
 	rg := chi.URLParam(r, "resourceGroupName")
@@ -327,11 +392,26 @@ func (h *Handler) powerAction(w http.ResponseWriter, r *http.Request, action str
 		azerr.NotFound(w, "Microsoft.Compute/virtualMachines", name)
 		return
 	}
-	if !h.dockerAvail {
-		dockerUnavailable(w)
-		return
+
+	target := powerTargets[action]
+	if h.dockerAvail {
+		if err := h.applyContainerPower(rec, sub, rg, name, action); err != nil {
+			azerr.WriteError(w, http.StatusConflict, "ContainerStartFailed", err.Error())
+			return
+		}
+	}
+	// Docker cannot tell stopped from deallocated, so a non-running target is
+	// authoritative.
+	if target != stateRunning || !h.dockerAvail {
+		getMinibluProps(rec)["powerState"] = target
 	}
 
+	appendProvisionEvent(rec, "power action %s completed (state %s)", action, powerState(rec))
+	h.store.Set(vmKey(sub, rg, name), rec)
+	json.NewEncoder(w).Encode(publicView(rec))
+}
+
+func (h *Handler) applyContainerPower(rec map[string]interface{}, sub, rg, name, action string) error {
 	containerName := vmContainerName(rg, name)
 	services := h.serviceRecords(sub, rg, name)
 
@@ -356,29 +436,25 @@ func (h *Handler) powerAction(w http.ResponseWriter, r *http.Request, action str
 	}
 
 	h.refreshVM(rec)
+	running := powerState(rec) == stateRunning
 	var err error
 	switch action {
 	case "start":
-		if powerState(rec) != "running" {
+		if !running {
 			err = start()
 		}
-	case "powerOff":
-		if powerState(rec) != "stopped" {
+	case "powerOff", "deallocate":
+		if running {
 			err = stop()
 		}
-	case "restart":
+	case "restart", "redeploy":
 		stop()
 		err = start()
 	}
-	if err != nil {
-		azerr.WriteError(w, http.StatusConflict, "ContainerStartFailed", err.Error())
-		return
+	if err == nil {
+		h.refreshVM(rec)
 	}
-
-	h.refreshVM(rec)
-	appendProvisionEvent(rec, "power action %s completed (state %s)", action, powerState(rec))
-	h.store.Set(vmKey(sub, rg, name), rec)
-	json.NewEncoder(w).Encode(publicView(rec))
+	return err
 }
 
 func (h *Handler) StartVM(w http.ResponseWriter, r *http.Request) {
@@ -391,4 +467,19 @@ func (h *Handler) PowerOffVM(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) RestartVM(w http.ResponseWriter, r *http.Request) {
 	h.powerAction(w, r, "restart")
+}
+
+func (h *Handler) DeallocateVM(w http.ResponseWriter, r *http.Request) {
+	h.powerAction(w, r, "deallocate")
+}
+
+func (h *Handler) RedeployVM(w http.ResponseWriter, r *http.Request) {
+	h.powerAction(w, r, "redeploy")
+}
+
+func imageSuffix(image string) string {
+	if image == "" {
+		return ""
+	}
+	return " (image " + image + ")"
 }

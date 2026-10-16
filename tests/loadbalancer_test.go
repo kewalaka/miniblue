@@ -45,6 +45,11 @@ func TestLoadBalancerLifecycle(t *testing.T) {
 	if len(frontends) != 1 {
 		t.Fatalf("expected 1 frontend, got %d", len(frontends))
 	}
+	frontend := frontends[0].(map[string]interface{})
+	expectedFrontendID := "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/loadBalancers/lb1/frontendIPConfigurations/frontend1"
+	if frontend["id"] != expectedFrontendID {
+		t.Fatalf("expected frontend id=%s, got %v", expectedFrontendID, frontend["id"])
+	}
 	backends := props["backendAddressPools"].([]interface{})
 	if len(backends) != 1 {
 		t.Fatalf("expected 1 backend pool, got %d", len(backends))
@@ -401,7 +406,7 @@ func TestLoadBalancingRuleLifecycle(t *testing.T) {
 	ruleBase := base + "/lb1/loadBalancingRules"
 
 	resp := doRequest(t, "PUT", ruleBase+"/rule1"+av, `{
-		"properties":{"protocol":"Tcp","frontendPort":443,"backendPort":443}
+		"properties":{"protocol":"Tcp","frontendPort":443,"backendPort":443,"frontendIPConfiguration":{"id":"/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/loadBalancers/lb1/frontendIPConfigurations/frontend"}}
 	}`)
 	expectStatus(t, resp, 201)
 	m := decodeJSON(t, resp)
@@ -423,6 +428,10 @@ func TestLoadBalancingRuleLifecycle(t *testing.T) {
 	resp.Body.Close()
 	if got["name"] != "rule1" {
 		t.Fatalf("GET: expected name=rule1, got %v", got["name"])
+	}
+	gotProps := got["properties"].(map[string]interface{})
+	if gotProps["frontendIPConfiguration"] == nil {
+		t.Fatalf("expected frontendIPConfiguration to round trip, got %v", gotProps)
 	}
 
 	resp = doRequest(t, "GET", ruleBase+av, "")

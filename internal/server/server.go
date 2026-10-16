@@ -19,11 +19,14 @@ import (
 	"github.com/moabukar/miniblue/internal/services/appgw"
 	"github.com/moabukar/miniblue/internal/services/apps"
 	"github.com/moabukar/miniblue/internal/services/auth"
+	"github.com/moabukar/miniblue/internal/services/authorization"
 	"github.com/moabukar/miniblue/internal/services/blob"
+	"github.com/moabukar/miniblue/internal/services/compute"
 	"github.com/moabukar/miniblue/internal/services/cosmosdb"
 	"github.com/moabukar/miniblue/internal/services/dbmysql"
 	"github.com/moabukar/miniblue/internal/services/dbpostgres"
 	"github.com/moabukar/miniblue/internal/services/deployments"
+	"github.com/moabukar/miniblue/internal/services/disks"
 	"github.com/moabukar/miniblue/internal/services/dns"
 	"github.com/moabukar/miniblue/internal/services/eventgrid"
 	"github.com/moabukar/miniblue/internal/services/identity"
@@ -31,6 +34,7 @@ import (
 	"github.com/moabukar/miniblue/internal/services/loadbalancer"
 	"github.com/moabukar/miniblue/internal/services/metadata"
 	"github.com/moabukar/miniblue/internal/services/network"
+	"github.com/moabukar/miniblue/internal/services/networkinterfaces"
 	"github.com/moabukar/miniblue/internal/services/nsg"
 	"github.com/moabukar/miniblue/internal/services/publicip"
 	"github.com/moabukar/miniblue/internal/services/queue"
@@ -47,10 +51,11 @@ import (
 )
 
 type Server struct {
-	router      *chi.Mux
-	store       *store.Store
-	services    []string
-	aksHandler  *aks.Handler
+	router     *chi.Mux
+	store      *store.Store
+	services   []string
+	aksHandler *aks.Handler
+	routeTrie  *routeTrie
 }
 
 func New() *Server {
@@ -60,11 +65,22 @@ func New() *Server {
 	}
 	s.setupMiddleware()
 	s.setupRoutes()
+	// Build the case-insensitive routing trie AFTER all routes are registered,
+	// then attach it via a final wrapper around the router. We can't put this
+	// in setupMiddleware() because the trie depends on the route list.
+	s.routeTrie = BuildRouteTrie(s.router)
+	s.router.NotFound(armNotFound)
+	s.router.MethodNotAllowed(armMethodNotAllowed)
 	return s
 }
 
 func (s *Server) Handler() http.Handler {
-	return s.router
+	// CaseInsensitiveARM must wrap the router from the outside so it sees the
+	// raw URL the client sent and can rewrite it to the canonical case before
+	// chi's routing logic runs. Putting it inside chi.Use would still work for
+	// matching, but middleware composition order makes external wrapping the
+	// clearest contract.
+	return CaseInsensitiveARM(s.routeTrie)(s.router)
 }
 
 // SaveState persists the store to disk if file-based persistence is active.
@@ -151,11 +167,16 @@ func parseServicesFilter() map[string]bool {
 }
 
 func (s *Server) setupRoutes() {
+	allowed := parseServicesFilter()
+	var authorizationHandler *authorization.Handler
+	if serviceEnabled("authorization", allowed) {
+		authorizationHandler = authorization.NewHandler(s.store)
+		s.router.Use(authorizationHandler.Middleware)
+	}
+
 	s.router.Get("/health", s.healthHandler)
 	s.router.Get("/metrics", s.metricsHandler)
 	s.router.Post("/_miniblue/reset", s.resetHandler)
-
-	allowed := parseServicesFilter()
 
 	// Cloud metadata + auth (always registered -- core infrastructure)
 	metadata.NewHandler(s.store).Register(s.router)
@@ -195,11 +216,19 @@ func (s *Server) setupRoutes() {
 		{"sqldb", func() { sqldb.NewHandler(s.store).Register(s.router) }},
 		{"dbmysql", func() { dbmysql.NewHandler(s.store).Register(s.router) }},
 		{"publicip", func() { publicip.NewHandler(s.store).Register(s.router) }},
+		{"compute", func() { compute.NewHandler(s.store).Register(s.router) }},
+		{"disks", func() { disks.NewHandler(s.store).Register(s.router) }},
+		{"networkinterfaces", func() { networkinterfaces.NewHandler(s.store).Register(s.router) }},
 		{"nsg", func() { nsg.NewHandler(s.store).Register(s.router) }},
 		{"loadbalancer", func() { loadbalancer.NewHandler(s.store).Register(s.router) }},
 		{"appgw", func() { appgw.NewHandler(s.store).Register(s.router) }},
 		{"deployments", func() {
-			deployments.NewHandler(s.store, deployments.NewRouterDispatcher(s.router)).Register(s.router)
+			// Dispatch through the case-insensitive wrapper so templated
+			// resource types (e.g. microsoft.network/virtualnetworks) route.
+			dispatch := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				s.Handler().ServeHTTP(w, r)
+			})
+			deployments.NewHandler(s.store, deployments.NewRouterDispatcher(dispatch)).Register(s.router)
 		}},
 		{"vm", func() { vm.NewHandler(s.store).Register(s.router) }},
 	}
@@ -218,6 +247,10 @@ func (s *Server) setupRoutes() {
 		if allowed == nil || serviceEnabled("storageaccounts", allowed) {
 			s.services = append(s.services, "storageaccounts")
 		}
+	}
+	if serviceEnabled("authorization", allowed) {
+		authorizationHandler.Register(s.router)
+		s.services = append(s.services, "authorization")
 	}
 }
 

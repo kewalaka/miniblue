@@ -46,6 +46,104 @@ func TestVNetSubnetLifecycle(t *testing.T) {
 	expectStatus(t, resp, 404)
 }
 
+func TestVNetInlineSubnetsPersist(t *testing.T) {
+	ts := setupServer()
+	defer ts.Close()
+	base := ts.URL + "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks"
+	av := "?api-version=2023-09-01"
+
+	resp := doRequest(t, "PUT", base+"/inline-vnet"+av,
+		`{"location":"eastus","properties":{"addressSpace":{"addressPrefixes":["10.60.0.0/16"]},"subnets":[{"name":"app","properties":{"addressPrefix":"10.60.1.0/24","addressPrefixes":["10.60.1.0/24"]}},{"name":"data","properties":{"addressPrefix":"10.60.2.0/24","addressPrefixes":["10.60.2.0/24"]}}]}}`)
+	expectStatus(t, resp, 201)
+	m := decodeJSON(t, resp)
+	resp.Body.Close()
+	props := m["properties"].(map[string]interface{})
+	subnets := props["subnets"].([]interface{})
+	if len(subnets) != 2 {
+		t.Fatalf("expected PUT response to include 2 inline subnets, got %d", len(subnets))
+	}
+
+	resp = doRequest(t, "GET", base+"/inline-vnet/subnets"+av, "")
+	expectStatus(t, resp, 200)
+	list := decodeJSON(t, resp)
+	resp.Body.Close()
+	subnets = list["value"].([]interface{})
+	if len(subnets) != 2 {
+		t.Fatalf("expected subnet list to include 2 inline subnets, got %d", len(subnets))
+	}
+
+	resp = doRequest(t, "GET", base+"/inline-vnet/subnets/app"+av, "")
+	expectStatus(t, resp, 200)
+	m = decodeJSON(t, resp)
+	resp.Body.Close()
+	if got := m["name"]; got != "app" {
+		t.Fatalf("expected subnet GET name=app, got %v", got)
+	}
+
+	resp = doRequest(t, "GET", base+"/inline-vnet"+av, "")
+	expectStatus(t, resp, 200)
+	m = decodeJSON(t, resp)
+	resp.Body.Close()
+	props = m["properties"].(map[string]interface{})
+	subnets = props["subnets"].([]interface{})
+	if len(subnets) != 2 {
+		t.Fatalf("expected VNet GET to include 2 inline subnets, got %d", len(subnets))
+	}
+
+	names := map[string]bool{}
+	for _, item := range subnets {
+		subnet := item.(map[string]interface{})
+		names[subnet["name"].(string)] = true
+	}
+	for _, name := range []string{"app", "data"} {
+		if !names[name] {
+			t.Fatalf("expected subnet %q in VNet GET response, got %v", name, names)
+		}
+	}
+}
+
+func TestVNetPrivateEndpointVNetPoliciesRoundTrip(t *testing.T) {
+	ts := setupServer()
+	defer ts.Close()
+	base := ts.URL + "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks"
+	av := "?api-version=2023-09-01"
+
+	// Omitted on PUT -> omitted on GET (don't fabricate a value the caller never set).
+	resp := doRequest(t, "PUT", base+"/vnet1"+av,
+		`{"location":"eastus","properties":{"addressSpace":{"addressPrefixes":["10.0.0.0/16"]}}}`)
+	resp.Body.Close()
+	expectStatus(t, resp, 201)
+
+	resp = doRequest(t, "GET", base+"/vnet1"+av, "")
+	expectStatus(t, resp, 200)
+	m := decodeJSON(t, resp)
+	resp.Body.Close()
+	props := m["properties"].(map[string]interface{})
+	if _, present := props["privateEndpointVNetPolicies"]; present {
+		t.Fatalf("expected privateEndpointVNetPolicies absent when not set on PUT, got %v", props["privateEndpointVNetPolicies"])
+	}
+
+	// Explicit "Basic" must round-trip through PUT and GET.
+	resp = doRequest(t, "PUT", base+"/vnet2"+av,
+		`{"location":"eastus","properties":{"addressSpace":{"addressPrefixes":["10.1.0.0/16"]},"privateEndpointVNetPolicies":"Basic"}}`)
+	expectStatus(t, resp, 201)
+	m = decodeJSON(t, resp)
+	resp.Body.Close()
+	props = m["properties"].(map[string]interface{})
+	if got := props["privateEndpointVNetPolicies"]; got != "Basic" {
+		t.Fatalf("expected PUT response privateEndpointVNetPolicies=Basic, got %v", got)
+	}
+
+	resp = doRequest(t, "GET", base+"/vnet2"+av, "")
+	expectStatus(t, resp, 200)
+	m = decodeJSON(t, resp)
+	resp.Body.Close()
+	props = m["properties"].(map[string]interface{})
+	if got := props["privateEndpointVNetPolicies"]; got != "Basic" {
+		t.Fatalf("expected GET response privateEndpointVNetPolicies=Basic, got %v", got)
+	}
+}
+
 func TestSubnetOnNonexistentVNet(t *testing.T) {
 	ts := setupServer()
 	defer ts.Close()

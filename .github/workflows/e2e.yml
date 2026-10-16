@@ -18,7 +18,7 @@ jobs:
 
       - name: Start miniblue
         run: |
-          docker run -d --name miniblue -p 4566:4566 -p 4567:4567 miniblue:pr
+          docker run -d --name miniblue -p 4566:4566 -p 443:4567 -p 4567:4567 miniblue:pr
           echo "Waiting for miniblue..."
           for i in $(seq 1 30); do
             if curl -fs http://localhost:4566/health > /dev/null 2>&1; then

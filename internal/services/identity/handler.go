@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -49,6 +50,7 @@ func (h *Handler) Register(r chi.Router) {
 		r.Get("/", h.ListIdentities)
 		r.Route("/{identityName}", func(r chi.Router) {
 			r.Put("/", h.CreateOrUpdateIdentity)
+			r.Patch("/", h.UpdateIdentity)
 			r.Get("/", h.GetIdentity)
 			r.Delete("/", h.DeleteIdentity)
 		})
@@ -82,37 +84,24 @@ func (h *Handler) CreateOrUpdateIdentity(w http.ResponseWriter, r *http.Request)
 	}
 
 	key := identityKey(sub, rg, name)
-	principalID := uuid.NewString()
-	clientID := uuid.NewString()
 	_, exists := h.store.Get(key)
-	if exists {
-		// principalId/clientId are stable across updates.
-		if v, ok := h.store.Get(key); ok {
-			if rec, ok := v.(map[string]interface{}); ok {
-				if props, ok := rec["properties"].(map[string]interface{}); ok {
-					if p, ok := props["principalId"].(string); ok {
-						principalID = p
-					}
-					if c, ok := props["clientId"].(string); ok {
-						clientID = c
-					}
-				}
-			}
-		}
-	}
 
+	// Deterministic IDs keep principalId/clientId stable across updates and
+	// across emulator resets, so role assignments in Terraform state don't drift.
+	armID := identityARMID(sub, rg, name)
 	rec := map[string]interface{}{
-		"id":       "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/" + name,
+		"id":       armID,
 		"name":     name,
 		"type":     "Microsoft.ManagedIdentity/userAssignedIdentities",
 		"location": location,
+		"tags":     map[string]interface{}{},
 		"properties": map[string]interface{}{
-			"principalId": principalID,
-			"clientId":    clientID,
+			"principalId": deterministicUUID(armID + ":principal"),
+			"clientId":    deterministicUUID(armID + ":client"),
 			"tenantId":    tenantID,
 		},
 	}
-	if tags, ok := input["tags"]; ok {
+	if tags, ok := input["tags"].(map[string]interface{}); ok {
 		rec["tags"] = tags
 	}
 	h.store.Set(key, rec)
@@ -121,6 +110,42 @@ func (h *Handler) CreateOrUpdateIdentity(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusOK)
 	} else {
 		w.WriteHeader(http.StatusCreated)
+	}
+	json.NewEncoder(w).Encode(rec)
+}
+
+func identityARMID(sub, rg, name string) string {
+	return "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/" + name
+}
+
+func deterministicUUID(seed string) string {
+	return uuid.NewSHA1(uuid.NameSpaceURL, []byte(strings.ToLower(seed))).String()
+}
+
+// UpdateIdentity implements PATCH: only tags are mutable on a user-assigned identity.
+func (h *Handler) UpdateIdentity(w http.ResponseWriter, r *http.Request) {
+	sub := chi.URLParam(r, "subscriptionId")
+	rg := chi.URLParam(r, "resourceGroupName")
+	name := chi.URLParam(r, "identityName")
+
+	key := identityKey(sub, rg, name)
+	v, ok := h.store.Get(key)
+	rec, _ := v.(map[string]interface{})
+	if !ok || rec == nil {
+		azerr.NotFound(w, "Microsoft.ManagedIdentity/userAssignedIdentities", name)
+		return
+	}
+
+	var patch map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+		azerr.BadRequest(w, "The request content was invalid: "+err.Error())
+		return
+	}
+	if tags, ok := patch["tags"].(map[string]interface{}); ok {
+		// Readers hold the stored map unlocked: publish a copy, never mutate it.
+		rec = maps.Clone(rec)
+		rec["tags"] = tags
+		h.store.Set(key, rec)
 	}
 	json.NewEncoder(w).Encode(rec)
 }

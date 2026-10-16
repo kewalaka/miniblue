@@ -25,6 +25,10 @@ func (h *Handler) Register(r chi.Router) {
 			r.Put("/", h.CreateOrUpdateAccount)
 			r.Get("/", h.GetAccount)
 			r.Delete("/", h.DeleteAccount)
+			r.Post("/listKeys", h.ListKeys)
+			r.Post("/readonlykeys", h.ListReadOnlyKeys)
+			r.Post("/listConnectionStrings", h.ListConnectionStrings)
+			r.Post("/regenerateKey", h.RegenerateKey)
 			r.Route("/sqlDatabases", func(r chi.Router) {
 				r.Get("/", h.ListSQLDatabases)
 				r.Route("/{dbName}", func(r chi.Router) {
@@ -38,6 +42,18 @@ func (h *Handler) Register(r chi.Router) {
 							r.Get("/", h.GetContainer)
 							r.Delete("/", h.DeleteContainer)
 						})
+					})
+				})
+			})
+			r.Route("/tables", func(r chi.Router) {
+				r.Get("/", h.ListTables)
+				r.Route("/{tableName}", func(r chi.Router) {
+					r.Put("/", h.CreateOrUpdateTable)
+					r.Get("/", h.GetTable)
+					r.Delete("/", h.DeleteTable)
+					r.Route("/throughputSettings/default", func(r chi.Router) {
+						r.Put("/", h.CreateOrUpdateTableThroughput)
+						r.Get("/", h.GetTableThroughput)
 					})
 				})
 			})
@@ -137,25 +153,126 @@ func (h *Handler) accountKey(sub, rg, name string) string {
 	return "cosmos:account:" + sub + ":" + rg + ":" + name
 }
 
-func (h *Handler) buildAccountResponse(sub, rg, name string) map[string]interface{} {
-	return map[string]interface{}{
-		"id":       "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.DocumentDB/databaseAccounts/" + name,
-		"name":     name,
-		"type":     "Microsoft.DocumentDB/databaseAccounts",
-		"location": "eastus",
-		"kind":     "GlobalDocumentDB",
-		"properties": map[string]interface{}{
-			"provisioningState":     "Succeeded",
-			"documentEndpoint":      "https://" + name + ".documents.azure.com:443/",
-			"databaseAccountOfferType": "Standard",
-			"consistencyPolicy": map[string]interface{}{
-				"defaultConsistencyLevel": "Session",
-			},
-			"locations": []map[string]interface{}{
-				{"locationName": "East US", "failoverPriority": 0, "isZoneRedundant": false},
-			},
-		},
+func accountArrayProperty(props map[string]interface{}, key string) interface{} {
+	if v, ok := props[key].([]interface{}); ok {
+		return v
 	}
+	return []interface{}{}
+}
+
+func accountLocationID(sub, rg, account, locationName string) string {
+	return "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.DocumentDB/databaseAccounts/" + account + "/locations/" + locationName
+}
+
+func accountLocationsProperty(sub, rg, name, defaultLocation string, props map[string]interface{}) []interface{} {
+	raw, ok := props["locations"].([]interface{})
+	if !ok || len(raw) == 0 {
+		raw = []interface{}{
+			map[string]interface{}{
+				"locationName":     defaultLocation,
+				"failoverPriority": float64(0),
+				"isZoneRedundant":  false,
+			},
+		}
+	}
+
+	locations := make([]interface{}, 0, len(raw))
+	for _, item := range raw {
+		loc, ok := item.(map[string]interface{})
+		if !ok {
+			locations = append(locations, item)
+			continue
+		}
+
+		copy := make(map[string]interface{}, len(loc)+1)
+		for k, v := range loc {
+			copy[k] = v
+		}
+		locationName, _ := copy["locationName"].(string)
+		if locationName == "" {
+			locationName = defaultLocation
+			copy["locationName"] = locationName
+		}
+		if _, ok := copy["id"]; !ok {
+			copy["id"] = accountLocationID(sub, rg, name, locationName)
+		}
+		if _, ok := copy["isZoneRedundant"]; !ok {
+			copy["isZoneRedundant"] = false
+		}
+		locations = append(locations, copy)
+	}
+	return locations
+}
+
+func accountFailoverPolicies(locations []interface{}) []interface{} {
+	policies := make([]interface{}, 0, len(locations))
+	for _, item := range locations {
+		loc, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		policy := map[string]interface{}{}
+		for _, key := range []string{"id", "locationName", "failoverPriority"} {
+			if v, ok := loc[key]; ok {
+				policy[key] = v
+			}
+		}
+		policies = append(policies, policy)
+	}
+	return policies
+}
+
+func (h *Handler) buildAccountResponse(sub, rg, name string, input map[string]interface{}) map[string]interface{} {
+	props, _ := input["properties"].(map[string]interface{})
+	location, _ := input["location"].(string)
+	if location == "" {
+		location = "eastus"
+	}
+	kind, _ := input["kind"].(string)
+	if kind == "" {
+		kind = "GlobalDocumentDB"
+	}
+
+	locations := accountLocationsProperty(sub, rg, name, location, props)
+	responseProps := map[string]interface{}{
+		"provisioningState":        "Succeeded",
+		"documentEndpoint":         "https://" + name + ".documents.azure.com:443/",
+		"databaseAccountOfferType": "Standard",
+		"consistencyPolicy": map[string]interface{}{
+			"defaultConsistencyLevel": "Session",
+		},
+		"locations":                   locations,
+		"failoverPolicies":            accountFailoverPolicies(locations),
+		"capabilities":                accountArrayProperty(props, "capabilities"),
+		"ipRules":                     accountArrayProperty(props, "ipRules"),
+		"virtualNetworkRules":         accountArrayProperty(props, "virtualNetworkRules"),
+		"cors":                        accountArrayProperty(props, "cors"),
+		"networkAclBypassResourceIds": accountArrayProperty(props, "networkAclBypassResourceIds"),
+	}
+	for _, key := range []string{
+		"databaseAccountOfferType",
+		"consistencyPolicy",
+		"publicNetworkAccess",
+		"minimalTlsVersion",
+		"minimumTlsVersion",
+	} {
+		if v, ok := props[key]; ok {
+			responseProps[key] = v
+		}
+	}
+
+	acct := map[string]interface{}{
+		"id":         "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.DocumentDB/databaseAccounts/" + name,
+		"name":       name,
+		"type":       "Microsoft.DocumentDB/databaseAccounts",
+		"location":   location,
+		"kind":       kind,
+		"properties": responseProps,
+	}
+	if tags, ok := input["tags"]; ok {
+		acct["tags"] = tags
+	}
+	return acct
 }
 
 func (h *Handler) CreateOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
@@ -164,16 +281,14 @@ func (h *Handler) CreateOrUpdateAccount(w http.ResponseWriter, r *http.Request) 
 	name := chi.URLParam(r, "accountName")
 
 	k := h.accountKey(sub, rg, name)
-	_, exists := h.store.Get(k)
 
-	acct := h.buildAccountResponse(sub, rg, name)
+	input := map[string]interface{}{}
+	json.NewDecoder(r.Body).Decode(&input)
+
+	acct := h.buildAccountResponse(sub, rg, name, input)
 	h.store.Set(k, acct)
 
-	if exists {
-		w.WriteHeader(http.StatusOK)
-	} else {
-		w.WriteHeader(http.StatusCreated)
-	}
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(acct)
 }
 
@@ -209,6 +324,62 @@ func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"value": items})
 }
 
+func (h *Handler) accountOperationAccountName(w http.ResponseWriter, r *http.Request) (string, bool) {
+	sub := chi.URLParam(r, "subscriptionId")
+	rg := chi.URLParam(r, "resourceGroupName")
+	name := chi.URLParam(r, "accountName")
+	if !h.store.Exists(h.accountKey(sub, rg, name)) {
+		azerr.NotFound(w, "Microsoft.DocumentDB/databaseAccounts", name)
+		return "", false
+	}
+	return name, true
+}
+
+func accountKeysResponse() map[string]interface{} {
+	return map[string]interface{}{
+		"primaryMasterKey":           "miniblue-primary-master-key",
+		"secondaryMasterKey":         "miniblue-secondary-master-key",
+		"primaryReadonlyMasterKey":   "miniblue-primary-readonly-master-key",
+		"secondaryReadonlyMasterKey": "miniblue-secondary-readonly-master-key",
+	}
+}
+
+func (h *Handler) ListKeys(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.accountOperationAccountName(w, r); !ok {
+		return
+	}
+	json.NewEncoder(w).Encode(accountKeysResponse())
+}
+
+func (h *Handler) ListReadOnlyKeys(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.accountOperationAccountName(w, r); !ok {
+		return
+	}
+	json.NewEncoder(w).Encode(accountKeysResponse())
+}
+
+func (h *Handler) ListConnectionStrings(w http.ResponseWriter, r *http.Request) {
+	name, ok := h.accountOperationAccountName(w, r)
+	if !ok {
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"connectionStrings": []map[string]interface{}{
+			{
+				"connectionString": "AccountEndpoint=https://" + name + ".documents.azure.com:443/;AccountKey=miniblue-primary-master-key;",
+				"description":      "Primary SQL Connection String",
+			},
+		},
+	})
+}
+
+func (h *Handler) RegenerateKey(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.accountOperationAccountName(w, r); !ok {
+		return
+	}
+	json.NewEncoder(w).Encode(accountKeysResponse())
+}
+
 // --- ARM SQL Database handlers ---
 
 func (h *Handler) sqlDbKey(sub, rg, acct, dbName string) string {
@@ -222,7 +393,6 @@ func (h *Handler) CreateOrUpdateSQLDatabase(w http.ResponseWriter, r *http.Reque
 	dbName := chi.URLParam(r, "dbName")
 
 	k := h.sqlDbKey(sub, rg, acct, dbName)
-	_, exists := h.store.Get(k)
 
 	db := map[string]interface{}{
 		"id":   "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.DocumentDB/databaseAccounts/" + acct + "/sqlDatabases/" + dbName,
@@ -234,11 +404,7 @@ func (h *Handler) CreateOrUpdateSQLDatabase(w http.ResponseWriter, r *http.Reque
 	}
 	h.store.Set(k, db)
 
-	if exists {
-		w.WriteHeader(http.StatusOK)
-	} else {
-		w.WriteHeader(http.StatusCreated)
-	}
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(db)
 }
 
@@ -291,7 +457,6 @@ func (h *Handler) CreateOrUpdateContainer(w http.ResponseWriter, r *http.Request
 	name := chi.URLParam(r, "containerName")
 
 	k := h.containerKey(sub, rg, acct, dbName, name)
-	_, exists := h.store.Get(k)
 
 	c := map[string]interface{}{
 		"id":   "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.DocumentDB/databaseAccounts/" + acct + "/sqlDatabases/" + dbName + "/containers/" + name,
@@ -309,11 +474,7 @@ func (h *Handler) CreateOrUpdateContainer(w http.ResponseWriter, r *http.Request
 	}
 	h.store.Set(k, c)
 
-	if exists {
-		w.WriteHeader(http.StatusOK)
-	} else {
-		w.WriteHeader(http.StatusCreated)
-	}
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(c)
 }
 
@@ -353,4 +514,102 @@ func (h *Handler) ListContainers(w http.ResponseWriter, r *http.Request) {
 	dbName := chi.URLParam(r, "dbName")
 	items := h.store.ListByPrefix("cosmos:container:" + sub + ":" + rg + ":" + acct + ":" + dbName + ":")
 	json.NewEncoder(w).Encode(map[string]interface{}{"value": items})
+}
+
+// --- ARM Table handlers ---
+
+func (h *Handler) tableKey(sub, rg, acct, name string) string {
+	return "cosmos:table:" + sub + ":" + rg + ":" + acct + ":" + name
+}
+
+func (h *Handler) tableThroughputKey(sub, rg, acct, name string) string {
+	return "cosmos:tablethroughput:" + sub + ":" + rg + ":" + acct + ":" + name
+}
+
+func (h *Handler) CreateOrUpdateTable(w http.ResponseWriter, r *http.Request) {
+	sub := chi.URLParam(r, "subscriptionId")
+	rg := chi.URLParam(r, "resourceGroupName")
+	acct := chi.URLParam(r, "accountName")
+	name := chi.URLParam(r, "tableName")
+
+	k := h.tableKey(sub, rg, acct, name)
+
+	table := map[string]interface{}{}
+	json.NewDecoder(r.Body).Decode(&table)
+	table["id"] = "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.DocumentDB/databaseAccounts/" + acct + "/tables/" + name
+	table["name"] = name
+	table["type"] = "Microsoft.DocumentDB/databaseAccounts/tables"
+	h.store.Set(k, table)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(table)
+}
+
+func (h *Handler) GetTable(w http.ResponseWriter, r *http.Request) {
+	sub := chi.URLParam(r, "subscriptionId")
+	rg := chi.URLParam(r, "resourceGroupName")
+	acct := chi.URLParam(r, "accountName")
+	name := chi.URLParam(r, "tableName")
+
+	v, ok := h.store.Get(h.tableKey(sub, rg, acct, name))
+	if !ok {
+		azerr.NotFound(w, "Microsoft.DocumentDB/databaseAccounts/tables", name)
+		return
+	}
+	json.NewEncoder(w).Encode(v)
+}
+
+func (h *Handler) DeleteTable(w http.ResponseWriter, r *http.Request) {
+	sub := chi.URLParam(r, "subscriptionId")
+	rg := chi.URLParam(r, "resourceGroupName")
+	acct := chi.URLParam(r, "accountName")
+	name := chi.URLParam(r, "tableName")
+
+	if !h.store.Delete(h.tableKey(sub, rg, acct, name)) {
+		azerr.NotFound(w, "Microsoft.DocumentDB/databaseAccounts/tables", name)
+		return
+	}
+	h.store.Delete(h.tableThroughputKey(sub, rg, acct, name))
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h *Handler) ListTables(w http.ResponseWriter, r *http.Request) {
+	sub := chi.URLParam(r, "subscriptionId")
+	rg := chi.URLParam(r, "resourceGroupName")
+	acct := chi.URLParam(r, "accountName")
+	items := h.store.ListByPrefix("cosmos:table:" + sub + ":" + rg + ":" + acct + ":")
+	json.NewEncoder(w).Encode(map[string]interface{}{"value": items})
+}
+
+func (h *Handler) CreateOrUpdateTableThroughput(w http.ResponseWriter, r *http.Request) {
+	sub := chi.URLParam(r, "subscriptionId")
+	rg := chi.URLParam(r, "resourceGroupName")
+	acct := chi.URLParam(r, "accountName")
+	tableName := chi.URLParam(r, "tableName")
+
+	k := h.tableThroughputKey(sub, rg, acct, tableName)
+
+	throughput := map[string]interface{}{}
+	json.NewDecoder(r.Body).Decode(&throughput)
+	throughput["id"] = "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.DocumentDB/databaseAccounts/" + acct + "/tables/" + tableName + "/throughputSettings/default"
+	throughput["name"] = "default"
+	throughput["type"] = "Microsoft.DocumentDB/databaseAccounts/tables/throughputSettings"
+	h.store.Set(k, throughput)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(throughput)
+}
+
+func (h *Handler) GetTableThroughput(w http.ResponseWriter, r *http.Request) {
+	sub := chi.URLParam(r, "subscriptionId")
+	rg := chi.URLParam(r, "resourceGroupName")
+	acct := chi.URLParam(r, "accountName")
+	tableName := chi.URLParam(r, "tableName")
+
+	v, ok := h.store.Get(h.tableThroughputKey(sub, rg, acct, tableName))
+	if !ok {
+		azerr.NotFound(w, "Microsoft.DocumentDB/databaseAccounts/tables/throughputSettings", "default")
+		return
+	}
+	json.NewEncoder(w).Encode(v)
 }

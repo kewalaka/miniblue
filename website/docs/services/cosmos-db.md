@@ -4,6 +4,21 @@ miniblue emulates Azure Cosmos DB with a SQL API-compatible document store. Crea
 
 ## API endpoints
 
+### ARM (control plane)
+
+Cosmos DB accounts, SQL databases & containers, and Table API tables are
+manageable via standard ARM endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `PUT` / `GET` / `DELETE` / `LIST` | `/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.DocumentDB/databaseAccounts/{account}` | Account CRUD |
+| `PUT` / `GET` / `DELETE` / `LIST` | `.../databaseAccounts/{account}/sqlDatabases/{db}` | SQL database CRUD |
+| `PUT` / `GET` / `DELETE` / `LIST` | `.../sqlDatabases/{db}/containers/{container}` | SQL container CRUD |
+| `PUT` / `GET` / `DELETE` / `LIST` | `.../databaseAccounts/{account}/tables/{table}` | Table API table CRUD |
+| `PUT` / `GET` | `.../tables/{table}/throughputSettings/default` | Table throughput settings |
+
+### Data plane (SQL API documents)
+
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/cosmosdb/{account}/dbs/{db}/colls/{coll}/docs` | Create document |
@@ -13,7 +28,9 @@ miniblue emulates Azure Cosmos DB with a SQL API-compatible document store. Crea
 | `DELETE` | `/cosmosdb/{account}/dbs/{db}/colls/{coll}/docs/{id}` | Delete document |
 
 !!! note
-    Accounts, databases, and collections are created implicitly. You do not need to create them before inserting documents.
+    On the data plane, accounts, databases, and collections are created
+    implicitly — you do not need to create them via ARM before inserting
+    documents.
 
 ## Create a document
 
@@ -159,4 +176,5 @@ curl -s "${BASE}" | jq '._count'
 - No SQL query language support -- the list endpoint returns all documents in the collection
 - No partition key support
 - No indexing or stored procedures
-- Documents are stored in memory and lost when miniblue restarts
+- Cosmos DB Mongo, Cassandra and Gremlin wire protocols are not implemented
+- Documents are stored in memory (or via `PERSISTENCE=1` / `DATABASE_URL`) and otherwise lost when miniblue restarts

@@ -26,12 +26,21 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | Azure Cache for Redis | Full | Full | Full | Full | - | Real connectivity check via REDIS_URL |
 | Container Instances | Full | Full | Full | Full | - | Real Docker containers when available |
 | Kubernetes Service (AKS) | Full | Full | Full | Full | - | Real k3s clusters with `AKS_BACKEND=k3s`; agent pool GET only |
-| Virtual Machines | Full | Full | Full | Full | - | Real Docker containers when available; services, logs, run-command, identity attestation |
 | Public IP Addresses | Full | Full | Full | Full | - | Static/dynamic allocation, auto-generated IPs |
 | Network Security Groups | Full | Full | Full | Full | - | Security rules, default rules, cascade delete |
+| Network Interfaces | Full | Full | Full | Full | Full (PATCH) | IP configurations, subnet/Public IP references, VM back-reference |
 | Load Balancer | Full | Full | Full | Full | - | Frontends, backends, rules, probes, NAT |
 | Application Gateway | Full | Full | Full | Full | - | SKU, frontends, backends, listeners, rules, probes, WAF |
-| Storage Accounts | Full | Full | Full | Full | - | Shared key auth, blob/queue/table/file endpoints |
+| Storage Accounts | Full | Full | Full | Full | - | Shared key auth, blob/queue/table/file endpoints, management policies |
+| Virtual Machines | Full | Full | Full | Full | Full (PATCH) | Power ops (start/stop/restart/deallocate/redeploy), instance view, extensions, synthesized OS disks. Real Docker containers when available, with services, logs, run-command and identity attestation |
+| Managed Disks | Full | Full | Full | Full | Full (PATCH) | `beginGetAccess`/`endGetAccess` return placeholder SAS |
+| Compute Catalog (VM sizes, SKUs, images) | -- | Full | Full | -- | -- | Static catalog used by Terraform plan |
+| User-Assigned Managed Identities | Full | Full | Full | Full | Full (PATCH) | Deterministic `principalId`/`clientId`/`tenantId` |
+| RBAC (role assignments + definitions) | Full | Full | Full | Full | - | Stored only — no access is enforced |
+| Key Vault Vaults | Full | Full | Full | Full | Full (PATCH) | `checkNameAvailability`, access policy updates, soft-deleted vault lookup/purge, and synchronous LRO headers |
+| Cosmos DB SQL Databases & Containers (ARM) | Full | Full | Full | Full | - | |
+| Cosmos DB Table API (ARM) | Full | Full | Full | Full | - | Throughput settings supported |
+| Storage Management Policies | Full | Full | -- | Full | - | Lifecycle rules round-tripped, not enforced |
 | Subscriptions | Full | Full | - | - | - | Mock subscription |
 | Tenants | - | - | Full | - | - | Mock tenant |
 | Providers | Full | Full | Full | - | - | Registration always succeeds |
@@ -40,13 +49,13 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 
 | Service | Operations | Status | Notes |
 |---------|-----------|--------|-------|
-| Blob Storage | Create container, upload, download, list, delete | Full | Content-length tracking |
+| Blob Storage | Create container, upload, download, list, delete, lease, HEAD | Full | Multi-segment blob names, lease acquire/renew/release/break/change, `?comp=metadata`/`?comp=properties`, spec-compliant List Blobs XML, SharedKey auth (optional bypass via `MINIBLUE_DISABLE_SHAREDKEY_AUTH`) |
 | Table Storage | Create table, upsert, get, query, delete entity | Full | Partition/row key support |
 | Queue Storage | Create queue, send, receive, clear, delete | Full | Dequeue count tracking |
-| Key Vault | Set, get, list, delete secrets | Full | Keys and certificates not supported |
+| Key Vault | Set, get, list, delete secrets | Full | Reachable via `/keyvault/{vault}/...` or by `Host: *.vault.azure.net` routing. Vault resources are available through ARM. Keys and certificates not supported. |
 | Cosmos DB | Create, get, replace, delete, list documents | Full | SQL API only, no query language |
 | Service Bus | Create queue/topic, send, receive, delete | Full | No subscriptions, no dead-letter |
-| App Configuration | Set, get, list, delete key-values | Full | No labels, no feature flags |
+| App Configuration | Set, get, list, delete key-values | Full | No labels, no feature flags. Reachable via `/appconfig/{store}/kv/...` or by `Host: *.azconfig.io` routing. |
 | Event Grid | Publish events | Full | No event subscriptions |
 | Container Registry | List manifests, tags | Stub | Docker v2 API stubs only |
 
@@ -59,19 +68,17 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | Instance discovery | Full | Authority validation (internal) |
 | Managed Identity (IMDS) | Full | Token endpoint for workload identity |
 | Cloud metadata | Full | Terraform provider metadata |
-| /health | Full | 26 services listed |
+| /health | Full | 32 services listed |
 | /metrics | Full | Uptime, request count, error rate |
 
 ## Not Implemented
 
 These Azure services have no emulation:
 
-- Azure Kubernetes Service (AKS)
 - Azure App Service
 - Azure Monitor / Log Analytics
 - Azure Active Directory (beyond mock tokens)
 - Azure Policy
-- Azure RBAC
 - Azure Key Vault (keys, certificates)
 - Azure Cosmos DB (Mongo, Cassandra, Gremlin APIs)
 - Azure Service Bus (subscriptions, dead-letter)

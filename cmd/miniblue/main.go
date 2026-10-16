@@ -207,11 +207,11 @@ func generateAndSaveCert(dir string) (tls.Certificate, []byte, error) {
 			if keyPEM, err := os.ReadFile(keyPath); err == nil {
 				if tlsCert, err := tls.X509KeyPair(certPEM, keyPEM); err == nil {
 					if leaf, err := x509.ParseCertificate(tlsCert.Certificate[0]); err == nil {
-						if time.Now().Before(leaf.NotAfter.Add(-24 * time.Hour)) {
+						if time.Now().Before(leaf.NotAfter.Add(-24*time.Hour)) && certCoversMiniblueHosts(leaf) {
 							log.Printf("Reusing existing certificate (expires %s)", leaf.NotAfter.Format("2006-01-02"))
 							return tlsCert, certPEM, nil
 						} else {
-							log.Printf("existing certificate expired, generating new one")
+							log.Printf("existing certificate expired or missing required hostnames, generating new one")
 						}
 					} else {
 						log.Printf("failed to parse existing certificate: %v, generating new one", err)
@@ -241,7 +241,7 @@ func generateAndSaveCert(dir string) (tls.Certificate, []byte, error) {
 	if err != nil {
 		return tls.Certificate{}, nil, err
 	}
-	log.Printf("generated new key for the certificate");
+	log.Printf("generated new key for the certificate")
 
 	serialNumber, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 
@@ -257,7 +257,7 @@ func generateAndSaveCert(dir string) (tls.Certificate, []byte, error) {
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		IsCA:                  true,
-		DNSNames:              []string{"localhost"},
+		DNSNames:              []string{"localhost", "*.azconfig.io", "*.vault.azure.net"},
 		IPAddresses:           []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
 	}
 
@@ -277,4 +277,21 @@ func generateAndSaveCert(dir string) (tls.Certificate, []byte, error) {
 	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
 	log.Printf("generated new certificate")
 	return tlsCert, certPEM, err
+}
+
+func certCoversMiniblueHosts(cert *x509.Certificate) bool {
+	hasLocalhost := false
+	hasAppConfigWildcard := false
+	hasKeyVaultWildcard := false
+	for _, name := range cert.DNSNames {
+		switch strings.ToLower(name) {
+		case "localhost":
+			hasLocalhost = true
+		case "*.azconfig.io":
+			hasAppConfigWildcard = true
+		case "*.vault.azure.net":
+			hasKeyVaultWildcard = true
+		}
+	}
+	return hasLocalhost && hasAppConfigWildcard && hasKeyVaultWildcard
 }

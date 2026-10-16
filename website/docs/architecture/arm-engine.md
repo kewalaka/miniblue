@@ -40,7 +40,7 @@ Services are gated like the others: types are registered only when the `policy` 
 | Extension resource | `{any resource ID}/providers/Microsoft.Authorization/.../x` |
 | Collection (list) | `{scope}/providers/{ns}/{type}` |
 
-The last `providers/{ns}/{type}` group is the resource; everything before it is its scope, parsed recursively. `ID.ScopeKind()` classifies the scope, `ID.Key()` is the lowercased identity.
+The last `providers/{ns}/{type}` group is the resource; everything before it is its scope, parsed recursively. A `providers` segment only delimits a group at an even position (names sit at odd positions), so a resource may be named `providers`. `ID.ScopeKind()` classifies the scope, `ID.Key()` is the lowercased identity.
 
 ## Store
 
@@ -48,13 +48,14 @@ The last `providers/{ns}/{type}` group is the resource; everything before it is 
 
 | Key | Value |
 |-----|-------|
-| `arm:r:<lowercased id>` | the resource document (as returned to clients) |
+| `arm:r:<lowercased id>` | the resource document, as JSON text |
 | `arm:i:<lowercased parent>\|<lowercased type>` | sorted list of child resource keys |
 
 - Lookups are case-insensitive; the stored document keeps the casing of the PUT that created it, so `id` and `name` never change with the casing of later requests.
 - Listing reads the index and then each child: O(children). It does not call `ListByPrefix`, which is O(n) on the memory backend (upstream issue #95).
 - Only `DeleteTree` scans by prefix. The engine uses it only for types that declare `Children`, never on a plain delete.
-- Documents are deep-copied on read and write (the memory backend stores by reference; Postgres round-trips JSON).
+- Documents are stored as JSON text and decoded with `json.Number`. The file and Postgres backends decode stored values into `interface{}`, which turns numbers into `float64` and corrupts integers above 2^53; a string survives every backend unchanged. Request bodies are decoded the same way, so numbers round-trip verbatim. Hooks therefore see `json.Number`, not `float64`. Callers never share state with the backend.
+- Writes are atomic within the process. `Store.Update(id, fn)` runs the read, the change and the write under one store lock, shared with `Delete` and `DeleteTree`. PUT (create-or-replace, and keeping the creating casing) and PATCH (update-if-present, `404` if not) are each a single `Update`, so a concurrent DELETE or PUT cannot be undone or overwritten by a PATCH, and concurrent first PUTs agree on one creator. The lock is one mutex per `Store`, not per resource: operations are small and an emulator does not need more. It does not coordinate several miniblue processes sharing one Postgres.
 - State lives only in the backend, so `/_miniblue/reset` clears it.
 
 ## Behaviour
@@ -98,7 +99,7 @@ Moving `policyDefinitions` to management-group scope is adding `arm.ScopeManagem
 
 ## Tests
 
-- `internal/arm`: parser (every scope shape, casing, invalid paths), store (memory and a JSON round-trip backend), engine CRUD with synthetic types at every scope, children, hooks, PATCH, error cases.
+- `internal/arm`: parser (every scope shape, casing, resources named `providers`, invalid paths), store (memory, a JSON round-trip backend and a file reload; exact numbers; `Update` atomicity), engine CRUD with synthetic types at every scope, children, hooks, PATCH, concurrent PUT/PATCH/DELETE, error cases.
 - `tests/arm_policydefinition_test.go`: policyDefinitions through the real server, including coexistence with the authorization handlers.
 - `tests/terraform/azapi/policy_definition`: the acceptance test. `terraform apply`, `terraform plan -detailed-exitcode` must report no drift, GET with mangled URL casing must return the canonical `id`, `terraform destroy`, GET must be `404`. It runs in CI (`.github/workflows/acceptance.yml`) with pinned Terraform and azapi versions.
 

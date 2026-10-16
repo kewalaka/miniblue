@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/moabukar/miniblue/internal/store"
 )
@@ -39,6 +40,15 @@ func mustID(t *testing.T, path string) ID {
 
 func doc(id ID) map[string]interface{} {
 	return map[string]interface{}{"id": id.String(), "name": id.Name(), "properties": map[string]interface{}{"n": 1}}
+}
+
+// Put is a test helper: an unconditional upsert built on Update.
+func (s *Store) Put(id ID, d map[string]interface{}) (created bool) {
+	_, created, err := s.Update(id, func(map[string]interface{}) map[string]interface{} { return d })
+	if err != nil {
+		panic(err)
+	}
+	return created
 }
 
 func ids(docs []map[string]interface{}) []string {
@@ -228,6 +238,92 @@ func TestStoreDeleteTree(t *testing.T) {
 				t.Errorf("backend keys = %v, want 4", backend.List())
 			}
 		})
+	}
+}
+
+func TestStoreUpdate(t *testing.T) {
+	s := NewStore(store.New())
+	id := mustID(t, "/subscriptions/a1/providers/Microsoft.Authorization/policyDefinitions/p")
+	coll := mustID(t, "/subscriptions/a1/providers/Microsoft.Authorization/policyDefinitions")
+
+	var saw map[string]interface{}
+	got, created, err := s.Update(id, func(cur map[string]interface{}) map[string]interface{} {
+		saw = cur
+		return doc(id)
+	})
+	if err != nil || !created || saw != nil || got == nil {
+		t.Fatalf("create: doc=%v created=%v saw=%v err=%v", got, created, saw, err)
+	}
+
+	got, created, err = s.Update(id, func(cur map[string]interface{}) map[string]interface{} {
+		saw = cur
+		cur["extra"] = true
+		return cur
+	})
+	if err != nil || created || saw == nil || got["extra"] != true {
+		t.Fatalf("update: doc=%v created=%v saw=%v err=%v", got, created, saw, err)
+	}
+	if stored, _ := s.Get(id); stored["extra"] != true {
+		t.Errorf("update not stored: %v", stored)
+	}
+
+	// Returning nil stores nothing, so an update-if-present cannot create.
+	missing := mustID(t, "/subscriptions/a1/providers/Microsoft.Authorization/policyDefinitions/missing")
+	got, created, err = s.Update(missing, func(map[string]interface{}) map[string]interface{} { return nil })
+	if got != nil || created || err != nil {
+		t.Fatalf("nil result: doc=%v created=%v err=%v", got, created, err)
+	}
+	if _, ok := s.Get(missing); ok {
+		t.Error("nil result created the resource")
+	}
+
+	// A document that cannot be encoded is an error and leaves no trace.
+	_, _, err = s.Update(missing, func(map[string]interface{}) map[string]interface{} {
+		return map[string]interface{}{"bad": make(chan int)}
+	})
+	if err == nil {
+		t.Fatal("unencodable document accepted")
+	}
+	if _, ok := s.Get(missing); ok {
+		t.Error("failed Update created the resource")
+	}
+	if got := ids(s.List(coll)); !reflect.DeepEqual(got, []string{id.String()}) {
+		t.Errorf("List = %v, want only %s", got, id)
+	}
+}
+
+func TestStoreUpdateExcludesDelete(t *testing.T) {
+	s := NewStore(store.New())
+	id := mustID(t, "/subscriptions/a1/providers/Microsoft.Authorization/policyDefinitions/p")
+	s.Put(id, doc(id))
+
+	entered, release, updated := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(updated)
+		s.Update(id, func(cur map[string]interface{}) map[string]interface{} {
+			close(entered)
+			<-release
+			cur["extra"] = true
+			return cur
+		})
+	}()
+	<-entered
+
+	deleted := make(chan bool, 1)
+	go func() { deleted <- s.Delete(id) }()
+	select {
+	case <-deleted:
+		t.Fatal("Delete completed while an Update was in flight")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(release)
+	<-updated
+	if !<-deleted {
+		t.Error("Delete should have removed the updated resource")
+	}
+	if _, ok := s.Get(id); ok {
+		t.Error("resource survived Delete")
 	}
 }
 

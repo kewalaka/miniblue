@@ -95,18 +95,27 @@ func (e *Engine) put(w http.ResponseWriter, r *http.Request, t *Type, id ID) {
 	}
 
 	// The id and name keep the casing of the PUT that created the resource,
-	// so responses do not change with the casing of later requests.
-	body["id"], body["name"] = id.WithTypeName(t.Name).String(), id.Name()
-	if cur, ok := e.store.Get(id); ok {
-		body["id"], body["name"] = cur["id"], cur["name"]
+	// so responses do not change with the casing of later requests. Deciding
+	// that and writing happen in one Update, so concurrent PUTs for the same
+	// resource with different URL casing cannot disagree about who created it.
+	canonID, canonName := id.WithTypeName(t.Name).String(), id.Name()
+	doc, created, err := e.store.Update(id, func(cur map[string]interface{}) map[string]interface{} {
+		body["id"], body["name"] = canonID, canonName
+		if cur != nil {
+			body["id"], body["name"] = cur["id"], cur["name"]
+		}
+		body["type"] = t.Name
+		return body
+	})
+	if err != nil {
+		internalError(w, err)
+		return
 	}
-	body["type"] = t.Name
-
 	status := http.StatusOK
-	if e.store.Put(id, body) {
+	if created {
 		status = http.StatusCreated
 	}
-	writeJSON(w, status, body)
+	writeJSON(w, status, doc)
 }
 
 func (e *Engine) delete(w http.ResponseWriter, t *Type, id ID) {
@@ -124,7 +133,8 @@ func (e *Engine) delete(w http.ResponseWriter, t *Type, id ID) {
 }
 
 // patchTags replaces the tags of an existing resource. Other properties in
-// the PATCH body are ignored.
+// the PATCH body are ignored. The read and write are one Update, so a
+// concurrent DELETE or PUT cannot be lost or undone by the PATCH.
 func (e *Engine) patchTags(w http.ResponseWriter, r *http.Request, id ID) {
 	body, ok := readObject(w, r)
 	if !ok {
@@ -135,17 +145,25 @@ func (e *Engine) patchTags(w http.ResponseWriter, r *http.Request, id ID) {
 		azerr.BadRequest(w, "The PATCH body must contain a 'tags' object.")
 		return
 	}
-	doc, found := e.store.Get(id)
-	if !found {
+	doc, _, err := e.store.Update(id, func(cur map[string]interface{}) map[string]interface{} {
+		if cur == nil {
+			return nil
+		}
+		if tags == nil {
+			delete(cur, "tags")
+		} else {
+			cur["tags"] = tags
+		}
+		return cur
+	})
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	if doc == nil {
 		notFound(w, id)
 		return
 	}
-	if tags == nil {
-		delete(doc, "tags")
-	} else {
-		doc["tags"] = tags
-	}
-	e.store.Put(id, doc)
 	writeJSON(w, http.StatusOK, doc)
 }
 
@@ -161,6 +179,10 @@ func readObject(w http.ResponseWriter, r *http.Request) (map[string]interface{},
 func notFound(w http.ResponseWriter, id ID) {
 	azerr.WriteError(w, http.StatusNotFound, "ResourceNotFound",
 		fmt.Sprintf("The resource '%s' could not be found.", id.String()))
+}
+
+func internalError(w http.ResponseWriter, err error) {
+	azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

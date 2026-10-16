@@ -29,7 +29,7 @@ import (
 // the whole backend (O(n), see upstream issue #95). Only DeleteTree scans by
 // prefix, and only for types that declare children.
 type Store struct {
-	mu sync.Mutex // serialises index read-modify-write
+	mu sync.Mutex // serialises all writes, including each index read-modify-write
 	s  *store.Store
 }
 
@@ -51,21 +51,30 @@ func (s *Store) Get(id ID) (map[string]interface{}, bool) {
 	return decodeDoc(v)
 }
 
-// Put stores doc under id and reports whether it was newly created.
-func (s *Store) Put(id ID, doc map[string]interface{}) (created bool) {
-	raw, err := json.Marshal(doc)
-	if err != nil {
-		panic("arm: document is not JSON-encodable: " + err.Error())
-	}
+// Update atomically replaces the document for id. fn receives the current
+// document, or nil if there is none, and returns the document to store; nil
+// stores nothing. It runs under the store lock, so it must not call the Store.
+// Update, Delete and DeleteTree are mutually exclusive, which makes
+// create-if-absent, update-if-present and delete race-free within this
+// process. Update returns the stored document and whether it was created.
+func (s *Store) Update(id ID, fn func(cur map[string]interface{}) map[string]interface{}) (doc map[string]interface{}, created bool, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := resKey(id)
-	created = !s.s.Exists(key)
+	cur, exists := s.Get(id)
+	next := fn(cur)
+	if next == nil {
+		return nil, false, nil
+	}
+	raw, err := json.Marshal(next)
+	if err != nil {
+		return nil, false, err
+	}
 	s.s.Set(key, string(raw))
-	if created {
+	if !exists {
 		s.indexAdd(idxKey(id), key)
 	}
-	return created
+	return next, !exists, nil
 }
 
 // Delete removes the resource and reports whether it existed.

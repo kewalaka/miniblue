@@ -3,9 +3,11 @@ package arm
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/moabukar/miniblue/internal/store"
@@ -279,6 +281,88 @@ func TestEngineRequestErrors(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			want(t, do(h, c.method, c.path, c.body), c.status)
 		})
+	}
+}
+
+func TestEnginePatchDoesNotResurrectDeleted(t *testing.T) {
+	h := newHandler(t)
+	path := subScope + "/providers/Microsoft.Test/widgets/w"
+	want(t, do(h, http.MethodPut, path+apiV, `{"properties":{"p":1}}`), http.StatusCreated)
+	want(t, do(h, http.MethodDelete, path+apiV, ""), http.StatusOK)
+	want(t, do(h, http.MethodPatch, path+apiV, `{"tags":{"a":"1"}}`), http.StatusNotFound)
+	want(t, do(h, http.MethodGet, path+apiV, ""), http.StatusNotFound)
+	if got := decode(t, do(h, http.MethodGet, subScope+"/providers/Microsoft.Test/widgets"+apiV, "")); len(got["value"].([]interface{})) != 0 {
+		t.Fatalf("deleted resource listed: %v", got)
+	}
+}
+
+// PATCH must never write after a concurrent DELETE has removed the resource.
+func TestEnginePatchRacingDelete(t *testing.T) {
+	h := newHandler(t)
+	path := subScope + "/providers/Microsoft.Test/widgets/w"
+	for i := 0; i < 200; i++ {
+		want(t, do(h, http.MethodPut, path+apiV, `{"properties":{"p":1}}`), http.StatusCreated)
+		var wg sync.WaitGroup
+		for j := 0; j < 4; j++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				do(h, http.MethodPatch, path+apiV, `{"tags":{"a":"1"}}`)
+			}()
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			do(h, http.MethodDelete, path+apiV, "")
+		}()
+		wg.Wait()
+		if w := do(h, http.MethodGet, path+apiV, ""); w.Code != http.StatusNotFound {
+			t.Fatalf("iteration %d: resource resurrected by PATCH: %d %s", i, w.Code, w.Body)
+		}
+	}
+}
+
+// Concurrent first PUTs that differ only in URL casing must agree on one
+// creator: a single 201, and every response carrying the committed id.
+func TestEngineConcurrentCreateKeepsOneIdentity(t *testing.T) {
+	h := newHandler(t)
+	for i := 0; i < 50; i++ {
+		base := fmt.Sprintf("Res%d", i)
+		variants := []string{base, strings.ToUpper(base), strings.ToLower(base), "r" + strings.ToUpper(base[1:])}
+		var (
+			wg  sync.WaitGroup
+			mu  sync.Mutex
+			got []*httptest.ResponseRecorder
+		)
+		for _, name := range variants {
+			wg.Add(1)
+			go func(name string) {
+				defer wg.Done()
+				w := do(h, http.MethodPut, subScope+"/providers/Microsoft.Test/widgets/"+name+apiV, `{}`)
+				mu.Lock()
+				got = append(got, w)
+				mu.Unlock()
+			}(name)
+		}
+		wg.Wait()
+
+		stored := decode(t, do(h, http.MethodGet, subScope+"/providers/Microsoft.Test/widgets/"+base+apiV, ""))
+		creates := 0
+		for _, w := range got {
+			if w.Code == http.StatusCreated {
+				creates++
+			} else if w.Code != http.StatusOK {
+				t.Fatalf("PUT status = %d: %s", w.Code, w.Body)
+			}
+			m := decode(t, w)
+			if m["id"] != stored["id"] || m["name"] != stored["name"] {
+				t.Fatalf("iteration %d: response id/name %v/%v differs from stored %v/%v",
+					i, m["id"], m["name"], stored["id"], stored["name"])
+			}
+		}
+		if creates != 1 {
+			t.Fatalf("iteration %d: %d creates, want 1", i, creates)
+		}
 	}
 }
 

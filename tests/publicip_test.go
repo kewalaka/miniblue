@@ -156,6 +156,38 @@ func TestPublicIPDefaults(t *testing.T) {
 	doRequest(t, "DELETE", base+"/pip-defaults"+av, "").Body.Close()
 }
 
+// azurerm reads zones and ipTags back; dropping them shows as plan drift.
+func TestPublicIPZonesAndIPTagsRoundTrip(t *testing.T) {
+	ts := setupServer()
+	defer ts.Close()
+	base := ts.URL + "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/publicIPAddresses"
+	av := "?api-version=2023-09-01"
+
+	resp := doRequest(t, "PUT", base+"/pip-zones"+av,
+		`{"location":"eastus","zones":["1","2"],"properties":{"ipTags":[{"ipTagType":"FirstPartyUsage","tag":"/Sql"}]}}`)
+	expectStatus(t, resp, 201)
+	m := decodeJSON(t, resp)
+	resp.Body.Close()
+	if zones, _ := m["zones"].([]interface{}); len(zones) != 2 {
+		t.Fatalf("expected zones echoed, got %v", m["zones"])
+	}
+	if tags, _ := m["properties"].(map[string]interface{})["ipTags"].([]interface{}); len(tags) != 1 {
+		t.Fatalf("expected ipTags echoed, got %v", m["properties"])
+	}
+
+	resp = doRequest(t, "PUT", base+"/pip-nozones"+av, `{"location":"eastus"}`)
+	expectStatus(t, resp, 201)
+	m = decodeJSON(t, resp)
+	resp.Body.Close()
+	if _, ok := m["zones"]; ok {
+		t.Fatalf("expected no zones key when none requested, got %v", m["zones"])
+	}
+	tags, ok := m["properties"].(map[string]interface{})["ipTags"].([]interface{})
+	if !ok || len(tags) != 0 {
+		t.Fatalf("expected empty ipTags array, got %v", m["properties"])
+	}
+}
+
 func TestPublicIPMultipleResources(t *testing.T) {
 	ts := setupServer()
 	defer ts.Close()

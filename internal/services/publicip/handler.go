@@ -91,7 +91,12 @@ func buildResponse(sub, rg, name string, input map[string]interface{}, existingI
 		tags = map[string]interface{}{}
 	}
 
-	return map[string]interface{}{
+	ipTags := props["ipTags"]
+	if ipTags == nil {
+		ipTags = []interface{}{}
+	}
+
+	resp := map[string]interface{}{
 		"id":       id,
 		"name":     name,
 		"type":     "Microsoft.Network/publicIPAddresses",
@@ -99,15 +104,20 @@ func buildResponse(sub, rg, name string, input map[string]interface{}, existingI
 		"tags":     tags,
 		"sku":      sku,
 		"properties": map[string]interface{}{
-			"provisioningState":       "Succeeded",
+			"provisioningState":        "Succeeded",
 			"publicIPAllocationMethod": allocationMethod,
-			"publicIPAddressVersion":  addressVersion,
-			"ipAddress":               ipAddress,
-			"idleTimeoutInMinutes":    idleTimeout,
-			"ipConfiguration":         nil,
-			"dnsSettings":             props["dnsSettings"],
+			"publicIPAddressVersion":   addressVersion,
+			"ipAddress":                ipAddress,
+			"idleTimeoutInMinutes":     idleTimeout,
+			"ipConfiguration":          nil,
+			"dnsSettings":              props["dnsSettings"],
+			"ipTags":                   ipTags,
 		},
 	}
+	if zones, ok := input["zones"].([]interface{}); ok && len(zones) > 0 {
+		resp["zones"] = zones
+	}
+	return resp
 }
 
 func (h *Handler) CreateOrUpdate(w http.ResponseWriter, r *http.Request) {

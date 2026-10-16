@@ -105,3 +105,27 @@ func TestMetadataEndpoints(t *testing.T) {
 	defer resp.Body.Close()
 	expectStatus(t, resp, 200)
 }
+
+// The storage suffix must match the host-style account endpoints ARM returns, or azurerm
+// cannot parse the account ID. With MINIBLUE_STORAGE_ENDPOINT set they are path-style instead.
+func TestMetadataStorageSuffix(t *testing.T) {
+	suffix := func() interface{} {
+		ts := setupServer()
+		defer ts.Close()
+		resp := doRequest(t, "GET", ts.URL+"/metadata/endpoints", "")
+		defer resp.Body.Close()
+		expectStatus(t, resp, 200)
+		return decodeJSON(t, resp)["suffixes"].(map[string]interface{})["storage"]
+	}
+
+	t.Setenv("MINIBLUE_STORAGE_ENDPOINT", "")
+	t.Setenv("PORT", "4566")
+	if got := suffix(); got != "core.windows.net" {
+		t.Fatalf("expected core.windows.net, got %v", got)
+	}
+
+	t.Setenv("MINIBLUE_STORAGE_ENDPOINT", "http://localhost:4566")
+	if got := suffix(); got != "localhost:4566" {
+		t.Fatalf("expected localhost:4566, got %v", got)
+	}
+}

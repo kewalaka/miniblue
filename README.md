@@ -80,16 +80,16 @@ bash scripts/trust-cert.sh  # one-time cert trust
 ```hcl
 provider "azurerm" {
   features {}
-  metadata_host              = "localhost:4567"
-  skip_provider_registration = true
-  subscription_id            = "00000000-0000-0000-0000-000000000000"
-  tenant_id                  = "00000000-0000-0000-0000-000000000001"
-  client_id                  = "miniblue"
-  client_secret              = "miniblue"
+  metadata_host                   = "localhost:4567"
+  resource_provider_registrations = "none"
+  subscription_id                 = "00000000-0000-0000-0000-000000000000"
+  tenant_id                       = "00000000-0000-0000-0000-000000000001"
+  client_id                       = "miniblue"
+  client_secret                   = "miniblue"
 }
 ```
 
-See [examples/terraform/](examples/terraform/) for full examples including three-tier, serverless, and microservices scenarios.
+Targets azurerm v4/v5 (CI runs 5.10.0); `skip_provider_registration` was removed in v4. See [examples/terraform/](examples/terraform/) for full examples including three-tier, serverless, and microservices scenarios. Go on Windows ignores `SSL_CERT_FILE`, so run Terraform from WSL2/Linux or import the cert into the Windows store.
 
 ## Real Backends (optional)
 

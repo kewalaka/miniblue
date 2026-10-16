@@ -16,7 +16,12 @@ miniblue works with zero configuration out of the box. This page covers everythi
 | `MINIBLUE_DISABLE_SHAREDKEY_AUTH` | _(unset)_ | When truthy (`1`, `true`, `yes`, `on`), disables SharedKey signature verification on the blob data-plane. Dev-only — never enable in environments that model production. |
 | `MINIBLUE_DISABLE_DOCKER` | _(unset)_ | When set, forces [Virtual Machines](../services/virtual-machines.md) into stub mode even if a Docker daemon is reachable. |
 
-When set, storage accounts return local endpoints (e.g., `http://localhost:4566/blob/{accountName}/`) instead of real Azure endpoints (e.g., `https://{accountName}.blob.core.windows.net/`). This allows SDKs and tools to connect directly to miniblue's local blob/queue/table/file services for data-plane testing.
+When set, storage accounts return local **path-style** endpoints (e.g., `http://localhost:4566/blob/{accountName}/`) instead of real Azure endpoints (e.g., `https://{accountName}.blob.core.windows.net/`). This allows SDKs and tools to connect directly to miniblue's local blob/queue/table/file services for data-plane testing.
+
+!!! warning "Terraform and `MINIBLUE_STORAGE_ENDPOINT`"
+    With this variable set, `azurerm_storage_container` and `azurerm_storage_blob` cannot work: the provider cannot parse path-style endpoints. Leave it unset for Terraform, in which case `azurerm_storage_container` works through the ARM API (use `storage_account_id`). `azurerm_storage_blob` and `backend "azurerm"` need host-style data-plane endpoints (`https://{accountName}.blob.core.windows.net/`) served by miniblue, which is a planned follow-up.
+
+The metadata endpoint's `suffixes.storage` is `core.windows.net` by default, and `localhost:<PORT>` when `MINIBLUE_STORAGE_ENDPOINT` is set.
 
 Example -- run on custom ports:
 
@@ -49,11 +54,22 @@ The certificate is valid for 1 year. miniblue reuses an existing certificate if 
 
 You need to trust the certificate for Terraform, Go SDKs, and other tools that verify TLS.
 
-=== "Quick (current session)"
+=== "Quick (Linux / WSL2, current session)"
 
     ```bash
-    export SSL_CERT_FILE=~/.miniblue/cert.pem
+    cat /etc/ssl/certs/ca-certificates.crt ~/.miniblue/cert.pem > ~/.miniblue/ca-bundle.pem
+    export SSL_CERT_FILE=~/.miniblue/ca-bundle.pem
     ```
+
+    `SSL_CERT_FILE` replaces Go's system roots, so the bundle keeps them (otherwise `terraform init` cannot reach the provider registry).
+
+=== "Windows (permanent)"
+
+    ```powershell
+    certutil -user -addstore Root "$env:USERPROFILE\.miniblue\cert.pem"
+    ```
+
+    Go on Windows ignores `SSL_CERT_FILE`; it uses the Windows certificate store. Alternatively run Terraform from WSL2.
 
 === "macOS (permanent)"
 

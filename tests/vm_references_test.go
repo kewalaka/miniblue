@@ -27,7 +27,7 @@ func TestVirtualMachineFromImageRejectsExistingDiskName(t *testing.T) {
 
 	resp := doRequest(t, "PUT", compute+"/disks/user-disk"+av,
 		`{"location":"eastus","tags":{"owner":"user"},"properties":{"creationData":{"createOption":"Empty"},"diskSizeGB":64}}`)
-	expectStatus(t, resp, 201)
+	expectStatus(t, resp, 200)
 	resp.Body.Close()
 	resp = doRequest(t, "PUT", compute+"/virtualMachines/vm-a"+av, vmBody("vm-a-os"))
 	expectStatus(t, resp, 201)

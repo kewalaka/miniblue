@@ -241,14 +241,11 @@ func (h *Handler) CreateOrUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	k := h.key(sub, rg, name)
-	existing, exists := h.store.Get(k)
+	existing, _ := h.store.Get(k)
 	disk := buildResponse(sub, rg, name, input, asMap(existing))
 	h.store.Set(k, disk)
-	if exists {
-		w.WriteHeader(http.StatusOK)
-	} else {
-		w.WriteHeader(http.StatusCreated)
-	}
+	// The Compute disk SDK only accepts 200/202 for PUT; 201 fails the apply.
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(disk)
 }
 
@@ -295,8 +292,9 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	rg := chi.URLParam(r, "resourceGroupName")
 	name := chi.URLParam(r, "diskName")
 
+	// VM deletion already removes OS/data disks, so a follow-up disk delete must succeed.
 	if !h.store.Delete(h.key(sub, rg, name)) {
-		azerr.NotFound(w, "Microsoft.Compute/disks", name)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)

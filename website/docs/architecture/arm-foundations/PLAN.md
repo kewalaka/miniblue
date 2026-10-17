@@ -58,6 +58,12 @@ The two slices run in parallel. Within each, follow the Depends column.
 | 2.5 | `test(apim): terraform azurerm and azapi consumption fixtures` | S | 2.4 |
 | 2.6 | `feat(policy): policyAssignments and opt-in deny/audit enforcement` | M | G1 |
 
+**Acceptance (scenarios).** Each PR ports the T1/T2 rows of its [catalogue](catalogue/index.md) page and lists the ids it ported:
+
+- 2.1 to 2.3: [authorization](catalogue/authorization.md). Note the real-Azure 409 `RoleAssignmentExists` and the `type` (not `roleType`) role-definition property.
+- 2.4, 2.5: [API Management](catalogue/api-management.md) and its [provider notes](catalogue/api-management-provider-notes.md). Tier A only. The T3 fixtures are nightly, never per-PR.
+- 2.6: no harvested scenarios for assignments. Management-group scope for definitions is `G2-T32` ([management groups](catalogue/management-groups.md)).
+
 **Gate G2:**
 
 - The slices landed without new engine seams beyond ADR-0003. If they did need one, the ADR was amended first.
@@ -74,6 +80,8 @@ The two slices run in parallel. Within each, follow the Depends column.
 | 3.3 | `refactor(resourcegroups): serve resource groups via arm engine` | M | G2 | `/resources` from the engine. `ScopeExists` becomes engine-native. RG delete becomes sync 200, so drop the `operationresults` 202. Bumps `SchemaVersion`. |
 | 3.4 | `feat(server): derive /providers from registry` | S | G2 | Merge with the existing static list until legacy types register. |
 
+**Acceptance (scenarios).** 3.1 and 3.2: [deployments](catalogue/deployments.md). 3.3: [resource groups](catalogue/resource-groups.md). 3.4: [subscriptions and providers](catalogue/subscriptions-providers.md). Conflicts to resolve first: management-group PUT/DELETE are LROs in real Azure but ADR-0006 is sync-only, and several real PUTs return 200 or 202 only (not 201), which needs a per-type status override (see [engine lessons](catalogue/engine-lessons.md)).
+
 **Gate G3:**
 
 - An ARM template with `dependsOn` across an engine type and a legacy type deploys.
@@ -88,6 +96,8 @@ Follow the ADR-0007 recipe exactly. One PR per type family, titled `refactor(<rp
 - **Wave 4:** network, networkinterfaces, loadbalancer, appgw, storageaccounts (ARM), keyvault (ARM), acr (ARM), appconfig (ARM), dbpostgres, dbmysql, sqldb, cosmosdb (ARM), servicebus (ARM), aci.
 
 `Type.Actions` lands with the first `listKeys` consumer, which is a reviewed seam addition.
+
+Each wave PR cites its [catalogue](catalogue/index.md) page as the acceptance list (T1 as the `Sample`, T2 as `tests/arm_<x>_test.go`). The pages also record the bugs to fix in the same PR (for example Redis PUT ignoring the body, Cosmos container `partitionKey`, ACI `buildResponse` dropping fields).
 
 **Gate G4 (per wave):**
 
@@ -107,6 +117,10 @@ Follow the ADR-0007 recipe exactly. One PR per type family, titled `refactor(<rp
 
 - **Passthrough for unregistered types** (`MINIBLUE_ARM_PASSTHROUGH=1`, ADR-0002). The design is recorded so nobody reinvents it differently. Build it when a user brings an azapi config that needs a type nobody intends to register. It is an S-sized PR touching only the chi NotFound handler.
 - **Legacy `Guard`** (ADR-0008).
+
+## Proposed, not scheduled
+
+Rows suggested by the [scenario catalogue](catalogue/engine-lessons.md) (secret projection, seeded singleton children, soft-delete seam, `NameTaken`/`ValidateLocation`, provider registration state, deployments validate/cancel/export, `$top`/`nextLink`, extra `armtest` checks). They are proposals: each needs an owner decision, and any seam needs an ADR amendment first. New resource types listed in the catalogue (SQL, Insights, Log Analytics, Event Hubs, management groups) are engine-only registrations and may start after G2.
 
 ## Rules for implementing agents
 

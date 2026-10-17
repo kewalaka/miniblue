@@ -2,7 +2,7 @@
 
 > **Status: input, partly superseded.** This spike came before the ARM foundation ADRs. Where they differ, the [ADRs](index.md) and the [PLAN](PLAN.md) win. §0 lists every change. The spike is still the source for the resource ranking (§3), the test tiers (§4) and the APIM provider findings (§5).
 
-Inputs: a second Azure emulator used as inspiration only (its behaviour is not spec; about 480 scenarios catalogued), the landed `internal/arm` engine, and the azurerm provider source (for APIM). The detailed reports and scenario catalogues are not in the repo. Scenario ids below refer to them.
+Inputs: a second Azure emulator used as inspiration only (its behaviour is not spec), the landed `internal/arm` engine, and the azurerm provider source (for APIM). The scenarios are in the [scenario catalogue](catalogue/index.md) and the scenario ids below resolve there. The detailed inventory reports are not in the repo.
 
 ## 0. What the ADRs changed
 
@@ -27,7 +27,7 @@ Inputs: a second Azure emulator used as inspiration only (its behaviour is not s
 
 ## 1. Verdict
 
-- **Yes, a lot ports.** ~25 resource types are plain registrations or hooks on the engine today or after small engine work; ~480 test scenarios were harvested (per-resource and cross-cutting scenario catalogues, not in the repo).
+- **Yes, a lot ports.** ~25 resource types are plain registrations or hooks on the engine today or after small engine work; ~480 test scenarios were harvested (see the [scenario catalogue](catalogue/index.md)).
 - **The engine, not the resources, is the bottleneck.** Five missing primitives gate ~25 rows: subscription-wide list, POST actions, parent-exists, typed hook errors, PATCH beyond tags. Land those first (S/M each).
 - **APIM is feasible: medium effort, high value**, and the Consumption-SKU slice needs no APIM-specific engine seams (it starts after G1, see §0). ~4 to 6 dev-days; +2 for Developer/Basic/Standard/Premium.
 - **The reference is a weak oracle**: no api-version validation, fully synchronous, per-service error codes, mandatory `If-Match` on APIM, several outright bugs. Port *scenarios*, assert real Azure status codes/bodies.
@@ -88,7 +88,7 @@ Method: scenarios only, re-written as our own tests asserting real-Azure contrac
 | Tier | Where | What | Count (approx) |
 |---|---|---|---|
 | T1 conformance | `internal/arm/armtest` (table-driven, needs `Registry.Types()`) | One sample per registered type; asserts PUT 201/200, GET, list, DELETE 200/204, canonical casing, missing or malformed api-version 400, name/id mismatch 400, children cascade, PATCH; options for ETag/paging; coverage test fails build if a type has no sample. Reference has no generic contract tests, so this is net-new | 25 (`X1…X27`) |
-| T2 per-resource | `tests/arm_<x>_test.go` via real server (pattern: `tests/arm_policydefinition_test.go`) | Scenario catalogues (not in the repo), ported as raw-HTTP httptest | ~330 |
+| T2 per-resource | `tests/arm_<x>_test.go` via real server (pattern: `tests/arm_policydefinition_test.go`) | Scenario catalogue pages (see [catalogue](catalogue/index.md)), ported as raw-HTTP httptest | ~330 |
 | T3 Terraform acceptance | `tests/terraform/{azurerm,azapi}/<case>/` | New: `azurerm/{apim-consumption,sql,servicebus,app_configuration,container_registry,cosmosdb,mgmt-group}`, `azapi/{servicebus,storage_account_basic,virtual_network_basic,apim}`, `azurerm_availability_set` in compute, negative fixture (invalid name must fail with surfaced 400). Batch azapi into one job (each fixture = a full CI job today); `TF_PLUGIN_CACHE_DIR`; nightly latest-provider | ~12 fixtures |
 | T4 client smoke | `tests/sdk/go`, Python, scripted `az` | Go SDK (`armresources`, policy defs: LRO polling, ID casing, 404 after delete), Python SDK, `az cloud register` + version matrix. Harness: CA-bundle trust per client (`SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, certifi for az, `AZURE_CORE_INSTANCE_DISCOVERY=false`); document the matrix in `acceptance-tests.md` | 3 suites |
 | T5 deployments | extend bespoke handler | validate, exportTemplate, cancel/HEAD, subscription scope. what-if is out of scope (needs async, ADR-0006) | ~15 (`X40…48`) |

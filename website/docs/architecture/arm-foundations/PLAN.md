@@ -137,7 +137,7 @@ Three loops. The first one keeps CI and review cheap, so do not skip it.
 
 - Push when the inner loop is green. Then run `gh pr checks <n>` and wait for it. Do not poll or re-run to see if it passes.
 - On a failure, reproduce it locally, fix it in one commit, push once. A new push cancels the run in progress.
-- Terraform acceptance (`acceptance.yml`, `acceptance-azurerm.yml`) runs on a PR only when Go code, `go.mod`/`go.sum`, a Terraform fixture or example, or the workflow itself changes. It always runs on push to main. Docs-only PRs skip it.
+- Terraform acceptance (`acceptance.yml`, `acceptance-azurerm.yml`) runs on a PR only when Go code, `go.mod`/`go.sum`, a Terraform fixture or example, or the workflow itself changes. `ci.yml` and `e2e.yml` skip docs-only PRs (`website/**`, `**/*.md`, issue and PR templates). All of them always run on push to main.
 - A slow fixture (API Management or similar) is never a per-PR job. Put it in a scheduled or manual workflow.
 
 **3. Review loop (after CI is green).**

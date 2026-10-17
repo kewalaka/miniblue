@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'website/**'
+      - '**/*.md'
+      - 'assets/**'
+      - '.zed/**'
+      - '.github/ISSUE_TEMPLATE/**'
 
 jobs:
   vet:

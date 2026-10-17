@@ -42,8 +42,6 @@ func TestHandlersAfterRestart(t *testing.T) {
 		t.Fatalf("upload: %d %s", w.Code, w.Body)
 	}
 
-	s = restart()
-
 	steps := []struct {
 		name     string
 		method   string
@@ -74,6 +72,10 @@ func TestHandlersAfterRestart(t *testing.T) {
 			wantHdr: map[string]string{"Content-Type": "application/json", "x-ms-meta-k": "v2"}},
 	}
 	for _, st := range steps {
+		// Restart before every step: handlers that write a Blob struct back
+		// would otherwise make the next step hit the in-memory struct fast
+		// path instead of the persisted map.
+		s = restart()
 		t.Run(st.name, func(t *testing.T) {
 			w := do(s, st.method, st.path, st.hdr)
 			if w.Code != st.wantCode {

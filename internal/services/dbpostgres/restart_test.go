@@ -24,6 +24,8 @@ func do(s *store.Store, method, path string) *httptest.ResponseRecorder {
 // real databases must still be found and dropped when the server is deleted.
 func TestDeleteServerDropsDatabasesAfterRestart(t *testing.T) {
 	s, restart := storetest.NewFile(t)
+	// Setup must not reach a real Postgres, even if POSTGRES_URL is inherited.
+	t.Setenv("POSTGRES_URL", "")
 	const server = "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.DBforPostgreSQL/flexibleServers/srv1"
 	for _, p := range []string{server, server + "/databases/db1"} {
 		if w := do(s, http.MethodPut, p); w.Code != http.StatusCreated {

@@ -121,6 +121,97 @@ func TestResourceGroupDeleteCascade(t *testing.T) {
 	expectStatus(t, resp, 404)
 }
 
+func TestResourceGroupDeleteCascadeKeyVault(t *testing.T) {
+	ts := setupServer()
+	defer ts.Close()
+
+	av := "?api-version=2023-07-01"
+	base := ts.URL + "/subscriptions/sub1"
+	vaultURL := func(rg, name string) string {
+		return base + "/resourceGroups/" + rg + "/providers/Microsoft.KeyVault/vaults/" + name + av
+	}
+	vnetURL := base + "/resourceGroups/myRG/providers/Microsoft.Network/virtualNetworks/vnet1" + av
+	vaultBody := `{"location":"eastus","properties":{"tenantId":"00000000-0000-0000-0000-000000000000","sku":{"family":"A","name":"standard"}}}`
+
+	for _, rg := range []string{"myRG", "otherRG"} {
+		resp := doRequest(t, "PUT", base+"/resourcegroups/"+rg+av, `{"location":"eastus"}`)
+		resp.Body.Close()
+		expectStatus(t, resp, 201)
+	}
+	for rg, name := range map[string]string{"myRG": "kvmine", "otherRG": "kvother"} {
+		resp := doRequest(t, "PUT", vaultURL(rg, name), vaultBody)
+		resp.Body.Close()
+		expectStatus(t, resp, 201)
+	}
+	resp := doRequest(t, "PUT", vnetURL, `{"location":"eastus","properties":{"addressSpace":{"addressPrefixes":["10.0.0.0/16"]}}}`)
+	resp.Body.Close()
+	resp = doRequest(t, "PUT", ts.URL+"/keyvault/kvmine/secrets/db-pass", `{"value":"supersecret"}`)
+	resp.Body.Close()
+	expectStatus(t, resp, 200)
+
+	resp = doRequest(t, "DELETE", base+"/resourcegroups/myRG"+av, "")
+	resp.Body.Close()
+	expectStatus(t, resp, 202)
+
+	for name, url := range map[string]string{
+		"vault":  vaultURL("myRG", "kvmine"),
+		"vnet":   vnetURL,
+		"secret": ts.URL + "/keyvault/kvmine/secrets/db-pass",
+	} {
+		resp = doRequest(t, "GET", url, "")
+		resp.Body.Close()
+		if resp.StatusCode != 404 {
+			t.Errorf("%s: expected 404 after RG delete, got %d", name, resp.StatusCode)
+		}
+	}
+
+	resp = doRequest(t, "GET", base+"/resourceGroups/myRG/providers/Microsoft.KeyVault/vaults"+av, "")
+	list := decodeJSON(t, resp)
+	resp.Body.Close()
+	if items, _ := list["value"].([]interface{}); len(items) != 0 {
+		t.Errorf("expected no vaults in the deleted RG, got %v", items)
+	}
+
+	// Other resource groups are untouched.
+	resp = doRequest(t, "GET", vaultURL("otherRG", "kvother"), "")
+	resp.Body.Close()
+	expectStatus(t, resp, 200)
+}
+
+// A case-only PATCH rewrites the stored vault name, but secrets written on the
+// path form keep the original spelling; the cascade must still remove them.
+func TestResourceGroupDeleteCascadeKeyVaultCaseRename(t *testing.T) {
+	ts := setupServer()
+	defer ts.Close()
+
+	av := "?api-version=2023-07-01"
+	base := ts.URL + "/subscriptions/sub1"
+	vaultURL := base + "/resourceGroups/myRG/providers/Microsoft.KeyVault/vaults/"
+
+	resp := doRequest(t, "PUT", base+"/resourcegroups/myRG"+av, `{"location":"eastus"}`)
+	resp.Body.Close()
+	expectStatus(t, resp, 201)
+	resp = doRequest(t, "PUT", vaultURL+"MyVault"+av, `{"location":"eastus","properties":{"tenantId":"00000000-0000-0000-0000-000000000000","sku":{"family":"A","name":"standard"}}}`)
+	resp.Body.Close()
+	expectStatus(t, resp, 201)
+
+	resp = doRequest(t, "PUT", ts.URL+"/keyvault/MyVault/secrets/db-pass", `{"value":"supersecret"}`)
+	resp.Body.Close()
+	expectStatus(t, resp, 200)
+
+	resp = doRequest(t, "PATCH", vaultURL+"myvault"+av, `{"tags":{"env":"test"}}`)
+	resp.Body.Close()
+	expectStatus(t, resp, 200)
+
+	resp = doRequest(t, "DELETE", base+"/resourcegroups/myRG"+av, "")
+	resp.Body.Close()
+	expectStatus(t, resp, 202)
+
+	resp = doRequest(t, "GET", ts.URL+"/keyvault/MyVault/secrets/db-pass", "")
+	resp.Body.Close()
+	expectStatus(t, resp, 404)
+}
+
 func TestResourceGroupMissingLocation(t *testing.T) {
 	ts := setupServer()
 	defer ts.Close()

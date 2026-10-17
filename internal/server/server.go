@@ -209,7 +209,7 @@ func (s *Server) setupRoutes() {
 		register func()
 	}
 	services := []namedService{
-		{"resourcegroups", func() { resourcegroups.NewHandler(s.store).Register(s.router) }},
+		{"resourcegroups", func() { resourcegroups.NewHandler(s.store, s.rgCleaners()...).Register(s.router) }},
 		{"blob", func() { blob.NewHandler(s.store).Register(s.router) }},
 		{"table", func() { table.NewHandler(s.store).Register(s.router) }},
 		{"queue", func() { queue.NewHandler(s.store).Register(s.router) }},
@@ -272,6 +272,41 @@ func (s *Server) setupRoutes() {
 	}
 	if serviceEnabled("policy", allowed) {
 		s.services = append(s.services, "policy")
+	}
+}
+
+// rgCleaners lists the legacy per-service cleaners that run on resource group
+// delete. vm must run before disks and networkinterfaces: it detaches them
+// from their VMs first.
+func (s *Server) rgCleaners() []resourcegroups.Cleaner {
+	bind := func(clean func(*store.Store, string, string)) resourcegroups.Cleaner {
+		return func(sub, rg string) { clean(s.store, sub, rg) }
+	}
+	return []resourcegroups.Cleaner{
+		bind(network.CleanupRG),
+		bind(sites.CleanupRG),
+		bind(acr.CleanupRG),
+		bind(eventgrid.CleanupRG),
+		bind(dns.CleanupRG),
+		bind(redis.CleanupRG),
+		bind(dbpostgres.CleanupRG),
+		bind(dbmysql.CleanupRG),
+		bind(sqldb.CleanupRG),
+		bind(aci.CleanupRG),
+		bind(aks.CleanupRG),
+		bind(vm.CleanupRG),
+		bind(identity.CleanupRG),
+		bind(nsg.CleanupRG),
+		bind(publicip.CleanupRG),
+		bind(disks.CleanupRG),
+		bind(networkinterfaces.CleanupRG),
+		bind(loadbalancer.CleanupRG),
+		bind(appgw.CleanupRG),
+		bind(storageaccounts.CleanupRG),
+		bind(cosmosdb.CleanupRG),
+		bind(servicebus.CleanupRG),
+		bind(appconfig.CleanupRG),
+		bind(keyvault.CleanupRG),
 	}
 }
 

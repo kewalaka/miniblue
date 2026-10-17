@@ -7,8 +7,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/moabukar/miniblue/internal/azerr"
-	"github.com/moabukar/miniblue/internal/services/aks"
-	"github.com/moabukar/miniblue/internal/services/vm"
 	"github.com/moabukar/miniblue/internal/store"
 )
 
@@ -23,12 +21,19 @@ type ResourceGroup struct {
 	} `json:"properties"`
 }
 
+// Cleaner removes the resources one service owns in a resource group. Services
+// export their own and the server passes them in, so this package does not
+// import them.
+type Cleaner func(sub, rg string)
+
 type Handler struct {
-	store *store.Store
+	store    *store.Store
+	cleaners []Cleaner
 }
 
-func NewHandler(s *store.Store) *Handler {
-	return &Handler{store: s}
+// NewHandler returns a handler whose delete runs the cleaners in order.
+func NewHandler(s *store.Store, cleaners ...Cleaner) *Handler {
+	return &Handler{store: s, cleaners: cleaners}
 }
 
 func (h *Handler) Register(r chi.Router) {
@@ -149,50 +154,9 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Also clean up resources in this resource group
-	p := sub + ":" + name + ":"
-	h.store.DeleteByPrefix("vnet:" + p)
-	h.store.DeleteByPrefix("subnet:" + p)
-	h.store.DeleteByPrefix("func:" + p)
-	h.store.DeleteByPrefix("acr:registry:" + p)
-	h.store.DeleteByPrefix("eg:topic:" + p)
-	h.store.DeleteByPrefix("dns:zone:" + p)
-	h.store.DeleteByPrefix("dns:record:" + p)
-	h.store.DeleteByPrefix("redis:" + p)
-	h.store.DeleteByPrefix("pgflex:server:" + p)
-	h.store.DeleteByPrefix("pgflex:db:" + p)
-	h.store.DeleteByPrefix("dbmysql:server:" + p)
-	h.store.DeleteByPrefix("dbmysql:db:" + p)
-	h.store.DeleteByPrefix("sqldb:server:" + p)
-	h.store.DeleteByPrefix("sqldb:db:" + p)
-	h.store.DeleteByPrefix("aci:containergroup:" + p)
-	// Tear down any real AKS k3s containers BEFORE clearing the store, so we
-	// can read the backend handles. No-op in stub mode.
-	aks.CleanupClustersInRG(h.store, sub, name)
-	h.store.DeleteByPrefix("aks:cluster:" + p)
-	// Same for VM containers/networks and their identity-secret index entries.
-	vm.CleanupVMsInRG(h.store, sub, name)
-	h.store.DeleteByPrefix("vm:" + p)
-	h.store.DeleteByPrefix("vmsvc:" + p)
-	h.store.DeleteByPrefix("msi:identity:" + p)
-	h.store.DeleteByPrefix("nsg:" + p)
-	h.store.DeleteByPrefix("nsgrule:" + p)
-	h.store.DeleteByPrefix("publicip:" + p)
-	h.store.DeleteByPrefix("disk:" + p)
-	h.store.DeleteByPrefix("vmext:" + p)
-	h.store.DeleteByPrefix("nic:" + p)
-	h.store.DeleteByPrefix("lb:" + p)
-	h.store.DeleteByPrefix("appgw:" + p)
-	h.store.DeleteByPrefix("blob:account:" + p)
-	h.store.DeleteByPrefix("blob:armcontainer:" + p)
-	h.store.DeleteByPrefix("blob:managementpolicy:" + p)
-	h.store.DeleteByPrefix("blob:svcprops:" + p)
-	h.store.DeleteByPrefix("cosmos:account:" + p)
-	h.store.DeleteByPrefix("cosmos:sqldb:" + p)
-	h.store.DeleteByPrefix("cosmos:container:" + p)
-	h.store.DeleteByPrefix("sb:namespace:" + p)
-	h.store.DeleteByPrefix("sb:armqueue:" + p)
-	h.store.DeleteByPrefix("sb:armtopic:" + p)
-	h.store.DeleteByPrefix("appconfig:store:" + p)
+	for _, clean := range h.cleaners {
+		clean(sub, name)
+	}
 
 	// Async operation - return Location header for polling (Terraform requires this on 202)
 	scheme := "http"

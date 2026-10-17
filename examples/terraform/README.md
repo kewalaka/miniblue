@@ -64,4 +64,4 @@ placeholders - no real Azure auth needed.
 - The cert is reused across restarts (regenerated if expiring within 24h)
 - `resource_provider_registrations = "none"` prevents namespace registration calls (`skip_provider_registration` was removed in azurerm v4)
 - `LOCAL_AZURE_CERT_DIR` env var overrides cert storage location
-- Storage: `azurerm_storage_container` works with `storage_account_id`; `azurerm_storage_blob` and `backend "azurerm"` need host-style data-plane endpoints, a planned follow-up. Do not set `MINIBLUE_STORAGE_ENDPOINT` with Terraform.
+- Storage: `azurerm_storage_container` works with `storage_account_id`; `azurerm_storage_blob` and `backend "azurerm"` need host-style data-plane endpoints, a planned follow-up ([#3](https://github.com/kewalaka/miniblue/issues/3)). Do not set `MINIBLUE_STORAGE_ENDPOINT` with Terraform.

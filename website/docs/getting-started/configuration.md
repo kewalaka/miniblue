@@ -19,7 +19,7 @@ miniblue works with zero configuration out of the box. This page covers everythi
 When set, storage accounts return local **path-style** endpoints (e.g., `http://localhost:4566/blob/{accountName}/`) instead of real Azure endpoints (e.g., `https://{accountName}.blob.core.windows.net/`). This allows SDKs and tools to connect directly to miniblue's local blob/queue/table/file services for data-plane testing.
 
 !!! warning "Terraform and `MINIBLUE_STORAGE_ENDPOINT`"
-    With this variable set, `azurerm_storage_container` and `azurerm_storage_blob` cannot work: the provider cannot parse path-style endpoints. Leave it unset for Terraform, in which case `azurerm_storage_container` works through the ARM API (use `storage_account_id`). `azurerm_storage_blob` and `backend "azurerm"` need host-style data-plane endpoints (`https://{accountName}.blob.core.windows.net/`) served by miniblue, which is a planned follow-up.
+    With this variable set, `azurerm_storage_container` and `azurerm_storage_blob` cannot work: the provider cannot parse path-style endpoints. Leave it unset for Terraform, in which case `azurerm_storage_container` works through the ARM API (use `storage_account_id`). `azurerm_storage_blob` and `backend "azurerm"` need host-style data-plane endpoints (`https://{accountName}.blob.core.windows.net/`) served by miniblue, which is a planned follow-up ([#3](https://github.com/kewalaka/miniblue/issues/3)).
 
 The metadata endpoint's `suffixes.storage` is `core.windows.net` by default, and `localhost:<PORT>` when `MINIBLUE_STORAGE_ENDPOINT` is set.
 

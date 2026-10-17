@@ -67,15 +67,15 @@ Bumping azurerm means changing the version in every fixture and refreshing every
 
 ## Known failures
 
-None at the time of writing. To record one, do not drop the fixture. Add a separate matrix entry with `continue-on-error: true` and a row here with the exact drift:
+No fixture fails. To record one, do not drop the fixture. Add a separate matrix entry with `continue-on-error: true` and a row here with the exact drift. One known gap has no fixture because it cannot pass yet:
 
 | Fixture | Step | Failing diff | Tracking |
 |---------|------|--------------|----------|
-| – | – | – | – |
+| none yet (`azurerm_storage_blob`, `backend "azurerm"`) | apply / init | data-plane requests to `https://<account>.blob.core.windows.net/` are not served: miniblue has no host-style blob routing | [#3](https://github.com/kewalaka/miniblue/issues/3) |
 
 ## Not covered
 
-- Blob/queue/table/file **data plane** (`azurerm_storage_blob`, `backend "azurerm"`). The provider derives data-plane URLs from `https://<account>.blob.core.windows.net/`, which needs host-style routing in miniblue. Planned follow-up.
+- Blob/queue/table/file **data plane** (`azurerm_storage_blob`, `backend "azurerm"`). The provider derives data-plane URLs from `https://<account>.blob.core.windows.net/`, which needs host-style routing in miniblue. Planned follow-up: [#3](https://github.com/kewalaka/miniblue/issues/3).
 - With `MINIBLUE_STORAGE_ENDPOINT` set, `azurerm_storage_container` and `azurerm_storage_blob` cannot work (path-style endpoints do not parse). Leave it unset for Terraform; see [Configuration](../getting-started/configuration.md).
 - Key Vault data plane (secrets, keys).
 - Docker-backed services (real containers); VMs run in stub mode.

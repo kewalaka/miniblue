@@ -561,7 +561,7 @@ func unixNow() int64 {
 	return time.Now().UTC().Unix()
 }
 
-func deletedSecretResponse(vault, name string, secret interface{}) map[string]interface{} {
+func deletedSecretResponse(vault, name string, secret *Secret) map[string]interface{} {
 	resp := map[string]interface{}{
 		"id":         "https://" + vault + ".vault.azure.net/secrets/" + name,
 		"recoveryId": "https://" + vault + ".vault.azure.net/deletedsecrets/" + name,
@@ -571,10 +571,10 @@ func deletedSecretResponse(vault, name string, secret interface{}) map[string]in
 			"scheduledPurgeDate": unixNow() + int64((90 * 24 * time.Hour).Seconds()),
 		},
 	}
-	if s, ok := secret.(Secret); ok {
-		resp["value"] = s.Value
-		resp["contentType"] = s.ContentType
-		resp["tags"] = s.Tags
+	if secret != nil {
+		resp["value"] = secret.Value
+		resp["contentType"] = secret.ContentType
+		resp["tags"] = secret.Tags
 	}
 	return resp
 }
@@ -634,8 +634,13 @@ func (h *Handler) DeleteSecret(w http.ResponseWriter, r *http.Request) {
 	vault := requestVaultName(r)
 	name := chi.URLParam(r, "secretName")
 	var deleted map[string]interface{}
-	if v, ok := h.store.Get(h.key(vault, name)); ok {
-		deleted = deletedSecretResponse(vault, name, v)
+	secret, found, err := store.GetAs[Secret](h.store, h.key(vault, name))
+	if err != nil {
+		azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
+		return
+	}
+	if found {
+		deleted = deletedSecretResponse(vault, name, &secret)
 		h.store.Set(h.deletedKey(vault, name), deleted)
 	} else {
 		deleted = deletedSecretResponse(vault, name, nil)
@@ -651,12 +656,15 @@ func (h *Handler) ListSecrets(w http.ResponseWriter, r *http.Request) {
 	// Azure Key Vault list returns metadata only, NOT the secret value
 	redacted := make([]map[string]interface{}, 0, len(items))
 	for _, item := range items {
-		if s, ok := item.(Secret); ok {
-			redacted = append(redacted, map[string]interface{}{
-				"id":         s.ID,
-				"attributes": s.Attributes,
-			})
+		s, err := store.Decode[Secret](item)
+		if err != nil {
+			azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
+			return
 		}
+		redacted = append(redacted, map[string]interface{}{
+			"id":         s.ID,
+			"attributes": s.Attributes,
+		})
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{"value": redacted})
 }

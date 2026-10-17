@@ -221,13 +221,16 @@ func (h *Handler) CheckNameAvailability(w http.ResponseWriter, r *http.Request) 
 
 	items := h.store.ListByPrefix("acr:registry:" + sub + ":")
 	for _, item := range items {
-		if reg, ok := item.(Registry); ok {
-			if reg.Name == input.Name {
-				nameAvailable = false
-				reason = "AlreadyExists"
-				message = "The registry " + input.Name + " is already in use."
-				break
-			}
+		reg, err := store.Decode[Registry](item)
+		if err != nil {
+			azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
+			return
+		}
+		if reg.Name == input.Name {
+			nameAvailable = false
+			reason = "AlreadyExists"
+			message = "The registry " + input.Name + " is already in use."
+			break
 		}
 	}
 

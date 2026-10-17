@@ -111,15 +111,17 @@ func (h *Handler) GetKeyValue(w http.ResponseWriter, r *http.Request) {
 	key := requestKey(r)
 	label := r.URL.Query().Get("label")
 
-	v, ok := h.store.Get(h.kvKey(storeName, key, label))
+	kv, ok, err := store.GetAs[KeyValue](h.store, h.kvKey(storeName, key, label))
+	if err != nil {
+		azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
+		return
+	}
 	if !ok {
 		azerr.NotFound(w, "AppConfiguration/keyValues", key)
 		return
 	}
-	if kv, ok := v.(KeyValue); ok {
-		w.Header().Set("ETag", kv.Etag)
-	}
-	json.NewEncoder(w).Encode(v)
+	w.Header().Set("ETag", kv.Etag)
+	json.NewEncoder(w).Encode(kv)
 }
 
 func (h *Handler) DeleteKeyValue(w http.ResponseWriter, r *http.Request) {

@@ -156,8 +156,9 @@ func hostPort() (string, string) {
 	return host, port
 }
 
-// execDDL runs a DDL statement against the admin Postgres.
-func execDDL(stmt string) error {
+// execDDL runs a DDL statement against the admin Postgres. It is a variable so
+// tests can observe the statements without a database.
+var execDDL = func(stmt string) error {
 	db, err := openAdmin()
 	if err != nil {
 		return fmt.Errorf("connect: %w", err)
@@ -261,10 +262,13 @@ func (h *Handler) DeleteServer(w http.ResponseWriter, r *http.Request) {
 		prefix := h.dbKey(sub, rg, name, "")
 		items := h.store.ListByPrefix(prefix)
 		for _, item := range items {
-			if db, ok := item.(Database); ok {
-				if err := execDDL(fmt.Sprintf("DROP DATABASE IF EXISTS %s", quoteIdent(db.Name))); err != nil {
-					log.Printf("dbpostgres: warning: failed to drop database %s: %v", db.Name, err)
-				}
+			db, err := store.Decode[Database](item)
+			if err != nil {
+				log.Printf("dbpostgres: warning: skipping undecodable database record: %v", err)
+				continue
+			}
+			if err := execDDL(fmt.Sprintf("DROP DATABASE IF EXISTS %s", quoteIdent(db.Name))); err != nil {
+				log.Printf("dbpostgres: warning: failed to drop database %s: %v", db.Name, err)
 			}
 		}
 	}

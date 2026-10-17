@@ -209,11 +209,14 @@ func (h *Handler) listContainersXML(w http.ResponseWriter, r *http.Request) {
 	var names []string
 	seen := map[string]bool{}
 	for _, v := range items {
-		if c, ok := v.(Container); ok && c.Name != "" {
-			if !seen[c.Name] {
-				seen[c.Name] = true
-				names = append(names, c.Name)
-			}
+		c, err := store.Decode[Container](v)
+		if err != nil {
+			writeBlobInternalError(w, err)
+			return
+		}
+		if c.Name != "" && !seen[c.Name] {
+			seen[c.Name] = true
+			names = append(names, c.Name)
 		}
 	}
 	sort.Strings(names)
@@ -350,8 +353,12 @@ func (h *Handler) ListBlobs(w http.ResponseWriter, r *http.Request) {
 
 	blobs := make([]Blob, 0, len(items))
 	for _, v := range items {
-		b, ok := v.(Blob)
-		if !ok || b.Name == "" {
+		b, err := store.Decode[Blob](v)
+		if err != nil {
+			writeBlobInternalError(w, err)
+			return
+		}
+		if b.Name == "" {
 			continue
 		}
 		if reqPrefix != "" && !strings.HasPrefix(b.Name, reqPrefix) {
@@ -560,12 +567,15 @@ func (h *Handler) copyBlob(w http.ResponseWriter, r *http.Request, account, cont
 		writeBlobLeaseError(w, http.StatusBadRequest, "InvalidHeaderValue", "The x-ms-copy-source header value is invalid.")
 		return
 	}
-	v, ok := h.store.Get(h.blobKey(srcAccount, srcContainer, srcBlobName))
+	src, ok, err := store.GetAs[Blob](h.store, h.blobKey(srcAccount, srcContainer, srcBlobName))
+	if err != nil {
+		writeBlobInternalError(w, err)
+		return
+	}
 	if !ok {
 		writeBlobNotFound(w)
 		return
 	}
-	src := v.(Blob)
 
 	now := time.Now().UTC()
 	httpTime := now.Format(http.TimeFormat)
@@ -605,12 +615,15 @@ func (h *Handler) setBlobMetadata(w http.ResponseWriter, r *http.Request, accoun
 		return
 	}
 
-	v, ok := h.store.Get(h.blobKey(account, container, blobName))
+	b, ok, err := store.GetAs[Blob](h.store, h.blobKey(account, container, blobName))
+	if err != nil {
+		writeBlobInternalError(w, err)
+		return
+	}
 	if !ok {
 		azerr.NotFound(w, "blob", blobName)
 		return
 	}
-	b := v.(Blob)
 
 	// Clear old metadata entries and set new ones from request headers.
 	for k := range b.Properties {
@@ -645,12 +658,15 @@ func (h *Handler) setBlobProperties(w http.ResponseWriter, r *http.Request, acco
 		return
 	}
 
-	v, ok := h.store.Get(h.blobKey(account, container, blobName))
+	b, ok, err := store.GetAs[Blob](h.store, h.blobKey(account, container, blobName))
+	if err != nil {
+		writeBlobInternalError(w, err)
+		return
+	}
 	if !ok {
 		azerr.NotFound(w, "blob", blobName)
 		return
 	}
-	b := v.(Blob)
 
 	if ct := r.Header.Get("x-ms-blob-content-type"); ct != "" {
 		b.Properties["contentType"] = ct
@@ -742,17 +758,24 @@ func writeBlobNotFound(w http.ResponseWriter) {
 	_, _ = w.Write([]byte(body))
 }
 
+func writeBlobInternalError(w http.ResponseWriter, err error) {
+	writeBlobLeaseError(w, http.StatusInternalServerError, "InternalError", err.Error())
+}
+
 func (h *Handler) DownloadBlob(w http.ResponseWriter, r *http.Request) {
 	account := chi.URLParam(r, "accountName")
 	container := chi.URLParam(r, "containerName")
 	blobName := blobNameParam(r)
 
-	v, ok := h.store.Get(h.blobKey(account, container, blobName))
+	b, ok, err := store.GetAs[Blob](h.store, h.blobKey(account, container, blobName))
+	if err != nil {
+		writeBlobInternalError(w, err)
+		return
+	}
 	if !ok {
 		writeBlobNotFound(w)
 		return
 	}
-	b := v.(Blob)
 	w.Header().Set("Content-Type", b.Properties["contentType"])
 	w.Header().Set("Content-Length", b.Properties["contentLength"])
 	w.Header().Set("ETag", b.Properties["etag"])
@@ -774,12 +797,15 @@ func (h *Handler) HeadBlob(w http.ResponseWriter, r *http.Request) {
 	container := chi.URLParam(r, "containerName")
 	blobName := blobNameParam(r)
 
-	v, ok := h.store.Get(h.blobKey(account, container, blobName))
+	b, ok, err := store.GetAs[Blob](h.store, h.blobKey(account, container, blobName))
+	if err != nil {
+		writeBlobInternalError(w, err)
+		return
+	}
 	if !ok {
 		writeBlobNotFound(w)
 		return
 	}
-	b := v.(Blob)
 	w.Header().Set("Content-Type", b.Properties["contentType"])
 	w.Header().Set("Content-Length", b.Properties["contentLength"])
 	w.Header().Set("ETag", b.Properties["etag"])

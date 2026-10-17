@@ -101,13 +101,16 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "resourceGroupName")
 
 	k := h.key(sub, name)
-	v, ok := h.store.Get(k)
+	rg, ok, err := store.GetAs[ResourceGroup](h.store, k)
+	if err != nil {
+		azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
+		return
+	}
 	if !ok {
 		azerr.NotFound(w, "Microsoft.Resources/resourceGroups", name)
 		return
 	}
 
-	rg := v.(ResourceGroup)
 	var patch struct {
 		Tags map[string]string `json:"tags,omitempty"`
 	}

@@ -15,7 +15,13 @@ import (
 func NewFile(t testing.TB) (*store.Store, func() *store.Store) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "state.json")
-	open := func() *store.Store { return store.NewWithBackend(store.NewFileBackend(path)) }
+	open := func() *store.Store {
+		fb, err := store.NewFileBackend(path)
+		if err != nil {
+			t.Fatalf("open state file: %v", err)
+		}
+		return store.NewWithBackend(fb)
+	}
 	cur := open()
 	restart := func() *store.Store {
 		t.Helper()

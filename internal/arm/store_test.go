@@ -130,12 +130,19 @@ func TestStoreKeepsNumbersExact(t *testing.T) {
 	}
 	t.Run("file reload", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "state.json")
-		fb := store.NewFileBackend(path)
+		fb, err := store.NewFileBackend(path)
+		if err != nil {
+			t.Fatal(err)
+		}
 		NewStore(store.NewWithBackend(fb)).Put(id, in)
 		if err := fb.Save(); err != nil {
 			t.Fatal(err)
 		}
-		check(t, NewStore(store.NewWithBackend(store.NewFileBackend(path))))
+		reloaded, err := store.NewFileBackend(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		check(t, NewStore(store.NewWithBackend(reloaded)))
 	})
 }
 

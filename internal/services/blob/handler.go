@@ -27,7 +27,7 @@ type Container struct {
 type Blob struct {
 	Name       string            `json:"name"`
 	Properties map[string]string `json:"properties"`
-	Content    []byte            `json:"-"`
+	Content    []byte            `json:"content"`
 }
 
 type Handler struct {

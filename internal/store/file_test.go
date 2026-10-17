@@ -8,11 +8,20 @@ import (
 	"time"
 )
 
+func newTestFileBackend(t *testing.T, path string) *FileBackend {
+	t.Helper()
+	fb, err := NewFileBackend(path)
+	if err != nil {
+		t.Fatalf("NewFileBackend: %v", err)
+	}
+	return fb
+}
+
 func TestFileBackend_AtomicSave(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 
-	fb := NewFileBackend(path)
+	fb := newTestFileBackend(t, path)
 	fb.Set("key1", "value1")
 	fb.Set("key2", 42.0)
 
@@ -47,14 +56,14 @@ func TestFileBackend_LoadExisting(t *testing.T) {
 	path := filepath.Join(dir, "state.json")
 
 	// Write initial state
-	fb := NewFileBackend(path)
+	fb := newTestFileBackend(t, path)
 	fb.Set("persistent", "yes")
 	if err := fb.Save(); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
 	// Load a new backend from the same path
-	fb2 := NewFileBackend(path)
+	fb2 := newTestFileBackend(t, path)
 	v, ok := fb2.Get("persistent")
 	if !ok {
 		t.Fatal("key 'persistent' not found after reload")
@@ -64,11 +73,38 @@ func TestFileBackend_LoadExisting(t *testing.T) {
 	}
 }
 
+func TestFileBackend_CorruptSnapshotFailsAndIsLeftUntouched(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.json")
+	corrupt := []byte(`{"key": "truncated`)
+	if err := os.WriteFile(path, corrupt, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := NewFileBackend(path); err == nil {
+		t.Fatal("NewFileBackend succeeded on a corrupt snapshot")
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(corrupt) {
+		t.Errorf("corrupt snapshot was modified: %q", got)
+	}
+}
+
+func TestFileBackend_MissingSnapshotStartsEmpty(t *testing.T) {
+	fb := newTestFileBackend(t, filepath.Join(t.TempDir(), "state.json"))
+	if n := len(fb.List()); n != 0 {
+		t.Errorf("expected empty backend, got %d keys", n)
+	}
+}
+
 func TestFileBackend_AutoSave(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 
-	fb := NewFileBackend(path)
+	fb := newTestFileBackend(t, path)
 	stop := fb.StartAutoSave(50 * time.Millisecond)
 
 	fb.Set("auto", "saved")
@@ -86,7 +122,7 @@ func TestFileBackend_AutoSave(t *testing.T) {
 	}
 
 	// Reload and verify
-	fb2 := NewFileBackend(path)
+	fb2 := newTestFileBackend(t, path)
 	v, ok := fb2.Get("auto")
 	if !ok {
 		t.Fatal("key 'auto' not found after auto-save")
@@ -99,7 +135,7 @@ func TestFileBackend_AutoSave(t *testing.T) {
 func TestFileBackend_ConcurrentWriteDuringSave(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
-	fb := NewFileBackend(path)
+	fb := newTestFileBackend(t, path)
 
 	for i := 0; i < 100; i++ {
 		fb.Set("key-"+string(rune('a'+i%26)), i)
@@ -126,7 +162,7 @@ func TestFileBackend_ConcurrentWriteDuringSave(t *testing.T) {
 		t.Fatalf("final Save() error: %v", err)
 	}
 
-	fb2 := NewFileBackend(path)
+	fb2 := newTestFileBackend(t, path)
 	if _, ok := fb2.Get("concurrent"); !ok {
 		t.Error("key 'concurrent' missing after concurrent save/write")
 	}

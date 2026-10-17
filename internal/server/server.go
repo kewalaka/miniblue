@@ -60,12 +60,13 @@ type Server struct {
 	routeTrie  *routeTrie
 }
 
+// New builds a server on an in-memory store.
 func New() *Server {
-	return NewWithStore(store.NewWithBackend(store.NewBackend()))
+	return NewWithStore(store.New())
 }
 
-// NewWithStore builds a server on st. Use store.Open to get a store whose
-// schema stamp has been checked.
+// NewWithStore builds a server on the given store. Use store.Open to get a
+// store whose schema stamp has been checked.
 func NewWithStore(st *store.Store) *Server {
 	s := &Server{
 		router: chi.NewRouter(),

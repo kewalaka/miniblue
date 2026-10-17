@@ -16,7 +16,11 @@ import (
 // keys. Receive must not return it in place of a message.
 func TestReceiveMessageIgnoresSchemaStamp(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state.json")
-	st := store.NewWithBackend(store.NewFileBackend(path))
+	fb, err := store.NewFileBackend(path)
+	if err != nil {
+		t.Fatalf("open state file: %v", err)
+	}
+	st := store.NewWithBackend(fb)
 	if err := store.CheckSchema(st, path); err != nil {
 		t.Fatal(err)
 	}

@@ -5,6 +5,15 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'pkg/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'tests/terraform/**'
+      - 'examples/terraform/**'
+      - '.github/workflows/acceptance.yml'
 
 concurrency:
   group: acceptance-${{ github.ref }}

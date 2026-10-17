@@ -122,6 +122,37 @@ Each wave PR cites its [catalogue](catalogue/index.md) page as the acceptance li
 
 Rows suggested by the [scenario catalogue](catalogue/engine-lessons.md) (secret projection, seeded singleton children, soft-delete seam, `NameTaken`/`ValidateLocation`, provider registration state, deployments validate/cancel/export, `$top`/`nextLink`, extra `armtest` checks). They are proposals: each needs an owner decision, and any seam needs an ADR amendment first. New resource types listed in the catalogue (SQL, Insights, Log Analytics, Event Hubs, management groups) are engine-only registrations and may start after G2.
 
+## Definition of done
+
+Three loops. The first one keeps CI and review cheap, so do not skip it.
+
+**1. Inner loop (local, before every push).** Seconds to a couple of minutes.
+
+- `go build ./... && go vet ./... && go test -race ./internal/...`, then `go test ./tests -run <Type>` for the area touched. CI does not run `internal/` tests until 0.1 lands, so this is the only place they run.
+- New or migrated type: an armtest `Sample` and the T2 rows from its [catalogue](catalogue/index.md) page.
+- Store changes: the restart round-trip test (0.2).
+- No Terraform, Docker or e2e locally. Those are CI-only.
+
+**2. PR CI (once per push).**
+
+- Push when the inner loop is green. Then run `gh pr checks <n>` and wait for it. Do not poll or re-run to see if it passes.
+- On a failure, reproduce it locally, fix it in one commit, push once. A new push cancels the run in progress.
+- Terraform acceptance (`acceptance.yml`, `acceptance-azurerm.yml`) runs on a PR only when Go code, `go.mod`/`go.sum`, a Terraform fixture or example, or the workflow itself changes. It always runs on push to main. Docs-only PRs skip it.
+- A slow fixture (API Management or similar) is never a per-PR job. Put it in a scheduled or manual workflow.
+
+**3. Review loop (after CI is green).**
+
+- The PR description names the PLAN row, lists the catalogue ids ported, and says which `(verify)` marks were resolved.
+- A code-review agent checks:
+    - the row's Depends were merged;
+    - no `Type` fields, hook parameters or engine options were added without an ADR amendment;
+    - every store error is checked;
+    - `SchemaVersion` is bumped with a CHANGELOG line if the key or value shape changed;
+    - the legacy route freeze file or cleaner count did not grow;
+    - a `Sample` exists for each type touched.
+- At most two review rounds. If it is still open after that, escalate to Stu rather than iterating.
+- Stu reviews and signs off the gates (G0 to G5), not each PR.
+
 ## Rules for implementing agents
 
 - Read ADR-0003, ADR-0005 and ADR-0007 before touching `internal/arm` or migrating a type.

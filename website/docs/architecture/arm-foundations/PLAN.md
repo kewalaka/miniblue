@@ -128,7 +128,7 @@ Three loops. The first one keeps CI and review cheap, so do not skip it.
 
 **1. Inner loop (local, before every push).** Seconds to a couple of minutes.
 
-- `go build ./... && go vet ./... && go test -race ./internal/...`, then `go test ./tests -run <Type>` for the area touched. CI does not run `internal/` tests until 0.1 lands, so this is the only place they run.
+- `go build ./... && go vet ./... && go test ./internal/...`, then `go test ./tests -run <Type>` for the area touched. CI runs `go test -race ./...` always. Add `-race` locally only where CGO is available (it needs `CGO_ENABLED=1` and a C compiler).
 - New or migrated type: an armtest `Sample` and the T2 rows from its [catalogue](catalogue/index.md) page.
 - Store changes: the restart round-trip test (0.2).
 - No Terraform, Docker or e2e locally. Those are CI-only.

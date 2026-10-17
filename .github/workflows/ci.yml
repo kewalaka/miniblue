@@ -49,8 +49,12 @@ jobs:
         with:
           go-version: "1.26"
 
+      # cmd/azlocal tests exec bin/azlocal (see `make build`)
+      - name: Build azlocal
+        run: go build -o bin/azlocal ./cmd/azlocal
+
       - name: Test
-        run: go test -v ./tests/...
+        run: go test -race -v ./...
 
   build:
     needs: [test, vet, lint]

@@ -1,6 +1,6 @@
 # Phased PR plan
 
-Each PR is small, uses a conventional-commit title, and keeps `go test ./...` green. Sizes: S (under 200 lines), M (200 to 600), L (over 600). A PR may start once everything in its Depends column has merged. Rows with no dependency can run in parallel.
+Action small tasks in sets.  Each PR uses a conventional-commit title, and keeps `go test ./...` green. Sizes: S (under 200 lines), M (200 to 600), L (over 600). A PR may start once everything in its Depends column has merged. Rows with no dependency can run in parallel.
 
 ## Phase 0: Hygiene (no behaviour change for users)
 

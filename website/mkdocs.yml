@@ -86,6 +86,20 @@ nav:
     - Overview: architecture/overview.md
     - Scope and Philosophy: architecture/scope.md
     - ARM Resource Engine: architecture/arm-engine.md
+    - ARM foundations:
+      - Overview: architecture/arm-foundations/index.md
+      - Plan: architecture/arm-foundations/PLAN.md
+      - "ADR-0001: Single ARM pipeline": architecture/arm-foundations/adr/0001-single-arm-pipeline.md
+      - "ADR-0002: Unregistered types": architecture/arm-foundations/adr/0002-unregistered-types.md
+      - "ADR-0003: Pipeline phases and hooks": architecture/arm-foundations/adr/0003-pipeline-phases-and-hooks.md
+      - "ADR-0004: Storage contract": architecture/arm-foundations/adr/0004-storage-contract.md
+      - "ADR-0005: Type metadata and conformance": architecture/arm-foundations/adr/0005-type-metadata-and-conformance.md
+      - "ADR-0006: Sync LRO and errors": architecture/arm-foundations/adr/0006-sync-lro-and-errors.md
+      - "ADR-0007: Migration strategy": architecture/arm-foundations/adr/0007-migration-strategy.md
+      - "ADR-0008: RBAC and policy minimum": architecture/arm-foundations/adr/0008-rbac-and-policy-minimum.md
+      - "Slice: role assignments": architecture/arm-foundations/slices/01-role-assignments.md
+      - "Slice: APIM Consumption": architecture/arm-foundations/slices/02-apim-consumption.md
+      - Spike: architecture/arm-foundations/SPIKE.md
   - Contributing: contributing.md
 
 markdown_extensions:

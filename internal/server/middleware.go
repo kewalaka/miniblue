@@ -23,6 +23,8 @@ func CORS(next http.Handler) http.Handler {
 }
 
 // AzureHeaders adds standard Azure response headers to every request.
+// CORS preflight (OPTIONS) is answered earlier in the chain and is intentionally
+// exempt: the skip-polling header only matters to SDK pollers, never to browsers.
 func AzureHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := uuid.New().String()

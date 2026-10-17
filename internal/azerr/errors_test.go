@@ -60,6 +60,9 @@ func TestWrite_NonAzerrBecomes500(t *testing.T) {
 	for name, err := range map[string]error{
 		"plain": errors.New("disk on fire"),
 		"nil":   nil,
+		// errors.As matches a typed-nil *Error with a nil target.
+		"typed nil":         (*Error)(nil),
+		"wrapped typed nil": fmt.Errorf("hook failed: %w", (*Error)(nil)),
 	} {
 		t.Run(name, func(t *testing.T) {
 			rec := httptest.NewRecorder()

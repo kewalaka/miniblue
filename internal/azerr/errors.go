@@ -29,7 +29,8 @@ func New(status int, code, format string, args ...any) *Error {
 // written as-is; anything else is logged and becomes 500 InternalServerError.
 func Write(w http.ResponseWriter, err error) {
 	var ae *Error
-	if !errors.As(err, &ae) {
+	// A typed-nil *Error satisfies errors.As with ae == nil.
+	if !errors.As(err, &ae) || ae == nil {
 		log.Printf("azerr: unexpected error: %v", err)
 		ae = New(http.StatusInternalServerError, "InternalServerError", "An internal error occurred.")
 	}

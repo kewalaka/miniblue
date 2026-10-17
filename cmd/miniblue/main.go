@@ -76,16 +76,18 @@ Documentation: https://moabukar.github.io/miniblue`)
 		tlsPort = "4567"
 	}
 
-	// Bind first: a busy port must stop startup before any state is loaded or written.
+	// Open state before binding the ports: a corrupt or schema-mismatched
+	// state file must stop startup without holding the ports. Open only
+	// reads (autosave starts after the listeners are up), so nothing is
+	// written before a bind failure.
+	st, err := store.Open()
+	if err != nil {
+		log.Fatalf("Failed to open state: %v", err)
+	}
+
 	httpLn, tlsLn, err := listenPorts(port, tlsPort)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
-	}
-
-	// Check the schema stamp before any handler can read or write state.
-	st, err := store.Open()
-	if err != nil {
-		log.Fatal(err)
 	}
 	srv := server.NewWithStore(st)
 	handler := srv.Handler()

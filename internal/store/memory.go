@@ -189,8 +189,14 @@ func (s *Store) DeleteByPrefix(prefix string) int {
 	return s.backend.DeleteByPrefix(prefix)
 }
 
+// Reset wipes all state except the schema stamp, which describes this miniblue
+// version rather than the data.
 func (s *Store) Reset() {
+	stamp, stamped := s.backend.Get(schemaKey)
 	s.backend.Reset()
+	if stamped {
+		_ = s.backend.Set(schemaKey, stamp)
+	}
 }
 
 // Save persists state to disk if the backend supports it (e.g. FileBackend).

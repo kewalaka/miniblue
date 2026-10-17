@@ -61,9 +61,15 @@ type Server struct {
 }
 
 func New() *Server {
+	return NewWithStore(store.NewWithBackend(store.NewBackend()))
+}
+
+// NewWithStore builds a server on st. Use store.Open to get a store whose
+// schema stamp has been checked.
+func NewWithStore(st *store.Store) *Server {
 	s := &Server{
 		router: chi.NewRouter(),
-		store:  store.NewWithBackend(store.NewBackend()),
+		store:  st,
 	}
 	s.setupMiddleware()
 	s.setupRoutes()

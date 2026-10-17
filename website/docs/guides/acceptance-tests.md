@@ -29,7 +29,7 @@ tests/terraform/azurerm/run.sh network          # one fixture
 tests/terraform/azurerm/run.sh examples/terraform
 ```
 
-The runner starts its own miniblue (stub mode, `MINIBLUE_DISABLE_DOCKER=1`), generates a throwaway certificate, builds a CA bundle (system roots + miniblue cert) for `SSL_CERT_FILE`, and sets the `ARM_*` provider environment. Fixtures therefore only need `provider "azurerm" { features {} }`. It cleans up on exit; `ACC_KEEP=1` keeps the work dir.
+The runner starts its own miniblue (stub mode, `MINIBLUE_DISABLE_DOCKER=1`, always in-memory state: `PERSISTENCE` and `DATABASE_URL` are ignored), generates a throwaway certificate, builds a CA bundle (system roots + miniblue cert) for `SSL_CERT_FILE`, and sets the `ARM_*` provider environment. It stops if `PORT` or `TLS_PORT` already accepts connections, so it never tests another miniblue. Fixtures therefore only need `provider "azurerm" { features {} }`. It cleans up on exit; `ACC_KEEP=1` keeps the work dir.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
@@ -50,7 +50,7 @@ The provider dials `https://<vault>.vault.azure.net` and waits for DNS and TLS, 
 ACC_SETUP_SYSTEM=1 tests/terraform/azurerm/run.sh keyvault
 ```
 
-This adds `127.0.0.1 acc-kv-0001.vault.azure.net` to `/etc/hosts` and lowers `net.ipv4.ip_unprivileged_port_start`. Without `ACC_SETUP_SYSTEM`, the runner stops and tells you what to do.
+This adds `127.0.0.1 acc-kv-0001.vault.azure.net` to `/etc/hosts` and lowers `net.ipv4.ip_unprivileged_port_start`. Without `ACC_SETUP_SYSTEM`, the runner stops and tells you what to do. If the name already resolves to a non-loopback address, the runner stops and never rewrites that mapping.
 
 ## Add a fixture
 

@@ -3,10 +3,46 @@ package main
 import (
 	"crypto/x509"
 	"encoding/pem"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 )
+
+// holdPort listens on a free port; closing the returned listener frees it again.
+func holdPort(t *testing.T) (string, net.Listener) {
+	t.Helper()
+	ln, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	return strconv.Itoa(ln.Addr().(*net.TCPAddr).Port), ln
+}
+
+func TestListenPorts(t *testing.T) {
+	busy, _ := holdPort(t)
+	free1, l1 := holdPort(t)
+	free2, l2 := holdPort(t)
+	l1.Close()
+	l2.Close()
+
+	if _, _, err := listenPorts(busy, free2); err == nil || !strings.Contains(err.Error(), "HTTP port "+busy) {
+		t.Fatalf("busy HTTP port: got %v", err)
+	}
+	if _, _, err := listenPorts(free1, busy); err == nil || !strings.Contains(err.Error(), "HTTPS port "+busy) {
+		t.Fatalf("busy HTTPS port: got %v", err)
+	}
+
+	// The failed call above must have released the HTTP listener it bound first.
+	httpLn, tlsLn, err := listenPorts(free1, free2)
+	if err != nil {
+		t.Fatalf("free ports: %v", err)
+	}
+	httpLn.Close()
+	tlsLn.Close()
+}
 
 func TestGeneratedCertificateCoversDataPlaneHosts(t *testing.T) {
 	_, certPEM, err := generateAndSaveCert(t.TempDir())

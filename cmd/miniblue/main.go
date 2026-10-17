@@ -75,6 +75,12 @@ Documentation: https://moabukar.github.io/miniblue`)
 		tlsPort = "4567"
 	}
 
+	// Bind first: a busy port must stop startup before any state is loaded or written.
+	httpLn, tlsLn, err := listenPorts(port, tlsPort)
+	if err != nil {
+		log.Fatalf("Failed to listen: %v", err)
+	}
+
 	srv := server.New()
 	handler := srv.Handler()
 
@@ -96,10 +102,10 @@ Documentation: https://moabukar.github.io/miniblue`)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	// Start HTTP
-	httpServer := &http.Server{Addr: ":" + port, Handler: handler}
+	httpServer := &http.Server{Handler: handler}
 	go func() {
 		log.Printf("miniblue HTTP  on http://localhost:%s", port)
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := httpServer.Serve(httpLn); err != nil && err != http.ErrServerClosed {
 			log.Printf("HTTP server error: %v", err)
 		}
 	}()
@@ -108,14 +114,13 @@ Documentation: https://moabukar.github.io/miniblue`)
 	log.Printf("miniblue HTTPS on https://localhost:%s", tlsPort)
 	_ = certPEM // already saved to disk
 	tlsServer := &http.Server{
-		Addr:    ":" + tlsPort,
 		Handler: handler,
 		TLSConfig: &tls.Config{
 			Certificates: []tls.Certificate{cert},
 		},
 	}
 	go func() {
-		if err := tlsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+		if err := tlsServer.ServeTLS(tlsLn, "", ""); err != nil && err != http.ErrServerClosed {
 			log.Printf("HTTPS server error: %v", err)
 		}
 	}()
@@ -162,6 +167,20 @@ Documentation: https://moabukar.github.io/miniblue`)
 	httpServer.Shutdown(ctx)
 	tlsServer.Shutdown(ctx)
 	log.Println("miniblue stopped")
+}
+
+// listenPorts binds both listeners up front; a port that is already in use is an error.
+func listenPorts(port, tlsPort string) (httpLn, tlsLn net.Listener, err error) {
+	httpLn, err = net.Listen("tcp", ":"+port)
+	if err != nil {
+		return nil, nil, fmt.Errorf("HTTP port %s: %w", port, err)
+	}
+	tlsLn, err = net.Listen("tcp", ":"+tlsPort)
+	if err != nil {
+		httpLn.Close()
+		return nil, nil, fmt.Errorf("HTTPS port %s: %w", tlsPort, err)
+	}
+	return httpLn, tlsLn, nil
 }
 
 func runInitHooks() {

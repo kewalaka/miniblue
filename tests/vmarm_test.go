@@ -28,7 +28,7 @@ func TestVirtualMachineLifecycleReferencesActionsAndSensitiveFields(t *testing.T
 	resp.Body.Close()
 	resp = doRequest(t, "PUT", compute+"/disks/datadisk1"+av,
 		`{"location":"eastus","properties":{"creationData":{"createOption":"Empty"},"diskSizeGB":64}}`)
-	expectStatus(t, resp, 201)
+	expectStatus(t, resp, 200)
 	resp.Body.Close()
 
 	vmBody := `{
@@ -431,7 +431,7 @@ func TestVirtualMachineDeleteDoesNotRemoveAttachedUserDisk(t *testing.T) {
 
 	resp = doRequest(t, "PUT", compute+"/disks/user-osdisk"+av,
 		`{"location":"eastus","properties":{"creationData":{"createOption":"Empty"},"diskSizeGB":64}}`)
-	expectStatus(t, resp, 201)
+	expectStatus(t, resp, 200)
 	resp.Body.Close()
 
 	resp = doRequest(t, "PUT", compute+"/virtualMachines/vm-attach"+av, `{

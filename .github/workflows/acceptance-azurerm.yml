@@ -1,0 +1,50 @@
+name: Acceptance (azurerm)
+
+# One job per fixture in tests/terraform/azurerm (plus the quickstart example), so a failing
+# fixture does not hide the others. Add a fixture = add a directory and a matrix entry.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: acceptance-azurerm-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  azurerm:
+    name: azurerm / ${{ matrix.fixture }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture:
+          - network
+          - storage
+          - identity-rbac
+          - keyvault
+          - compute
+          - examples/terraform
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26"
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.16.6
+          terraform_wrapper: false
+
+      - name: Build miniblue
+        run: go build -o miniblue ./cmd/miniblue
+
+      - name: Run ${{ matrix.fixture }}
+        run: ACC_SETUP_SYSTEM=1 ./tests/terraform/azurerm/run.sh ${{ matrix.fixture }}

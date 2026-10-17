@@ -12,7 +12,7 @@ func TestManagedDiskLifecyclePatchAccessAndLists(t *testing.T) {
 
 	resp := doRequest(t, "PUT", disks+"/disk1"+av,
 		`{"location":"eastus","sku":{"name":"Premium_LRS"},"properties":{"creationData":{"createOption":"Empty"},"diskSizeGB":64}}`)
-	expectStatus(t, resp, 201)
+	expectStatus(t, resp, 200)
 	disk := decodeJSON(t, resp)
 	resp.Body.Close()
 	if disk["type"] != "Microsoft.Compute/disks" {
@@ -69,7 +69,7 @@ func TestManagedDiskLifecyclePatchAccessAndLists(t *testing.T) {
 
 	resp = doRequest(t, "PUT", subBase+"/resourceGroups/rg2/providers/Microsoft.Compute/disks/disk2"+av,
 		`{"location":"westus","properties":{"creationData":{"createOption":"Copy","sourceResourceId":"/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/disks/disk1"}}}`)
-	expectStatus(t, resp, 201)
+	expectStatus(t, resp, 200)
 	resp.Body.Close()
 
 	resp = doRequest(t, "GET", disks+av, "")
@@ -102,6 +102,10 @@ func TestManagedDiskLifecyclePatchAccessAndLists(t *testing.T) {
 	resp = doRequest(t, "GET", disks+"/disk1"+av, "")
 	expectStatus(t, resp, 404)
 	resp.Body.Close()
+
+	resp = doRequest(t, "DELETE", disks+"/disk1"+av, "")
+	expectStatus(t, resp, 204)
+	resp.Body.Close()
 }
 
 func TestManagedDiskUploadStateAndResourceGroupCascade(t *testing.T) {
@@ -119,7 +123,7 @@ func TestManagedDiskUploadStateAndResourceGroupCascade(t *testing.T) {
 
 	resp = doRequest(t, "PUT", disks+"/upload"+av,
 		`{"location":"eastus","properties":{"creationData":{"createOption":"Upload"},"diskSizeGB":10}}`)
-	expectStatus(t, resp, 201)
+	expectStatus(t, resp, 200)
 	disk := decodeJSON(t, resp)
 	resp.Body.Close()
 	if disk["properties"].(map[string]interface{})["diskState"] != "ReadyToUpload" {

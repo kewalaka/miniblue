@@ -10,11 +10,11 @@ import (
 )
 
 type Registry struct {
-	ID         string       `json:"id"`
-	Name       string       `json:"name"`
-	Type       string       `json:"type"`
-	Location   string       `json:"location"`
-	SKU        RegistrySKU  `json:"sku"`
+	ID         string        `json:"id"`
+	Name       string        `json:"name"`
+	Type       string        `json:"type"`
+	Location   string        `json:"location"`
+	SKU        RegistrySKU   `json:"sku"`
 	Properties RegistryProps `json:"properties"`
 }
 
@@ -74,6 +74,18 @@ func buildRegistryResponse(sub, rg, name string, input map[string]interface{}) m
 		}
 	}
 
+	props, _ := input["properties"].(map[string]interface{})
+	inPolicies, _ := props["policies"].(map[string]interface{})
+	inARMPolicy, _ := inPolicies["azureADAuthenticationAsArmPolicy"].(map[string]interface{})
+	armPolicyStatus, _ := inARMPolicy["status"].(string)
+	if armPolicyStatus == "" {
+		armPolicyStatus = "enabled"
+	}
+	roleAssignmentMode, _ := props["roleAssignmentMode"].(string)
+	if roleAssignmentMode == "" {
+		roleAssignmentMode = "LegacyRegistryPermissions"
+	}
+
 	return map[string]interface{}{
 		"id":       id,
 		"name":     name,
@@ -92,6 +104,7 @@ func buildRegistryResponse(sub, rg, name string, input map[string]interface{}) m
 			"zoneRedundancy":           "Disabled",
 			"networkRuleBypassOptions": "AzureServices",
 			"dataEndpointEnabled":      false,
+			"roleAssignmentMode":       roleAssignmentMode,
 			"encryption": map[string]interface{}{
 				"status": "disabled",
 			},
@@ -100,10 +113,11 @@ func buildRegistryResponse(sub, rg, name string, input map[string]interface{}) m
 				"ipRules":       []interface{}{},
 			},
 			"policies": map[string]interface{}{
-				"quarantinePolicy": map[string]interface{}{"status": "disabled"},
-				"trustPolicy":     map[string]interface{}{"status": "disabled", "type": "Notary"},
-				"retentionPolicy": map[string]interface{}{"status": "disabled", "days": 7},
-				"exportPolicy":    map[string]interface{}{"status": "enabled"},
+				"quarantinePolicy":                 map[string]interface{}{"status": "disabled"},
+				"trustPolicy":                      map[string]interface{}{"status": "disabled", "type": "Notary"},
+				"retentionPolicy":                  map[string]interface{}{"status": "disabled", "days": 7},
+				"exportPolicy":                     map[string]interface{}{"status": "enabled"},
+				"azureADAuthenticationAsArmPolicy": map[string]interface{}{"status": armPolicyStatus},
 			},
 		},
 	}

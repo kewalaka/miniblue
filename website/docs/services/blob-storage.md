@@ -34,9 +34,10 @@ multi-segment paths used by the Terraform `azurerm` backend work as expected.
 The blob data plane verifies Azure SharedKey signatures using the
 auto-generated account keys returned by `listKeys`. For local scripting
 where signing is impractical, set `MINIBLUE_DISABLE_SHAREDKEY_AUTH=1`
-(accepted values: `1`, `true`, `yes`, `on`) to bypass signature verification
-entirely. This is **dev-only** — never enable it in an environment that
-pretends to model production.
+(accepted values: `1`, `true`, `yes`, `on`) to skip **all** blob data-plane
+authentication, SharedKey and Bearer alike; tokens are never validated. This
+is **dev-only** — never enable it in an environment that pretends to model
+production.
 
 ## Create a container
 

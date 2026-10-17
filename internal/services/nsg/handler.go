@@ -168,6 +168,18 @@ func buildRuleResponse(sub, rg, nsgName, ruleName string, input map[string]inter
 	}
 }
 
+func (h *Handler) replaceRules(sub, rg, nsgName string, inline []interface{}) {
+	h.store.DeleteByPrefix(h.ruleKey(sub, rg, nsgName, ""))
+	for _, item := range inline {
+		rule, _ := item.(map[string]interface{})
+		ruleName, _ := rule["name"].(string)
+		if ruleName == "" {
+			continue
+		}
+		h.store.Set(h.ruleKey(sub, rg, nsgName, ruleName), buildRuleResponse(sub, rg, nsgName, ruleName, rule))
+	}
+}
+
 func (h *Handler) CreateOrUpdate(w http.ResponseWriter, r *http.Request) {
 	sub := chi.URLParam(r, "subscriptionId")
 	rg := chi.URLParam(r, "resourceGroupName")
@@ -178,6 +190,13 @@ func (h *Handler) CreateOrUpdate(w http.ResponseWriter, r *http.Request) {
 
 	k := h.nsgKey(sub, rg, name)
 	_, exists := h.store.Get(k)
+
+	// Inline securityRules in an NSG PUT replace the whole rule set; omitting the field keeps existing rules.
+	if props, _ := input["properties"].(map[string]interface{}); props != nil {
+		if inline, ok := props["securityRules"].([]interface{}); ok {
+			h.replaceRules(sub, rg, name, inline)
+		}
+	}
 
 	rules := h.store.ListByPrefix(h.ruleKey(sub, rg, name, ""))
 	nsgResp := buildNSGResponse(sub, rg, name, input, rules)

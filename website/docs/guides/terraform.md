@@ -12,11 +12,22 @@ miniblue works with the official `hashicorp/azurerm` Terraform provider. This gu
 
 Terraform's azurerm provider connects to the `metadata_host` over HTTPS. You must trust miniblue's self-signed certificate.
 
-=== "Quick (current shell)"
+=== "Quick (Linux / WSL2, current shell)"
 
     ```bash
-    export SSL_CERT_FILE=~/.miniblue/cert.pem
+    cat /etc/ssl/certs/ca-certificates.crt ~/.miniblue/cert.pem > ~/.miniblue/ca-bundle.pem
+    export SSL_CERT_FILE=~/.miniblue/ca-bundle.pem
     ```
+
+    `SSL_CERT_FILE` replaces Go's system roots, so the bundle keeps them; pointing it at `cert.pem` alone breaks `terraform init` (registry.terraform.io is no longer trusted).
+
+=== "Permanent (Windows)"
+
+    ```powershell
+    certutil -user -addstore Root "$env:USERPROFILE\.miniblue\cert.pem"
+    ```
+
+    Go on Windows ignores `SSL_CERT_FILE` and uses the Windows certificate store. Alternatively run Terraform from WSL2 and follow the Linux steps.
 
 === "Permanent (macOS)"
 
@@ -43,12 +54,14 @@ Terraform's azurerm provider connects to the `metadata_host` over HTTPS. You mus
 
 ## Step 2: Provider configuration
 
+This targets azurerm v4/v5 and is exercised in CI against azurerm 5.10.0 (see [Acceptance tests](acceptance-tests.md)). `skip_provider_registration` was removed in azurerm v4; use `resource_provider_registrations = "none"`.
+
 ```hcl
 terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.0"
+      version = "= 5.10.0"
     }
   }
 }
@@ -60,7 +73,7 @@ provider "azurerm" {
   metadata_host = "localhost:4567"
 
   # Skip provider namespace registration (miniblue doesn't need it)
-  skip_provider_registration = true
+  resource_provider_registrations = "none"
 
   # Mock credentials -- miniblue accepts anything
   subscription_id = "00000000-0000-0000-0000-000000000000"
@@ -75,7 +88,7 @@ Key settings explained:
 | Setting | Value | Why |
 |---------|-------|-----|
 | `metadata_host` | `localhost:4567` | HTTPS endpoint where Terraform fetches cloud metadata |
-| `skip_provider_registration` | `true` | miniblue does not require provider namespace registration |
+| `resource_provider_registrations` | `"none"` | miniblue does not require provider namespace registration |
 | `subscription_id` | Any UUID | miniblue accepts any subscription ID |
 | `tenant_id` | Any UUID | miniblue accepts any tenant ID |
 | `client_id` / `client_secret` | Any string | miniblue does not validate credentials |
@@ -89,7 +102,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.0"
+      version = "= 5.10.0"
     }
   }
 }
@@ -97,8 +110,8 @@ terraform {
 provider "azurerm" {
   features {}
 
-  metadata_host              = "localhost:4567"
-  skip_provider_registration = true
+  metadata_host                   = "localhost:4567"
+  resource_provider_registrations = "none"
 
   subscription_id = "00000000-0000-0000-0000-000000000000"
   tenant_id       = "00000000-0000-0000-0000-000000000001"
@@ -146,10 +159,7 @@ resource "azurerm_container_registry" "example" {
 ## Step 4: Apply
 
 ```bash
-# Trust cert (if not done permanently)
-export SSL_CERT_FILE=~/.miniblue/cert.pem
-
-# Initialise and apply
+# Trust the cert first (Step 1), then initialise and apply
 terraform init
 terraform apply -auto-approve
 ```
@@ -281,13 +291,11 @@ jobs:
 
 ### "tls: failed to verify certificate"
 
-The miniblue certificate is not trusted. Run:
+The miniblue certificate is not trusted. Follow [Step 1](#step-1-trust-the-certificate), or permanently trust it with `bash scripts/trust-cert.sh`. On Windows, Go ignores `SSL_CERT_FILE`: import the certificate into the Windows store or use WSL2.
 
-```bash
-export SSL_CERT_FILE=~/.miniblue/cert.pem
-```
+### "x509: certificate signed by unknown authority" on `terraform init`
 
-Or permanently trust it with `bash scripts/trust-cert.sh`.
+`SSL_CERT_FILE` points at miniblue's `cert.pem` alone, which replaces the system roots. Use the combined bundle from Step 1.
 
 ### "connection refused" on metadata_host
 
@@ -299,4 +307,4 @@ curl -k https://localhost:4567/health
 
 ### "provider registration" errors
 
-Ensure `skip_provider_registration = true` is set in the provider block.
+Ensure `resource_provider_registrations = "none"` is set in the provider block. (`skip_provider_registration` only exists in azurerm v3; v4+ rejects it.)

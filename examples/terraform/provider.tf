@@ -4,8 +4,8 @@ provider "azurerm" {
   # Point to miniblue metadata endpoint (HTTPS)
   metadata_host = "localhost:4567"
 
-  # Skip provider namespace registration
-  skip_provider_registration = true
+  # miniblue does not implement provider registration
+  resource_provider_registrations = "none"
 
   # Mock credentials - miniblue accepts anything
   subscription_id = "00000000-0000-0000-0000-000000000000"

@@ -3,8 +3,9 @@
 # Start miniblue first:
 #   ./bin/miniblue
 #
-# Trust the cert:
-#   export SSL_CERT_FILE=~/.miniblue/cert.pem
+# Trust the cert (Linux / WSL2; keep the system roots in the bundle):
+#   cat /etc/ssl/certs/ca-certificates.crt ~/.miniblue/cert.pem > ~/.miniblue/ca-bundle.pem
+#   export SSL_CERT_FILE=~/.miniblue/ca-bundle.pem
 #
 # Run:
 #   terraform init

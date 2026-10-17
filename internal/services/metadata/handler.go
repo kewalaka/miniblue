@@ -9,6 +9,9 @@ import (
 	"github.com/moabukar/miniblue/internal/store"
 )
 
+// envStorageEndpoint mirrors the variable read by the storageaccounts handler.
+const envStorageEndpoint = "MINIBLUE_STORAGE_ENDPOINT"
+
 type Handler struct {
 	store *store.Store
 }
@@ -28,6 +31,13 @@ func (h *Handler) Endpoints(w http.ResponseWriter, r *http.Request) {
 		httpPort = "4566"
 	}
 	httpBase := "http://localhost:" + httpPort
+
+	// Account endpoints from ARM are host-style (<acct>.blob.core.windows.net) unless
+	// MINIBLUE_STORAGE_ENDPOINT switches them to path-style; clients require the suffix to match.
+	storageSuffix := "core.windows.net"
+	if os.Getenv(envStorageEndpoint) != "" {
+		storageSuffix = "localhost:" + httpPort
+	}
 
 	// This MUST match the metaDataResponse struct in:
 	// github.com/hashicorp/go-azure-sdk/sdk/internal/metadata/client.go
@@ -50,7 +60,7 @@ func (h *Handler) Endpoints(w http.ResponseWriter, r *http.Request) {
 			"sqlServerHostname":                   "localhost",
 			"azureDataLakeAnalyticsCatalogAndJob": "localhost",
 			"keyVaultDns":                         "vault.azure.net",
-			"storage":                             "localhost:" + httpPort,
+			"storage":                             storageSuffix,
 			"azureFrontDoorEndpointSuffix":        "localhost",
 			"storageSyncEndpointSuffix":           "localhost",
 			"mhsmDns":                             "localhost",

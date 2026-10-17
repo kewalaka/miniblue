@@ -38,6 +38,7 @@ func (h *Handler) Register(r chi.Router) {
 			r.Get("/", h.GetStorageAccount)
 			r.Delete("/", h.DeleteStorageAccount)
 			r.Post("/listKeys", h.ListKeys)
+			r.Get("/accountMigrations/default", h.GetAccountMigration)
 			r.Put("/managementPolicies/default", h.SetManagementPolicy)
 			r.Get("/managementPolicies/default", h.GetManagementPolicy)
 			r.Delete("/managementPolicies/default", h.DeleteManagementPolicy)

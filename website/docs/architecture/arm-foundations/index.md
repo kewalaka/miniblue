@@ -31,6 +31,7 @@ There are about 6 seams to add, not 8: `Do`/`Resolve`, Current-aware hooks under
 | [Slice 2](slices/02-apim-consumption.md) | APIM Consumption control plane. |
 | [PLAN](PLAN.md) | Phased PR plan with decision gates. |
 | [SPIKE](SPIKE.md) | The earlier spike: resource ranking, test tiers, APIM provider findings. Partly superseded; its §0 lists what changed. |
+| [Scenario catalogue](catalogue/index.md) | About 490 real-Azure scenarios per resource type, mapped to the engine, with engine lessons and a porting recipe. The acceptance list for each migration PR. |
 
 ADRs are written to be commit-safe. Suggested home: `website/docs/architecture/adr/`.
 

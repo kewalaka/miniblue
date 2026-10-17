@@ -100,6 +100,37 @@ nav:
       - "Slice: role assignments": architecture/arm-foundations/slices/01-role-assignments.md
       - "Slice: APIM Consumption": architecture/arm-foundations/slices/02-apim-consumption.md
       - Spike: architecture/arm-foundations/SPIKE.md
+      - Scenario catalogue:
+          - Overview: architecture/arm-foundations/catalogue/index.md
+          - Engine lessons: architecture/arm-foundations/catalogue/engine-lessons.md
+          - Cross-cutting: architecture/arm-foundations/catalogue/cross-cutting.md
+          - Client suites: architecture/arm-foundations/catalogue/client-suites.md
+          - API Management: architecture/arm-foundations/catalogue/api-management.md
+          - API Management provider notes: architecture/arm-foundations/catalogue/api-management-provider-notes.md
+          - App Configuration: architecture/arm-foundations/catalogue/app-configuration.md
+          - App Service: architecture/arm-foundations/catalogue/app-service.md
+          - Authorization: architecture/arm-foundations/catalogue/authorization.md
+          - Compute: architecture/arm-foundations/catalogue/compute.md
+          - Container Instances: architecture/arm-foundations/catalogue/container-instances.md
+          - Container Registry: architecture/arm-foundations/catalogue/container-registry.md
+          - Cosmos DB: architecture/arm-foundations/catalogue/cosmos-db.md
+          - Deployments: architecture/arm-foundations/catalogue/deployments.md
+          - Disk: architecture/arm-foundations/catalogue/disk.md
+          - Event Grid: architecture/arm-foundations/catalogue/event-grid.md
+          - Event Hubs: architecture/arm-foundations/catalogue/event-hubs.md
+          - Insights: architecture/arm-foundations/catalogue/insights.md
+          - Key Vault: architecture/arm-foundations/catalogue/key-vault.md
+          - Load Balancer: architecture/arm-foundations/catalogue/load-balancer.md
+          - Log Analytics: architecture/arm-foundations/catalogue/log-analytics.md
+          - Managed identity: architecture/arm-foundations/catalogue/managed-identity.md
+          - Management groups: architecture/arm-foundations/catalogue/management-groups.md
+          - Redis: architecture/arm-foundations/catalogue/redis.md
+          - Resource groups: architecture/arm-foundations/catalogue/resource-groups.md
+          - Service Bus: architecture/arm-foundations/catalogue/service-bus.md
+          - SQL: architecture/arm-foundations/catalogue/sql.md
+          - Storage: architecture/arm-foundations/catalogue/storage.md
+          - Subscriptions and providers: architecture/arm-foundations/catalogue/subscriptions-providers.md
+          - Virtual network: architecture/arm-foundations/catalogue/virtual-network.md
   - Contributing: contributing.md
 
 markdown_extensions:

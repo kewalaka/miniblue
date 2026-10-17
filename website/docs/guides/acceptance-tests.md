@@ -76,7 +76,7 @@ No fixture fails. To record one, do not drop the fixture. Add a separate matrix 
 ## Not covered
 
 - Blob/queue/table/file **data plane** (`azurerm_storage_blob`, `backend "azurerm"`). The provider derives data-plane URLs from `https://<account>.blob.core.windows.net/`, which needs host-style routing in miniblue. Planned follow-up: [#3](https://github.com/kewalaka/miniblue/issues/3).
-- With `MINIBLUE_STORAGE_ENDPOINT` set, `azurerm_storage_container` and `azurerm_storage_blob` cannot work (path-style endpoints do not parse). Leave it unset for Terraform; see [Configuration](../getting-started/configuration.md).
+- With `MINIBLUE_STORAGE_ENDPOINT` set, `azurerm_storage_container` (and `azurerm_storage_blob` referencing a container resource) cannot work: path-style endpoints do not parse. `azurerm_storage_blob` with a literal `storage_container_id` works path-style. Leave the variable unset for Terraform; see [Configuration](../getting-started/configuration.md), including the RBAC state backend note.
 - Key Vault data plane (secrets, keys).
 - Docker-backed services (real containers); VMs run in stub mode.
 - `examples/terraform/aks` and `examples/terraform/scenarios/*` (still azurerm `~> 3.0`).

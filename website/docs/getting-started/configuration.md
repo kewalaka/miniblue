@@ -19,7 +19,12 @@ miniblue works with zero configuration out of the box. This page covers everythi
 When set, storage accounts return local **path-style** endpoints (e.g., `http://localhost:4566/blob/{accountName}/`) instead of real Azure endpoints (e.g., `https://{accountName}.blob.core.windows.net/`). This allows SDKs and tools to connect directly to miniblue's local blob/queue/table/file services for data-plane testing.
 
 !!! warning "Terraform and `MINIBLUE_STORAGE_ENDPOINT`"
-    With this variable set, `azurerm_storage_container` and `azurerm_storage_blob` cannot work: the provider cannot parse path-style endpoints. Leave it unset for Terraform, in which case `azurerm_storage_container` works through the ARM API (use `storage_account_id`). `azurerm_storage_blob` and `backend "azurerm"` need host-style data-plane endpoints (`https://{accountName}.blob.core.windows.net/`) served by miniblue, which is a planned follow-up ([#3](https://github.com/kewalaka/miniblue/issues/3)).
+    With this variable set, `azurerm_storage_container` cannot work, and neither can `azurerm_storage_blob` when its `storage_container_id` references an `azurerm_storage_container`: the provider cannot parse path-style endpoints. `azurerm_storage_blob` with a literal `storage_container_id` (an ARM container ID string) does work path-style. To use `azurerm_storage_container`, leave the variable unset: it then works through the ARM API (use `storage_account_id`). Host-style data-plane endpoints (`https://{accountName}.blob.core.windows.net/`) served by miniblue are a planned follow-up ([#3](https://github.com/kewalaka/miniblue/issues/3)).
+
+!!! note "State backend with RBAC today"
+    `backend "azurerm"` works against miniblue with Entra auth when `use_azuread_auth = true`, `lookup_blob_endpoint = true` and `resource_group_name` are set (no `access_key`/`sas_token`), and miniblue runs with `MINIBLUE_STORAGE_ENDPOINT` (for example `http://localhost:4566`) and `MINIBLUE_DISABLE_SHAREDKEY_AUTH=1`. The backend then takes the path-style endpoint from the ARM response.
+
+    `MINIBLUE_DISABLE_SHAREDKEY_AUTH` is a blunt, dev-only switch: it skips **all** blob data-plane authentication (SharedKey and Bearer), and tokens are never validated. Without it, the blob handler returns 403 `AuthenticationFailed` for Bearer requests on accounts created through ARM. The proper fix is tracked in [#3](https://github.com/kewalaka/miniblue/issues/3).
 
 The metadata endpoint's `suffixes.storage` is `core.windows.net` by default, and `localhost:<PORT>` when `MINIBLUE_STORAGE_ENDPOINT` is set.
 

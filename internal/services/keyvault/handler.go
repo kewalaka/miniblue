@@ -282,6 +282,19 @@ func (h *Handler) CreateOrUpdateVault(w http.ResponseWriter, r *http.Request) {
 	rg := chi.URLParam(r, "resourceGroupName")
 	name := chi.URLParam(r, "vaultName")
 
+	if !h.store.Exists("rg:" + sub + ":" + rg) {
+		// ResourceGroupNotFound is (verify) for Microsoft.KeyVault.
+		azerr.WriteError(w, http.StatusNotFound, "ResourceGroupNotFound",
+			"Resource group '"+rg+"' could not be found.")
+		return
+	}
+	if !validVaultName(name) {
+		// VaultNameNotValid is (verify); checkNameAvailability uses AccountNameInvalid.
+		azerr.WriteError(w, http.StatusBadRequest, "VaultNameNotValid",
+			"The vault name '"+name+"' is invalid. "+vaultNameRules)
+		return
+	}
+
 	var input map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		azerr.BadRequest(w, "The request content was invalid: "+err.Error())
@@ -455,6 +468,8 @@ func (h *Handler) UpdateAccessPolicies(w http.ResponseWriter, r *http.Request) {
 
 var vaultNamePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9-]{1,22}[a-zA-Z0-9]$`)
 
+const vaultNameRules = "Vault names must be 3-24 characters, start with a letter, end with a letter or digit, contain only letters, digits, and hyphens, and not contain consecutive hyphens."
+
 func validVaultName(name string) bool {
 	return vaultNamePattern.MatchString(name) && !strings.Contains(name, "--")
 }
@@ -472,7 +487,7 @@ func (h *Handler) CheckNameAvailability(w http.ResponseWriter, r *http.Request) 
 	if !validVaultName(input.Name) {
 		resp["nameAvailable"] = false
 		resp["reason"] = "AccountNameInvalid"
-		resp["message"] = "The vault name is invalid. Vault names must be 3-24 characters, start with a letter, end with a letter or digit, contain only letters, digits, and hyphens, and not contain consecutive hyphens."
+		resp["message"] = "The vault name is invalid. " + vaultNameRules
 		json.NewEncoder(w).Encode(resp)
 		return
 	}

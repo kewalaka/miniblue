@@ -111,6 +111,7 @@ func TestKeyVaultARMVaultCRUDAndAccessPolicies(t *testing.T) {
 	defer ts.Close()
 
 	const sub = "00000000-0000-0000-0000-000000000000"
+	createRG(t, ts, sub, "rg1")
 	base := ts.URL + "/subscriptions/" + sub + "/resourceGroups/rg1/providers/Microsoft.KeyVault/vaults/kvtest?api-version=2023-07-01"
 
 	resp := doRequest(t, "PUT", base, `{

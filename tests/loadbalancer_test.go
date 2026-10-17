@@ -502,3 +502,40 @@ func TestLoadBalancerSubResourcesMultiple(t *testing.T) {
 		t.Fatalf("expected 1 rule, got %d", len(list["value"].([]interface{})))
 	}
 }
+
+func TestLoadBalancerResourceGuidStableAcrossPuts(t *testing.T) {
+	ts := setupServer()
+	defer ts.Close()
+	base := ts.URL + "/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/loadBalancers/lb1"
+	av := "?api-version=2023-09-01"
+
+	guid := func(resp map[string]interface{}) string {
+		g, _ := resp["properties"].(map[string]interface{})["resourceGuid"].(string)
+		return g
+	}
+
+	for _, path := range []string{"", "/backendAddressPools/pool1", "/probes/probe1", "/loadBalancingRules/rule1"} {
+		resp := doRequest(t, "PUT", base+path+av, `{"location":"eastus"}`)
+		expectStatus(t, resp, 201)
+		first := guid(decodeJSON(t, resp))
+		resp.Body.Close()
+		if first == "" {
+			t.Fatalf("%q: expected resourceGuid on create", path)
+		}
+
+		resp = doRequest(t, "PUT", base+path+av, `{"location":"eastus","tags":{"a":"b"}}`)
+		expectStatus(t, resp, 200)
+		second := guid(decodeJSON(t, resp))
+		resp.Body.Close()
+		if second != first {
+			t.Fatalf("%q: resourceGuid changed across PUTs: %s -> %s", path, first, second)
+		}
+
+		resp = doRequest(t, "GET", base+path+av, "")
+		got := guid(decodeJSON(t, resp))
+		resp.Body.Close()
+		if got != first {
+			t.Fatalf("%q: GET resourceGuid = %s, want %s", path, got, first)
+		}
+	}
+}

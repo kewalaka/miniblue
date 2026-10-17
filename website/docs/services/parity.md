@@ -19,7 +19,8 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | DNS Records | Full | Full | - | Full | - | A, CNAME, MX, TXT, SOA, NS |
 | Container Registry | Full | Full | Full | Full | - | Name availability check, replications |
 | Event Grid Topics | Full | Full | Full | Full | - | Event publishing on data plane |
-| Azure Functions | Stub | Stub | Stub | Stub | - | No function execution |
+| Azure Functions | Stub | Stub | Stub | Stub | - | No function execution. Served by the same `Microsoft.Web/sites` handler as App Service |
+| App Service (web apps, slots, plans) | Full | Full | Full | Full | - | `Microsoft.Web/sites`, deployment slots, `serverFarms`, site config (`web`, app settings, connection strings, auth settings, and more) and publishing-credential policies. Stored only: no app hosting, Kudu/SCM or slot swap |
 | DB for PostgreSQL | Full | Full | Full | Full | - | Real DB creation via POSTGRES_URL |
 | DB for MySQL | Stub | Stub | Stub | Stub | - | ARM only, no real MySQL |
 | Azure SQL Database | Stub | Stub | Stub | Stub | - | ARM only, no real SQL Server |
@@ -56,7 +57,7 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | Key Vault | Set, get, list, delete secrets | Full | Reachable via `/keyvault/{vault}/...` or by `Host: *.vault.azure.net` routing. Vault resources are available through ARM. Keys and certificates not supported. |
 | Cosmos DB | Create, get, replace, delete, list documents | Full | SQL API only, no query language |
 | Service Bus | Create queue/topic, send, receive, delete | Full | No subscriptions, no dead-letter |
-| App Configuration | Set, get, list, delete key-values | Full | No labels, no feature flags. Reachable via `/appconfig/{store}/kv/...` or by `Host: *.azconfig.io` routing. |
+| App Configuration | Set, get, list, delete key-values | Full | Labels on set, get and delete via the `label` query parameter. No feature flags. Reachable via `/appconfig/{store}/kv/...` or by `Host: *.azconfig.io` routing. |
 | Event Grid | Publish events | Full | No event subscriptions |
 | Container Registry | List manifests, tags | Stub | Docker v2 API stubs only |
 
@@ -76,7 +77,7 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 
 These Azure services have no emulation:
 
-- Azure App Service
+- Azure App Service runtime (app hosting, Kudu/SCM, slot swap)
 - Azure Monitor / Log Analytics
 - Azure Active Directory (beyond mock tokens)
 - Azure Policy (assignments, initiatives, built-in definitions, evaluation, management-group scope)

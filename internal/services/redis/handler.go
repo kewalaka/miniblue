@@ -2,6 +2,8 @@ package redis
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -66,7 +68,7 @@ func checkRedisConnectivity(host, port string) bool {
 	return true
 }
 
-func buildCacheResponse(sub, rg, name, host, port string) map[string]interface{} {
+func buildCacheResponse(sub, rg, name, host, port string, input map[string]interface{}) map[string]interface{} {
 	id := "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.Cache/redis/" + name
 	portNum := 6379
 	if port != "" {
@@ -74,23 +76,37 @@ func buildCacheResponse(sub, rg, name, host, port string) map[string]interface{}
 			portNum = n
 		}
 	}
+
+	location, _ := input["location"].(string)
+	if location == "" {
+		location = "eastus"
+	}
+
+	tags, _ := input["tags"].(map[string]interface{})
+	if tags == nil {
+		tags = map[string]interface{}{}
+	}
+
+	props, _ := input["properties"].(map[string]interface{})
+	sku, _ := props["sku"].(map[string]interface{})
+	if sku == nil {
+		sku = map[string]interface{}{"name": "Basic", "family": "C", "capacity": 1}
+	}
+
 	return map[string]interface{}{
 		"id":       id,
 		"name":     name,
 		"type":     "Microsoft.Cache/redis",
-		"location": "eastus",
+		"location": location,
+		"tags":     tags,
 		"properties": map[string]interface{}{
-			"provisioningState": "Succeeded",
-			"hostName":          host,
-			"port":              portNum,
-			"sslPort":           6380,
-			"redisVersion":      "7.2",
-			"sku": map[string]interface{}{
-				"name":     "Basic",
-				"family":   "C",
-				"capacity": 1,
-			},
-			"enableNonSslPort":  true,
+			"provisioningState":   "Succeeded",
+			"hostName":            host,
+			"port":                portNum,
+			"sslPort":             6380,
+			"redisVersion":        "7.2",
+			"sku":                 sku,
+			"enableNonSslPort":    true,
 			"publicNetworkAccess": "Enabled",
 		},
 	}
@@ -100,6 +116,12 @@ func (h *Handler) CreateOrUpdateCache(w http.ResponseWriter, r *http.Request) {
 	sub := chi.URLParam(r, "subscriptionId")
 	rg := chi.URLParam(r, "resourceGroupName")
 	name := chi.URLParam(r, "cacheName")
+
+	var input map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil && !errors.Is(err, io.EOF) {
+		azerr.BadRequest(w, "The request content was invalid: "+err.Error())
+		return
+	}
 
 	host, port := redisHostPort()
 
@@ -112,7 +134,7 @@ func (h *Handler) CreateOrUpdateCache(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	cache := buildCacheResponse(sub, rg, name, host, port)
+	cache := buildCacheResponse(sub, rg, name, host, port, input)
 	k := h.cacheKey(sub, rg, name)
 	_, exists := h.store.Get(k)
 	h.store.Set(k, cache)

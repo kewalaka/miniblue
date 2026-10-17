@@ -50,7 +50,7 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 
 | Service | Operations | Status | Notes |
 |---------|-----------|--------|-------|
-| Blob Storage | Create container, upload, download, list, delete, lease, HEAD | Full | Multi-segment blob names, lease acquire/renew/release/break/change, `?comp=metadata`/`?comp=properties`, spec-compliant List Blobs XML, SharedKey auth (optional bypass via `MINIBLUE_DISABLE_SHAREDKEY_AUTH`) |
+| Blob Storage | Create container, upload, download, list, delete, lease, HEAD | Full | Multi-segment blob names, lease acquire/renew/release/break/change, `?comp=metadata`/`?comp=properties`, spec-compliant List Blobs XML, SharedKey auth (dev-only `MINIBLUE_DISABLE_SHAREDKEY_AUTH` skips all data-plane auth, including Bearer) |
 | Table Storage | Create table, upsert, get, query, delete entity | Full | Partition/row key support |
 | Queue Storage | Create queue, send, receive, clear, delete | Full | Dequeue count tracking |
 | Key Vault | Set, get, list, delete secrets | Full | Reachable via `/keyvault/{vault}/...` or by `Host: *.vault.azure.net` routing. Vault resources are available through ARM. Keys and certificates not supported. |

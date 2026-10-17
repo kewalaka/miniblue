@@ -45,9 +45,10 @@ resource "azurerm_storage_account" "example" {
 miniblue supports Azure shared key authentication for storage data plane operations. Keys are auto-generated when a storage account is created.
 
 For local scripting where SharedKey signing is impractical, set
-`MINIBLUE_DISABLE_SHAREDKEY_AUTH=1` to bypass signature verification on the
-blob data plane. This is **only** for development workflows — never enable
-it in an environment that pretends to model production.
+`MINIBLUE_DISABLE_SHAREDKEY_AUTH=1` to skip **all** blob data-plane
+authentication (SharedKey and Bearer); tokens are never validated. This is
+**only** for development workflows — never enable it in an environment that
+pretends to model production.
 
 ## Lifecycle management policies
 

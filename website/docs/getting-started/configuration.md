@@ -13,7 +13,7 @@ miniblue works with zero configuration out of the box. This page covers everythi
 | `LOCAL_AZURE_CERT_DIR` | `~/.miniblue` | Directory for TLS certificate and key |
 | `DATABASE_URL` | _(unset)_ | PostgreSQL connection string for persistent storage |
 | `MINIBLUE_STORAGE_ENDPOINT` | _(unset)_ | Overrides storage account data-plane endpoints to point to local server (enables SDK/data-plane testing) |
-| `MINIBLUE_DISABLE_SHAREDKEY_AUTH` | _(unset)_ | When truthy (`1`, `true`, `yes`, `on`), disables SharedKey signature verification on the blob data-plane. Dev-only — never enable in environments that model production. |
+| `MINIBLUE_DISABLE_SHAREDKEY_AUTH` | _(unset)_ | When truthy (`1`, `true`, `yes`, `on`), skips **all** blob data-plane authentication (SharedKey and Bearer); tokens are never validated. Dev-only — never enable in environments that model production. |
 | `MINIBLUE_DISABLE_DOCKER` | _(unset)_ | When set, forces [Virtual Machines](../services/virtual-machines.md) into stub mode even if a Docker daemon is reachable. |
 
 When set, storage accounts return local **path-style** endpoints (e.g., `http://localhost:4566/blob/{accountName}/`) instead of real Azure endpoints (e.g., `https://{accountName}.blob.core.windows.net/`). This allows SDKs and tools to connect directly to miniblue's local blob/queue/table/file services for data-plane testing.

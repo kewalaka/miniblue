@@ -125,6 +125,8 @@ Or use the included Postgres docker-compose:
 docker-compose -f docker-compose.postgres.yml up
 ```
 
+Persisted state (file or Postgres) is stamped with a schema version. If a miniblue release changes how state is stored, startup stops with a message naming both versions. Delete `~/.miniblue/state.json` (or `TRUNCATE miniblue_store` on Postgres) and restart. State is never reset automatically.
+
 ## Docker configuration
 
 Pass environment variables with `-e`:

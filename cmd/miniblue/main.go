@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/moabukar/miniblue/internal/server"
+	"github.com/moabukar/miniblue/internal/store"
 )
 
 func main() {
@@ -81,7 +82,12 @@ Documentation: https://moabukar.github.io/miniblue`)
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
-	srv := server.New()
+	// Check the schema stamp before any handler can read or write state.
+	st, err := store.Open()
+	if err != nil {
+		log.Fatal(err)
+	}
+	srv := server.NewWithStore(st)
 	handler := srv.Handler()
 
 	// Generate cert and save to ~/.miniblue/

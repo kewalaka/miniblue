@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"strings"
 
@@ -12,6 +13,14 @@ import (
 // PostgresBackend implements Backend using a PostgreSQL database.
 type PostgresBackend struct {
 	db *sql.DB
+}
+
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+// likePrefix returns a LIKE pattern matching keys that start with prefix,
+// with the wildcards and the escape character in prefix taken literally.
+func likePrefix(prefix string) string {
+	return likeEscaper.Replace(prefix) + "%"
 }
 
 // NewPostgresBackend connects to Postgres and auto-creates the storage table.
@@ -30,6 +39,14 @@ func NewPostgresBackend(databaseURL string) (*PostgresBackend, error) {
 		value JSONB,
 		created_at TIMESTAMPTZ DEFAULT NOW()
 	)`)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	// The primary key btree cannot serve LIKE 'x%' under non-C collations.
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS miniblue_store_key_prefix
+		ON miniblue_store (key text_pattern_ops)`)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -94,7 +111,7 @@ func (p *PostgresBackend) List() []string {
 func (p *PostgresBackend) ListByPrefix(prefix string) []interface{} {
 	rows, err := p.db.Query(
 		`SELECT value FROM miniblue_store WHERE key LIKE $1`,
-		prefix+"%",
+		likePrefix(prefix),
 	)
 	if err != nil {
 		return []interface{}{}
@@ -117,11 +134,9 @@ func (p *PostgresBackend) ListByPrefix(prefix string) []interface{} {
 
 func (p *PostgresBackend) CountByPrefix(prefix string) int {
 	var count int
-	// Escape LIKE wildcards in the prefix itself.
-	escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(prefix)
 	err := p.db.QueryRow(
 		`SELECT COUNT(*) FROM miniblue_store WHERE key LIKE $1`,
-		escaped+"%",
+		likePrefix(prefix),
 	).Scan(&count)
 	if err != nil {
 		return 0
@@ -141,7 +156,7 @@ func (p *PostgresBackend) Exists(key string) bool {
 func (p *PostgresBackend) DeleteByPrefix(prefix string) int {
 	result, err := p.db.Exec(
 		`DELETE FROM miniblue_store WHERE key LIKE $1`,
-		prefix+"%",
+		likePrefix(prefix),
 	)
 	if err != nil {
 		return 0
@@ -150,6 +165,26 @@ func (p *PostgresBackend) DeleteByPrefix(prefix string) int {
 	return int(n)
 }
 
+// Reset drops all state except the schema stamp. It is one statement, so the
+// stamp is never absent.
 func (p *PostgresBackend) Reset() {
-	_, _ = p.db.Exec(`TRUNCATE miniblue_store`)
+	_, _ = p.db.Exec(`DELETE FROM miniblue_store WHERE key <> $1`, schemaKey)
+}
+
+// readSchema implements schemaReader, reporting query and decode failures
+// instead of folding them into "absent" as Get and List do.
+func (p *PostgresBackend) readSchema() (stamp interface{}, stamped, hasState bool, err error) {
+	var data []byte
+	err = p.db.QueryRow(`SELECT value FROM miniblue_store WHERE key = $1`, schemaKey).Scan(&data)
+	switch {
+	case err == nil:
+		if err := json.Unmarshal(data, &stamp); err != nil {
+			return nil, false, false, err
+		}
+		return stamp, true, true, nil
+	case !errors.Is(err, sql.ErrNoRows):
+		return nil, false, false, err
+	}
+	err = p.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM miniblue_store)`).Scan(&hasState)
+	return nil, false, hasState, err
 }

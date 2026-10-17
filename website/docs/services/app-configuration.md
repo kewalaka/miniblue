@@ -30,6 +30,6 @@ The TLS certificate includes `*.azconfig.io` to cover this case.
 
 ## Limitations
 
-- No labels or feature flags
+- No feature flags
 - No configuration snapshots
 - No event notifications

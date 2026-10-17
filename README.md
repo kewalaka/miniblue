@@ -1,3 +1,5 @@
+> Builds on the work of [moabukar](https://github.com/moabukar) and [lonegunmanb](https://github.com/lonegunmanb).
+
 <p align="center">
   <img src="assets/logo.svg" alt="miniblue" width="120" />
 </p>
@@ -142,15 +144,9 @@ Full docs at **[miniblue.io](https://miniblue.io)** covering:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Each service is its own Go package under `internal/services/`.
 
-## Sponsors
+## Contact
 
-<p>
-  <a href="https://coderco.io"><img src="assets/cc.jpg" alt="CoderCo" width="200" /></a>
-</p>
-
-miniblue is sponsored by [CoderCo](https://coderco.io).
-
-Want to sponsor this project? Reach out at devopsbymo@gmail.com.
+If miniblue is useful to you, get in touch, and let me know if you'd be interested in sponsoring further development.
 
 ## License
 

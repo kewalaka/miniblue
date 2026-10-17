@@ -4,6 +4,7 @@ Most miniblue services are hand-written chi route trees over `map[string]interfa
 
 Status: the engine serves `Microsoft.Authorization/policyDefinitions@2023-04-01` at subscription scope. Everything else still uses its own handler.
 
+The agreed design direction for evolving the engine is recorded in [ARM foundations](arm-foundations/index.md).
 ## Request flow
 
 The engine is a chi **root middleware**, registered in `server.setupRoutes` before the authorization middleware:

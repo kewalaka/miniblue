@@ -11,7 +11,7 @@ jobs:
     name: Run E2E tests against miniblue container
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Build miniblue image from PR
         run: docker build -t miniblue:pr .
@@ -134,7 +134,7 @@ jobs:
           [ "$CODE" = "404" ] && echo "OK: Cascade delete (aks)" || (echo "FAIL: Expected 404 for AKS, got $CODE" && exit 1)
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: '1.26'
 

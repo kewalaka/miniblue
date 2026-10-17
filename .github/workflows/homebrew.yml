@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Update Homebrew formula
-        uses: mislav/bump-homebrew-formula-action@v4.1
+        uses: mislav/bump-homebrew-formula-action@ccf2332299a883f6af50a1d2d41e5df7904dd769 # v4.1
         with:
           formula-name: miniblue
           homebrew-tap: moabukar/homebrew-tap

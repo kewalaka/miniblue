@@ -1,0 +1,4557 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Local Azure development. One binary. No account needed.">
+      
+      
+        <meta name="author" content="Mo Abukar">
+      
+      
+        <link rel="canonical" href="https://miniblue.io/architecture/arm-foundations/catalogue/engine-lessons/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../cross-cutting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Engine lessons - miniblue</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#engine-lessons" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="miniblue" class="md-header__button md-logo" aria-label="miniblue" data-md-component="logo">
+      
+  <img src="../../../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            miniblue
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Engine lessons
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/moabukar/miniblue" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    moabukar/miniblue
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../guides/terraform/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../services/overview/" class="md-tabs__link">
+          
+  
+  
+  Services
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../../overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="miniblue" class="md-nav__button md-logo" aria-label="miniblue" data-md-component="logo">
+      
+  <img src="../../../../assets/logo.svg" alt="logo">
+
+    </a>
+    miniblue
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/moabukar/miniblue" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    moabukar/miniblue
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../getting-started/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/terraform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terraform
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/acceptance-tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terraform acceptance tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/pulumi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pulumi
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/sdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDKs (Python, Go, JS)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/azlocal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    azlocal CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/azure-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Helm / Kubernetes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Services
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Services
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/parity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Parity Matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/resource-groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resource Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/storage-accounts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage Accounts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/blob-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blob Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/table-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Table Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/queue-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/key-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/cosmos-db/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cosmos DB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/service-bus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Service Bus
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/event-grid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Grid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/app-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/virtual-networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtual Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/public-ip-addresses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public IP Addresses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/network-security-groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Security Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/network-interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Interfaces
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/load-balancer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load Balancer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/application-gateway/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Application Gateway
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/dns-zones/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DNS Zones
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/container-registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/container-instances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Instances
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/kubernetes-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kubernetes Service (AKS)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/virtual-machines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtual Machines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/managed-disks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managed Disks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/managed-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managed Identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/rbac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RBAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/database-postgresql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DB for PostgreSQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/database-mysql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DB for MySQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/database-sql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure SQL Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/redis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Cache for Redis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../scope/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scope and Philosophy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../arm-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARM Resource Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARM foundations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ARM foundations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0001-single-arm-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0001: Single ARM pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0002-unregistered-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0002: Unregistered types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0003-pipeline-phases-and-hooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0003: Pipeline phases and hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0004-storage-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0004: Storage contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0005-type-metadata-and-conformance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0005: Type metadata and conformance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0006-sync-lro-and-errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0006: Sync LRO and errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0007-migration-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0007: Migration strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0008-rbac-and-policy-minimum/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0008: RBAC and policy minimum
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slices/01-role-assignments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Slice: role assignments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slices/02-apim-consumption/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Slice: APIM Consumption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../SPIKE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spike
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4_14" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5_4_14" id="__nav_5_4_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenario catalogue
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_4_14_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_4_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Scenario catalogue
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine lessons
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine lessons
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#lessons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lessons
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lessons">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#name-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Name validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#id-parsing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Id parsing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-taxonomy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error taxonomy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list-and-paging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        List and paging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secrets-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secrets handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#soft-delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Soft-delete
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST actions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-helper-lessons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other helper lessons
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#porting-recipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Porting recipe
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Porting recipe">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#integration-test-skeleton" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration-test skeleton
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adr-cross-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADR cross-check
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ADR cross-check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#proposed-plan-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed PLAN rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross-cutting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-cutting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../client-suites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client suites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-management-provider-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Management provider notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../app-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../app-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../authorization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authorization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compute/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compute
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../container-instances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Instances
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../container-registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cosmos-db/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cosmos DB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../event-grid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Grid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../event-hubs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Hubs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../insights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Insights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../key-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../load-balancer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load Balancer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../log-analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Log Analytics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../managed-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managed identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../management-groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Management groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../redis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Redis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resource-groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resource groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../service-bus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Service Bus
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../subscriptions-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subscriptions and providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../virtual-network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtual network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#lessons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lessons
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lessons">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#name-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Name validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#id-parsing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Id parsing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-taxonomy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error taxonomy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list-and-paging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        List and paging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secrets-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secrets handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#soft-delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Soft-delete
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST actions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-helper-lessons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other helper lessons
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#porting-recipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Porting recipe
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Porting recipe">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#integration-test-skeleton" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration-test skeleton
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adr-cross-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADR cross-check
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ADR cross-check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#proposed-plan-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed PLAN rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="engine-lessons">Engine lessons</h1>
+<blockquote>
+<p>Engine fit: design guidance for the shared engine helpers and the porting workflow (not a service). miniblue today: the engine serves <code>policyDefinitions</code> only; <code>armtest</code> and the legacy route freeze file do not exist yet. Suggested wave: PLAN 1.4 and 1.5 for the helpers, Phase 4 for the recipe.</p>
+</blockquote>
+<p>This page turns the design lessons about shared ARM helpers into decisions for miniblue's engine. It does three things: states each lesson with the real Azure behaviour behind it, restates the porting recipe and test skeleton in current ADR vocabulary, and cross-checks every lesson against the ADRs and the PLAN so the gaps are visible. It proposes amendments and PLAN rows; it edits neither.</p>
+<p>Authoritative sources: <a href="../../adr/0003-pipeline-phases-and-hooks/">ADR-0003 pipeline and hooks</a>, <a href="../../adr/0005-type-metadata-and-conformance/">ADR-0005 conformance</a>, <a href="../../adr/0006-sync-lro-and-errors/">ADR-0006 sync and errors</a>, <a href="../../adr/0007-migration-strategy/">ADR-0007 migration</a>, <a href="../../PLAN/">PLAN</a>. Scenarios that exercise these lessons are on <a href="../cross-cutting/">cross-cutting scenarios</a>.</p>
+<p>Statements marked <code>(verify)</code> were not checked against the REST specs or provider source.</p>
+<h2 id="lessons">Lessons</h2>
+<h3 id="name-validation">Name validation</h3>
+<table>
+<thead>
+<tr>
+<th>Lesson</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Validate on PUT, not only in checkNameAvailability</td>
+<td>A helper that checks names only in the availability call lets invalid names through the create path. Real ARM rejects on PUT with 400</td>
+</tr>
+<tr>
+<td>The rule is per type</td>
+<td>There is no universal name rule. Put the regex and length in the type's <code>Validate</code> hook through <code>CheckName(name, re, min, max)</code> (400 <code>InvalidResourceName</code>, ADR-0003). Declarative name fields on <code>Type</code> were rejected in ADR-0003</td>
+</tr>
+<tr>
+<td>Share the rule with the name check</td>
+<td>The provider-level <code>checkNameAvailability</code> route and the PUT hook must use one regex per type, or the two drift</td>
+</tr>
+<tr>
+<td>Error code varies by RP</td>
+<td><code>InvalidResourceName</code> is the default; some RPs use their own code <code>(verify)</code>. Pin the code per type in its Sample (<code>Invalid</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Constraints to confirm before asserting, all <code>(verify)</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Constraint</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Storage account</td>
+<td>3 to 24 characters, lowercase letters and digits, globally unique</td>
+</tr>
+<tr>
+<td>SQL server</td>
+<td>1 to 63 characters, lowercase letters, digits and hyphens, globally unique</td>
+</tr>
+<tr>
+<td>Service Bus namespace</td>
+<td>6 to 50 characters, letters, digits and hyphens, starts with a letter, globally unique</td>
+</tr>
+<tr>
+<td>Virtual network, subnet</td>
+<td>2 to 64 characters</td>
+</tr>
+<tr>
+<td>API Management service</td>
+<td>per <a href="../../slices/02-apim-consumption/">Slice 2</a> (<code>CheckName</code> with 1 to 50)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="id-parsing">Id parsing</h3>
+<table>
+<thead>
+<tr>
+<th>Lesson</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Parse structurally, not positionally</td>
+<td>Position-based parsing breaks on extension resources, names equal to a keyword (<code>providers</code>) and mixed-case segments. <code>arm.ParseID</code> is the structural parser; keep it</td>
+</tr>
+<tr>
+<td>Build ids from one helper</td>
+<td>Nested ids come from <code>ChildID(parent, typeName, name)</code> for both the PUT response and <code>outputResources</code> (ADR-0001, PLAN 1.4). A builder pairs each type segment with a name segment and handles the tenant-level empty scope</td>
+</tr>
+<tr>
+<td>Name casing is frozen at create</td>
+<td>Lookups are case-insensitive; the response keeps canonical keywords and the creating PUT's name casing (ADR-0003)</td>
+</tr>
+<tr>
+<td>Opaque names</td>
+<td>Some names carry characters such as <code>;rev=</code> (APIM). Treat the segment as opaque after decoding; an encoded <code>/</code> inside a name is still open (SPIKE)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="error-taxonomy">Error taxonomy</h3>
+<p>One envelope everywhere: <code>{"error":{"code","message","target"?,"details"?}}</code> as <code>application/json</code> through <code>azerr.Error</code> (ADR-0006, PLAN 0.7). Never default an unmapped code to 500, and never invent per-service not-found codes.</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Codes in use or planned</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td><code>InvalidRequestContent</code>, <code>MissingApiVersionParameter</code>, <code>InvalidApiVersionParameter</code>, <code>InvalidResourceName</code>, <code>InvalidParameter</code></td>
+<td>bad body, bad or missing api-version, bad name, hook validation</td>
+</tr>
+<tr>
+<td>403</td>
+<td><code>AuthorizationFailed</code>, <code>RequestDisallowedByPolicy</code></td>
+<td>RBAC or policy enforcement (ADR-0008)</td>
+</tr>
+<tr>
+<td>404</td>
+<td><code>ResourceNotFound</code>, <code>ResourceGroupNotFound</code>, <code>SubscriptionNotFound</code>, <code>ParentResourceNotFound</code>, <code>InvalidResourceType</code> <code>(verify)</code></td>
+<td>missing resource, RG, subscription, parent, unregistered type</td>
+</tr>
+<tr>
+<td>405</td>
+<td><code>MethodNotAllowed</code></td>
+<td>unsupported verb, <code>PatchNone</code> types</td>
+</tr>
+<tr>
+<td>409</td>
+<td><code>Conflict</code> and type-specific codes such as <code>RoleAssignmentExists</code>; <code>InvalidResourceGroupLocation</code>; <code>MissingSubscriptionRegistration</code></td>
+<td>duplicates, immutable-field changes, unregistered provider</td>
+</tr>
+<tr>
+<td>412</td>
+<td><code>PreconditionFailed</code></td>
+<td><code>If-None-Match: *</code> on an existing resource</td>
+</tr>
+<tr>
+<td>500</td>
+<td><code>InternalServerError</code></td>
+<td>store or reader failure (never treated as not found)</td>
+</tr>
+</tbody>
+</table>
+<p>Rules that follow:</p>
+<ul>
+<li>Missing parent is <code>ParentResourceNotFound</code>, not a per-service code (<code>VirtualNetworkNotFound</code>, <code>SubnetNotFound</code>) <code>(verify)</code>.</li>
+<li>404 messages are scope-aware: "under resource group" only at RG scope.</li>
+<li>Hooks return <code>*azerr.Error</code>; a plain <code>error</code> becomes 400 <code>InvalidRequestContent</code> (ADR-0003 phase 8).</li>
+<li>Any <code>Reader</code> or store failure is 500, so an outage never looks like an empty list.</li>
+</ul>
+<h3 id="list-and-paging">List and paging</h3>
+<table>
+<thead>
+<tr>
+<th>Lesson</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Shape</td>
+<td><code>{"value":[...]}</code> with <code>nextLink</code> only when the RP pages. Engine lists are sorted and prefix-safe (deleting <code>x</code> leaves <code>x2</code>)</td>
+</tr>
+<tr>
+<td>Scope variants</td>
+<td>Parent list, RG-wide and subscription-wide lists for the same type; <code>Reader.Under</code> serves the last two (ADR-0003, PLAN 1.2)</td>
+</tr>
+<tr>
+<td>Paging is deferred</td>
+<td>Clients that list follow <code>nextLink</code> if present, so omitting it is safe until a list is large. <code>$top</code>, <code>$skip</code> and <code>$filter</code> are RP-specific; add per type when a client needs them</td>
+</tr>
+<tr>
+<td>Generic resource list</td>
+<td><code>GET .../resourceGroups/{rg}/resources</code> aggregates across types. It is <code>[]</code> today and becomes engine-backed at PLAN 3.3; <code>$filter=resourceType eq</code> is not planned</td>
+</tr>
+</tbody>
+</table>
+<h3 id="secrets-handling">Secrets handling</h3>
+<table>
+<thead>
+<tr>
+<th>Lesson</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Never echo secrets on GET</td>
+<td>Admin passwords, keys, connection strings and similar fields are accepted on PUT and are never returned by GET. Keys come back only from a <code>POST</code> action (<code>listKeys</code>, <code>listSecrets</code>)</td>
+</tr>
+<tr>
+<td>The engine stores what the client sent</td>
+<td>There is no redaction step, so a typed model with a password field echoes it on GET. This is a documented deviation today, not Azure behaviour</td>
+</tr>
+<tr>
+<td>A Defaults hook cannot fix it</td>
+<td>Defaults output is persisted; stripping there loses the value an action later needs</td>
+</tr>
+<tr>
+<td>Needed seam</td>
+<td>Keep secrets in the stored document and project them out of GET, list and PUT responses; actions read the stored value. Declare the paths per type (the SPIKE called it <code>SecretPaths</code>). Requires an ADR-0003 amendment</td>
+</tr>
+<tr>
+<td>Some secrets are masked, not removed</td>
+<td>Named values and similar fields return a masked or empty value on GET <code>(verify)</code> per type</td>
+</tr>
+</tbody>
+</table>
+<h3 id="soft-delete">Soft-delete</h3>
+<table>
+<thead>
+<tr>
+<th>Lesson</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Behaviour</td>
+<td>Key Vault, App Configuration and API Management keep a deleted resource in a per-location <code>deleted...</code> collection. A recreate with the same name conflicts until purge. Purge of a purge-protected item is 409 <code>Conflict</code> <code>(verify)</code></td>
+</tr>
+<tr>
+<td>Engine today</td>
+<td>DELETE hard-removes. Hooks never write (ADR-0003), so a hook cannot move a document into a deleted collection</td>
+</tr>
+<tr>
+<td>Needed seam</td>
+<td>A write-capable delete path, or a second registered type for the deleted collection plus an engine-owned move. Decide before the first soft-delete type migrates</td>
+</tr>
+<tr>
+<td>Interim</td>
+<td>Legacy soft-delete flows stay bespoke (ADR-0006, ADR-0007). <code>purge_soft_delete_on_destroy</code> is documented unsupported for APIM; the deleted-service GET is a strict 404</td>
+</tr>
+</tbody>
+</table>
+<h3 id="post-actions">POST actions</h3>
+<table>
+<thead>
+<tr>
+<th>Lesson</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Instance actions are engine-owned</td>
+<td><code>listKeys</code>, <code>regenerateKey</code>, <code>listSecrets</code> belong in <code>Type.Actions</code>, which lands with its first consumer (ADR-0001, ADR-0003, PLAN Phase 4). Authorisation strings follow <code>{type}/{action}/action</code></td>
+</tr>
+<tr>
+<td>Provider-level operations stay chi routes</td>
+<td><code>checkNameAvailability</code>, <code>operationResults</code>, <code>locations/*</code>, <code>operations</code>, <code>deletedservices</code> (exempt from the freeze file, ADR-0001)</td>
+</tr>
+<tr>
+<td>Subscription and deployment actions are not engine actions</td>
+<td>subscription cancel and enable, deployment validate, cancel, exportTemplate and what-if stay bespoke</td>
+</tr>
+<tr>
+<td>Unregistered action paths</td>
+<td>Fall through today; with ADR-0002 they become a strict 404</td>
+</tr>
+</tbody>
+</table>
+<h3 id="other-helper-lessons">Other helper lessons</h3>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Lesson</th>
+<th>Today</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Server-owned fields</td>
+<td>Keys, creation times, generated GUIDs and URLs must survive a replacing PUT. Copy from <code>Current</code> in <code>Defaults</code>; Defaults must be idempotent</td>
+<td>Covered by ADR-0003 and the DefaultsIdempotent check</td>
+</tr>
+<tr>
+<td>Global name uniqueness</td>
+<td>DNS-global names (storage, SQL server, Service Bus, Key Vault, ACR, APIM) conflict across RGs and subscriptions: 409 (storage uses <code>StorageAccountAlreadyTaken</code> <code>(verify)</code>)</td>
+<td>No helper. A hook can scan with <code>Reader.Under</code>, but a cross-subscription check needs a store-wide lookup</td>
+</tr>
+<tr>
+<td>Location</td>
+<td><code>location</code> is required on regional types (400) and must be in the type's list (400 <code>LocationNotAvailableForResourceType</code>); global types have no <code>location</code></td>
+<td>No helper. Each type would hand-roll it</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>Replace on PUT, default <code>{}</code>, PATCH per <code>PatchMode</code>. Limits of 50 tags, name up to 512, value up to 256 <code>(verify)</code></td>
+<td>Modes covered; limits not enforced</td>
+</tr>
+<tr>
+<td>Singleton and default children</td>
+<td><code>default</code>, <code>current</code>, <code>$Default</code>, <code>RootManageSharedAccessKey</code> exist or are auto-created, so GET is 200 before any PUT</td>
+<td>No seed mechanism (APIM Tier B needs one)</td>
+</tr>
+<tr>
+<td>Provider registration</td>
+<td>A per-subscription state; PUT under an unregistered namespace is 409 <code>MissingSubscriptionRegistration</code>; <code>az</code> auto-registers and retries</td>
+<td>Only the namespace list is derived from the registry (PLAN 3.4); no state, no gate</td>
+</tr>
+<tr>
+<td>Cross-resource side effects</td>
+<td>NIC and private endpoint IP allocation against a subnet, availability set membership, subscription creation seeding RBAC</td>
+<td>Out of engine scope: hooks are read-only. These stay bespoke</td>
+</tr>
+<tr>
+<td>ETag</td>
+<td>Optional per RP; mismatched <code>If-Match</code> is 412. Never require <code>If-Match</code> where azurerm deletes without it</td>
+<td>Engine ignores <code>If-Match</code>, sends no ETags</td>
+</tr>
+</tbody>
+</table>
+<h2 id="porting-recipe">Porting recipe</h2>
+<p>ADR-0007 holds the per-type checklist and is authoritative. The table below is the full mechanical sequence, with the steps ADR-0007 does not spell out marked "extra".</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Step</th>
+<th>Where</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Classify fit: passthrough, hooks, engine-gap, bespoke. If a gap needs an engine change, land it first with an <code>internal/arm</code> unit test and an ADR amendment</td>
+<td><code>internal/arm/*</code></td>
+<td>Gate G4: no new <code>Type</code> fields outside an ADR amendment</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>Register(reg *arm.Registry)</code>: one <code>arm.Type</code> per top-level type; children via <code>Children</code></td>
+<td><code>internal/services/&lt;rp&gt;/types.go</code></td>
+<td><code>Name</code> must be <code>Namespace/type</code> with one slash; a malformed, duplicate or incomplete type panics (<code>internal/arm/registry.go:46-61</code>)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Mount before the engine, gated by the service filter</td>
+<td><code>internal/server/server.go:178-181</code></td>
+<td><code>if serviceEnabled("&lt;svc&gt;", allowed) { &lt;pkg&gt;.Register(armTypes) }</code> precedes <code>arm.NewEngine</code> (extra)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Append the service name for <code>/health</code></td>
+<td><code>internal/server/server.go:267-268</code></td>
+<td>Extra. The <code>/health</code> list is built from the same filter</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Delete the chi ARM routes and their lines in <code>legacy_arm_routes.txt</code>; keep data-plane and provider-level routes</td>
+<td>the old handler, freeze file</td>
+<td>Freeze file lands with PLAN 1.6; it does not exist yet. Engine shadows chi, so legacy state would dangle</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Provider-level chi routes for <code>checkNameAvailability</code> and similar</td>
+<td>beside <code>Register</code></td>
+<td>Exempt from the freeze file. Share the name rule with the hook</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Add an armtest <code>Sample</code></td>
+<td><code>tests/armsamples_&lt;rp&gt;_test.go</code></td>
+<td>One Sample of about 15 lines; <code>Skip</code> needs a reason (ADR-0005)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Port validation, defaults and actions into hooks; read through <code>r.Store</code>; copy generated values from <code>r.Current</code></td>
+<td><code>hooks.go</code></td>
+<td>Hooks never write and never call <code>Do</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Bespoke tests for hook logic and coexistence</td>
+<td><code>tests/arm_&lt;name&gt;_test.go</code></td>
+<td>See the skeleton below</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Remove the type's prefixes from the package's RG cleaner</td>
+<td>the package cleaner</td>
+<td>Delete the cleaner if it is empty</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Bump <code>store.SchemaVersion</code> and add a CHANGELOG line <code>state reset required: &lt;type&gt; moved to the ARM engine</code></td>
+<td><code>internal/store</code>, <code>CHANGELOG.md</code></td>
+<td>ADR-0004 and ADR-0007</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Add the namespace to the provider list only if clients enumerate it</td>
+<td><code>internal/services/subscriptions/handler.go</code></td>
+<td>Optional; <code>Microsoft.Authorization</code> is already absent and policy works. PLAN 3.4 derives it later (extra)</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Docs: services parity table and overview, a service page, <code>mkdocs.yml</code> nav, README service counts, CHANGELOG</td>
+<td><code>website/docs/services/*</code></td>
+<td>Extra. The contributing guide still documents the hand-written pattern <code>(verify)</code>; add the engine recipe in the first porting PR</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Terraform acceptance when the type is reachable from azurerm or azapi</td>
+<td>azapi: <code>tests/terraform/azapi/&lt;case&gt;/{main.tf,run.sh}</code> plus a job in <code>acceptance.yml</code>; azurerm: <code>tests/terraform/azurerm/&lt;fixture&gt;/main.tf</code>, a committed <code>.terraform.lock.hcl</code> (linux_amd64, darwin_arm64, windows_amd64) and a matrix entry in <code>acceptance-azurerm.yml</code></td>
+<td>Extra. <code>run.sh</code> asserts apply, no drift, a no-op second apply, destroy. Linux or WSL2 only</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Behaviour changes in a separate <code>fix(&lt;rp&gt;)</code> commit; PR title <code>refactor(&lt;rp&gt;): serve &lt;type&gt; via arm engine</code></td>
+<td>git</td>
+<td>ADR-0007</td>
+</tr>
+</tbody>
+</table>
+<p>A test that PUTs without creating its RG now gets 404 <code>ResourceGroupNotFound</code>. Fix the test setup, not the engine.</p>
+<h3 id="integration-test-skeleton">Integration-test skeleton</h3>
+<p>After ADR-0005 the generic behaviour moves into the armtest Sample, so the bespoke file shrinks to what a Sample cannot say. Helpers already in <code>tests/helpers_test.go</code>: <code>setupServer</code>, <code>doRequest</code>, <code>expectStatus</code>, <code>decodeJSON</code>, <code>decodeError</code>. <code>tests/arm_policydefinition_test.go</code> is the worked example (five tests).</p>
+<table>
+<thead>
+<tr>
+<th>Test (file <code>tests/arm_&lt;name&gt;_test.go</code>)</th>
+<th>Asserts</th>
+<th>Covered by armtest instead</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TestArm&lt;Thing&gt;_Lifecycle</code></td>
+<td>PUT 201 then 200, mangled-case GET, list, DELETE 200 then 204, GET 404</td>
+<td>PutCreate, PutReplace, Get, UrlCasing, List, Delete</td>
+</tr>
+<tr>
+<td><code>TestArm&lt;Thing&gt;_RequestValidation</code></td>
+<td>the type's own <code>Validate</code> codes (typed 400, 409)</td>
+<td>generic checks: MissingAPIVersion, NameIDMismatch, BadBody</td>
+</tr>
+<tr>
+<td><code>TestArm&lt;Thing&gt;_ScopeOnly</code></td>
+<td>a type registered at one scope falls through at the other scopes</td>
+<td>none; keep</td>
+</tr>
+<tr>
+<td><code>TestArm&lt;Thing&gt;_ComputedFieldsStable</code></td>
+<td>specific computed fields (ids, keys, endpoints) stable across a second PUT, no azurerm drift</td>
+<td>DefaultsIdempotent (generic)</td>
+</tr>
+<tr>
+<td><code>TestArm&lt;Thing&gt;_CoexistsWithHandWritten</code></td>
+<td>a hand-written neighbour on the same subscription still answers</td>
+<td>none; keep</td>
+</tr>
+<tr>
+<td><code>TestArm&lt;Thing&gt;_ServiceFilterAndReset</code></td>
+<td><code>SERVICES</code> excluding the service leaves the type unmounted; <code>/_miniblue/reset</code> empties it</td>
+<td>none; keep</td>
+</tr>
+<tr>
+<td><code>TestArm&lt;Thing&gt;_CascadeOnResourceGroupDelete</code></td>
+<td>RG delete removes the resource</td>
+<td>RGCascade</td>
+</tr>
+<tr>
+<td><code>TestArm&lt;Thing&gt;_Actions</code></td>
+<td><code>listKeys</code> and similar: status, body shape, case-mangled path</td>
+<td>none; keep once <code>Type.Actions</code> exists</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">// Signatures only; bodies follow tests/arm_policydefinition_test.go.</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kd">func</span><span class="w"> </span><span class="nx">TestArmThing_RequestValidation</span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span><span class="w">    </span><span class="c1">// hook codes only</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kd">func</span><span class="w"> </span><span class="nx">TestArmThing_ScopeOnly</span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span><span class="w">            </span><span class="c1">// falls through at other scopes</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kd">func</span><span class="w"> </span><span class="nx">TestArmThing_CoexistsWithHandWritten</span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="kd">func</span><span class="w"> </span><span class="nx">TestArmThing_ServiceFilterAndReset</span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kd">func</span><span class="w"> </span><span class="nx">TestArmThing_Actions</span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span><span class="w">              </span><span class="c1">// after Type.Actions</span>
+</code></pre></div>
+<h3 id="migration-notes">Migration notes</h3>
+<p>Wave order and gates are in PLAN Phase 4 and ADR-0007. Keep these in view:</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stays bespoke</td>
+<td>data planes always; <code>keyvault</code>, network (inline plus child sync), <code>storageaccounts</code> (PUT must return 200 <code>(verify)</code>), <code>vm</code>, <code>aci</code>, <code>aks</code>, <code>sites</code>, <code>dbpostgres</code> unless a fidelity or enforcement need arises (ADR-0007 gates G4, G5)</td>
+</tr>
+<tr>
+<td>Casing</td>
+<td>Legacy handlers mirror client casing; engine types return canonical casing. A move is a listed behaviour change</td>
+</tr>
+<tr>
+<td>Middleware order</td>
+<td>The engine must stay ahead of authorisation middleware so extension scopes resolve</td>
+</tr>
+<tr>
+<td>State</td>
+<td>Moving a type changes the key space; bump <code>SchemaVersion</code></td>
+</tr>
+<tr>
+<td>Drift</td>
+<td>Idempotent <code>Defaults</code> is the guard against azurerm plan drift; the acceptance fixture proves it</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>Each migrated type adds one Sample (fast) and, if reachable, one Terraform job (slow). Batch azapi fixtures if the count grows</td>
+</tr>
+</tbody>
+</table>
+<h2 id="adr-cross-check">ADR cross-check</h2>
+<p>"Covered" cites the ADR or PLAN row that already decides the lesson. "Gap" is a proposal, not a decision: an ADR amendment or a PLAN row for the owners to accept.</p>
+<table>
+<thead>
+<tr>
+<th>Lesson</th>
+<th>Already covered by</th>
+<th>Gap (proposal)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Typed errors with <code>target</code> and <code>details</code>; generic codes</td>
+<td>ADR-0006, PLAN 0.7</td>
+<td>none</td>
+</tr>
+<tr>
+<td>Code for an unrouted request</td>
+<td>ADR-0002 (strict 404, code open)</td>
+<td>pin <code>InvalidResourceType</code> or <code>NoRegisteredProviderFound</code> <code>(verify)</code> in the PLAN row that implements ADR-0002</td>
+</tr>
+<tr>
+<td>Missing and malformed api-version</td>
+<td>ADR-0005, ADR-0006, PLAN 1.4</td>
+<td>MalformedAPIVersion check is not in the ADR-0005 list; add it</td>
+</tr>
+<tr>
+<td>Name validation per type in hooks</td>
+<td>ADR-0003 (<code>CheckName</code>), PLAN 1.4</td>
+<td>negative Terraform fixture for name errors (see <a href="../client-suites/">client suites</a>); share one rule between the hook and the availability route</td>
+</tr>
+<tr>
+<td>Id parsing and builder</td>
+<td><code>arm.ParseID</code>; <code>ChildID</code> in ADR-0003 and PLAN 1.4</td>
+<td>extend the id tests with builder cases (tenant-level scope, unpaired segments)</td>
+</tr>
+<tr>
+<td>RG and parent existence</td>
+<td>ADR-0003 phase 5</td>
+<td>subscription existence needs a "known subscription" model; no PLAN row</td>
+</tr>
+<tr>
+<td>Server-owned fields, stable defaults</td>
+<td>ADR-0003 (<code>Current</code>, idempotent <code>Defaults</code>), ADR-0005 DefaultsIdempotent</td>
+<td>none</td>
+</tr>
+<tr>
+<td>Sub-wide list, prefix safety</td>
+<td>ADR-0004, PLAN 1.2</td>
+<td>none</td>
+</tr>
+<tr>
+<td>Paging and <code>nextLink</code></td>
+<td>none (SPIKE "Later")</td>
+<td>PLAN row <code>feat(arm): $top and nextLink for lists</code>, triggered by the first type whose list needs it</td>
+</tr>
+<tr>
+<td>RG <code>/resources</code></td>
+<td>PLAN 3.3</td>
+<td><code>$filter=resourceType eq</code> is not covered; add to 3.3 or drop</td>
+</tr>
+<tr>
+<td>RG cascade</td>
+<td>ADR-0004, PLAN 0.6 and 1.2</td>
+<td>ScopeSurvivesRGDelete check</td>
+</tr>
+<tr>
+<td>Secrets never echoed</td>
+<td>none (SPIKE "Later", <code>SecretPaths</code>)</td>
+<td>ADR-0003 amendment: declared secret paths projected out of responses; PLAN row <code>feat(arm): secret path projection</code> before the first secret-bearing type (SQL, APIM named values)</td>
+</tr>
+<tr>
+<td>Soft-delete and purge</td>
+<td>ADR-0006 and ADR-0007 keep legacy flows bespoke; APIM deletedservices is a strict 404</td>
+<td>ADR amendment for a write-capable delete path or deleted-collection type, before App Configuration or Key Vault migrates</td>
+</tr>
+<tr>
+<td>POST instance actions</td>
+<td>ADR-0001, ADR-0003 (<code>Type.Actions</code> with first consumer), PLAN Phase 4</td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>checkNameAvailability</code></td>
+<td>ADR-0001 (provider-level chi route)</td>
+<td>shared name-taken helper (next row)</td>
+</tr>
+<tr>
+<td>Global-name uniqueness</td>
+<td>none</td>
+<td>helper <code>arm.NameTaken(...)</code> over a store-wide lookup, used by <code>Validate</code> and the availability route; PLAN row</td>
+</tr>
+<tr>
+<td>Location validation</td>
+<td>none</td>
+<td>helper <code>arm.ValidateLocation(allowed...)</code> added to the ADR-0003 helper list</td>
+</tr>
+<tr>
+<td>Tags limits</td>
+<td>none</td>
+<td>optional; verify limits first, then a shared <code>Validate</code> helper</td>
+</tr>
+<tr>
+<td><code>provisioningState</code></td>
+<td>ADR-0003 <code>Provisioned</code>, ADR-0005 ProvisioningState</td>
+<td>none</td>
+</tr>
+<tr>
+<td>Singleton and auto-created children</td>
+<td>none (SPIKE "Later"; APIM page notes the need)</td>
+<td>ADR amendment for a seed mechanism; PLAN row before APIM Tier B</td>
+</tr>
+<tr>
+<td>Provider registration state and 409 gate</td>
+<td>PLAN 3.4 (derive the list only)</td>
+<td>PLAN row: stored per-subscription state, <code>unregister</code>, tenant <code>/providers</code>, optional 409 gate default off</td>
+</tr>
+<tr>
+<td>Cross-resource side effects</td>
+<td>ADR-0003 (hooks are read-only), ADR-0007 (wave 4 optional)</td>
+<td>none; state explicitly that these stay bespoke</td>
+</tr>
+<tr>
+<td>Sync only, no LRO</td>
+<td>ADR-0006</td>
+<td>none</td>
+</tr>
+<tr>
+<td>ETag and <code>If-Match</code></td>
+<td>ADR-0003 (ignored, never required)</td>
+<td>opt-in ETag type flag only when a type needs it</td>
+</tr>
+<tr>
+<td>Deployments beyond RG-scope CRUD</td>
+<td>ADR-0001, PLAN 3.1 and 3.2</td>
+<td>validate, exportTemplate, cancel, HEAD, subscription, management group and tenant scope, operations have no PLAN row (T5 in the SPIKE); what-if is out of scope</td>
+</tr>
+<tr>
+<td>Conformance additions</td>
+<td>ADR-0005 (16 checks)</td>
+<td>WrongMethod, ResponseHeaders, UnknownRoute, ScopeSurvivesRGDelete; see <a href="../cross-cutting/">cross-cutting</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="proposed-plan-rows">Proposed PLAN rows</h3>
+<p>Proposals only. Sizes are estimates; the PLAN owners decide numbering and dependencies.</p>
+<table>
+<thead>
+<tr>
+<th>Proposed row</th>
+<th>Size</th>
+<th>Depends on</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test(arm): extra armtest checks (MalformedAPIVersion, WrongMethod, ResponseHeaders, UnknownRoute, ScopeSurvivesRGDelete)</code></td>
+<td>S</td>
+<td>1.5</td>
+<td>with 1.5</td>
+</tr>
+<tr>
+<td><code>feat(arm): ValidateLocation and NameTaken helpers</code></td>
+<td>S</td>
+<td>1.4</td>
+<td>first type needing either</td>
+</tr>
+<tr>
+<td><code>feat(arm): secret path projection</code></td>
+<td>M</td>
+<td>1.1</td>
+<td>first secret-bearing type</td>
+</tr>
+<tr>
+<td><code>feat(arm): seeded singleton children</code></td>
+<td>M</td>
+<td>1.1</td>
+<td>APIM Tier B or the first <code>default</code> child</td>
+</tr>
+<tr>
+<td><code>feat(arm): soft-delete seam</code></td>
+<td>M</td>
+<td>1.1</td>
+<td>first soft-delete type migrates</td>
+</tr>
+<tr>
+<td><code>feat(server): stateful provider registration</code></td>
+<td>M</td>
+<td>3.4</td>
+<td><code>az</code> suite or a client that needs the gate</td>
+</tr>
+<tr>
+<td><code>feat(deployments): validate, cancel, exportTemplate, HEAD, scopes, operations</code></td>
+<td>M</td>
+<td>3.1</td>
+<td>after dispatch is in-process</td>
+</tr>
+<tr>
+<td><code>feat(arm): $top and nextLink</code></td>
+<td>M</td>
+<td>1.2</td>
+<td>first large list</td>
+</tr>
+</tbody>
+</table>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul>
+<li>A name rule enforced only in <code>checkNameAvailability</code> lets invalid names reach the store.</li>
+<li>A per-service not-found code is not ARM. Use <code>ResourceNotFound</code> and <code>ParentResourceNotFound</code>.</li>
+<li>Mapping an unknown error code to 500 turns client faults into server faults in every SDK.</li>
+<li>Echoing a secret on GET is not Azure behaviour, even when the typed model makes it free.</li>
+<li>A hook that writes under the engine lock breaks the ordering guarantees in ADR-0003. Needs that require writes need a seam, not a workaround.</li>
+<li>Requiring <code>If-Match</code> breaks <code>terraform destroy</code>, which deletes without it.</li>
+<li>Defaults that regenerate keys, GUIDs or timestamps on every PUT cause azurerm plan drift.</li>
+<li>A bare 202 with no <code>Location</code> stalls the azurerm poller. Return a terminal status.</li>
+<li>Moving a type without bumping <code>SchemaVersion</code> leaves dangling legacy state that is silently misread.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/moabukar/miniblue" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://hub.docker.com/r/moabukar/miniblue" target="_blank" rel="noopener" title="hub.docker.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M349.9 236.3h-66.1v-59.4h66.1zm0-204.3h-66.1v60.7h66.1zm78.2 144.8H362v59.4h66.1zm-156.3-72.1h-66.1v60.1h66.1zm78.1 0h-66.1v60.1h66.1zm276.8 100c-14.4-9.7-47.6-13.2-73.1-8.4-3.3-24-16.7-44.9-41.1-63.7l-14-9.3-9.3 14c-18.4 27.8-23.4 73.6-3.7 103.8-8.7 4.7-25.8 11.1-48.4 10.7H2.4c-8.7 50.8 5.8 116.8 44 162.1 37.1 43.9 92.7 66.2 165.4 66.2 157.4 0 273.9-72.5 328.4-204.2 21.4.4 67.6.1 91.3-45.2 1.5-2.5 6.6-13.2 8.5-17.1zm-511.1-27.9h-66v59.4h66.1v-59.4zm78.1 0h-66.1v59.4h66.1zm78.1 0h-66.1v59.4h66.1zm-78.1-72.1h-66.1v60.1h66.1z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

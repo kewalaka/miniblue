@@ -1,0 +1,4498 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Local Azure development. One binary. No account needed.">
+      
+      
+        <meta name="author" content="Mo Abukar">
+      
+      
+        <link rel="canonical" href="https://miniblue.io/architecture/arm-foundations/catalogue/api-management/">
+      
+      
+        <link rel="prev" href="../client-suites/">
+      
+      
+        <link rel="next" href="../api-management-provider-notes/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>API Management - miniblue</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-management" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="miniblue" class="md-header__button md-logo" aria-label="miniblue" data-md-component="logo">
+      
+  <img src="../../../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            miniblue
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API Management
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/moabukar/miniblue" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    moabukar/miniblue
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../guides/terraform/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../services/overview/" class="md-tabs__link">
+          
+  
+  
+  Services
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../../overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="miniblue" class="md-nav__button md-logo" aria-label="miniblue" data-md-component="logo">
+      
+  <img src="../../../../assets/logo.svg" alt="logo">
+
+    </a>
+    miniblue
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/moabukar/miniblue" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    moabukar/miniblue
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../getting-started/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/terraform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terraform
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/acceptance-tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terraform acceptance tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/pulumi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pulumi
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/sdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDKs (Python, Go, JS)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/azlocal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    azlocal CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/azure-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../guides/helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Helm / Kubernetes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Services
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Services
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/parity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Parity Matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/resource-groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resource Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/storage-accounts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage Accounts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/blob-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blob Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/table-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Table Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/queue-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/key-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/cosmos-db/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cosmos DB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/service-bus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Service Bus
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/event-grid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Grid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/app-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/virtual-networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtual Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/public-ip-addresses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public IP Addresses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/network-security-groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Security Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/network-interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Interfaces
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/load-balancer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load Balancer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/application-gateway/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Application Gateway
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/dns-zones/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DNS Zones
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/container-registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/container-instances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Instances
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/kubernetes-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kubernetes Service (AKS)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/virtual-machines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtual Machines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/managed-disks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managed Disks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/managed-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managed Identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/rbac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RBAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/database-postgresql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DB for PostgreSQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/database-mysql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DB for MySQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/database-sql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure SQL Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../services/redis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure Cache for Redis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../scope/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scope and Philosophy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../arm-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARM Resource Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARM foundations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ARM foundations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0001-single-arm-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0001: Single ARM pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0002-unregistered-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0002: Unregistered types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0003-pipeline-phases-and-hooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0003: Pipeline phases and hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0004-storage-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0004: Storage contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0005-type-metadata-and-conformance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0005: Type metadata and conformance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0006-sync-lro-and-errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0006: Sync LRO and errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0007-migration-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0007: Migration strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/0008-rbac-and-policy-minimum/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0008: RBAC and policy minimum
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slices/01-role-assignments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Slice: role assignments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slices/02-apim-consumption/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Slice: APIM Consumption
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../SPIKE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spike
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4_14" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5_4_14" id="__nav_5_4_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenario catalogue
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_4_14_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_4_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Scenario catalogue
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine-lessons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine lessons
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross-cutting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-cutting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../client-suites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client suites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Management
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Types
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#miniblue-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        miniblue gaps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenarios
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scenarios">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Api
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operation-product-backend-policy-named-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operation, product, backend, policy, named value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#portal-settings-tenant-access-subscriptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portal settings, tenant access, subscriptions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#terraform-and-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terraform and lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cost-tier-test-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost-tier test plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dropped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dropped
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-management-provider-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Management provider notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../app-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../app-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../authorization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authorization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compute/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compute
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../container-instances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Instances
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../container-registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cosmos-db/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cosmos DB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../event-grid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Grid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../event-hubs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Hubs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../insights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Insights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../key-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Key Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../load-balancer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load Balancer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../log-analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Log Analytics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../managed-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managed identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../management-groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Management groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../redis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Redis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resource-groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resource groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../service-bus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Service Bus
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../subscriptions-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subscriptions and providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../virtual-network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtual network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Types
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#miniblue-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        miniblue gaps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenarios
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scenarios">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Api
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operation-product-backend-policy-named-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operation, product, backend, policy, named value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#portal-settings-tenant-access-subscriptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portal settings, tenant access, subscriptions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#terraform-and-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terraform and lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cost-tier-test-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost-tier test plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dropped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dropped
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="api-management">API Management</h1>
+<blockquote>
+<p>Engine fit: hooks for every Tier A type (<code>service</code>, <code>apis</code>, <code>operations</code>, <code>products</code>, <code>namedValues</code>, <code>backends</code>), passthrough for <code>products/apis</code>, engine-gap for the Tier B singletons and <code>listSecrets</code>. miniblue today: none (no <code>internal/services/apim</code>, no registration, no test, no Terraform fixture). Suggested wave: <a href="../../slices/02-apim-consumption/">Slice 2</a> (PLAN 2.4 and 2.5) for Tier A; Tier B and the follow-on types after G2.</p>
+</blockquote>
+<p>The MVP slice (types, hooks, defaults, acceptance, PRs) is in <a href="../../slices/02-apim-consumption/">Slice 2</a> and is not repeated here. This page holds the full resource table, every <code>APIM-T</code> scenario with its tier, the cost-tier test plan and the pitfalls. Provider call sequences and the defaults azurerm dereferences are in <a href="../api-management-provider-notes/">API Management: provider notes</a>.</p>
+<p><strong>Gateway runtime is out of scope.</strong> No proxying through APIs, no policy execution, no subscription-key validation, no <code>*.azure-api.net</code> host handling. The derived <code>gatewayUrl</code> is a string that does not resolve. Policies are stored as opaque XML. Nothing on this page covers a data plane.</p>
+<p>Tiers used below: <strong>Tier A</strong> is the Consumption SKU path (<code>Consumption_0</code>), <strong>Tier B</strong> adds what azurerm needs for <code>Developer_1</code> and above (portal settings, tenant access, <code>listSecrets</code>).</p>
+<h2 id="types">Types</h2>
+<p>Latest stable api-version is 2024-05-01 (confirmed in the REST spec repo; older stable versions run from 2016-07-07 to 2022-08-01, previews to 2025-09-01-preview). azurerm pins the service and backends at 2024-05-01 and most other children at 2022-08-01; pins move between provider releases (verify per release). Types therefore list both versions. <code>APIVersions</code> is metadata only (ADR-0005), so extra versions never produce <code>InvalidApiVersionParameter</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Resource type</th>
+<th>api-versions seen (real latest <code>(verify)</code>)</th>
+<th>Scopes</th>
+<th>Children</th>
+<th>Non-CRUD ops</th>
+<th>Engine fit</th>
+<th>Needs (ADR seams)</th>
+<th>Value</th>
+<th>Effort</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Microsoft.ApiManagement/service</code></td>
+<td>2024-05-01, 2022-08-01, 2021-08-01</td>
+<td>RG</td>
+<td>apis, products, namedValues, backends (Tier A); all rows below</td>
+<td>provider-level <code>POST checkNameAvailability</code>; <code>GET/DELETE locations/{loc}/deletedservices/{n}</code>; <code>POST</code> backup, restore, migrateToStv2, applynetworkconfigurationupdates, getssotoken</td>
+<td>hooks</td>
+<td><code>Request.Current</code> (stable URLs and identity), <code>PatchMode</code> merge (azurerm updates with PATCH), <code>ListSubscription</code>, RG existence, <code>Provisioned</code></td>
+<td>H</td>
+<td>M</td>
+</tr>
+<tr>
+<td><code>service/apis</code> (name may be <code>id;rev=N</code>)</td>
+<td>2022-08-01, 2024-05-01</td>
+<td>child of service</td>
+<td>operations, policies, releases, revisions, diagnostics, schemas, tags</td>
+<td><code>GET apis/{id}/revisions</code>; <code>GET ?export=true</code>; <code>DELETE ?deleteRevisions=</code></td>
+<td>hooks</td>
+<td>opaque <code>;rev=</code> name, parent existence</td>
+<td>H</td>
+<td>S to M</td>
+</tr>
+<tr>
+<td><code>service/apis/operations</code></td>
+<td>2022-08-01</td>
+<td>child of apis</td>
+<td>policies</td>
+<td>none</td>
+<td>hooks</td>
+<td>parent existence</td>
+<td>H</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/products</code></td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>apis (assignment), groups, policies, subscriptions, tags</td>
+<td><code>DELETE ?deleteSubscriptions=true</code></td>
+<td>hooks</td>
+<td>none</td>
+<td>H</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/products/apis</code></td>
+<td>2022-08-01</td>
+<td>child of products</td>
+<td>none</td>
+<td><code>HEAD</code> existence check (204)</td>
+<td>passthrough</td>
+<td>echoes the API contract</td>
+<td>M</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/namedValues</code></td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>none</td>
+<td><code>POST listValue</code>, <code>POST refreshSecret</code></td>
+<td>hooks</td>
+<td><code>Type.Actions</code> for both POSTs (later); secret masking has no seam</td>
+<td>H</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/backends</code></td>
+<td>2024-05-01, 2022-08-01</td>
+<td>child of service</td>
+<td>none</td>
+<td><code>POST reconnect</code> (202 in the spec)</td>
+<td>hooks</td>
+<td><code>Type.Actions</code> (later); 202 conflicts with sync-only (ADR-0006)</td>
+<td>M</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/policies/policy</code></td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>none</td>
+<td><code>GET ?format=</code> conversion between xml and rawxml</td>
+<td>passthrough</td>
+<td>format-dependent GET has no seam; azurerm tolerates 404 on read</td>
+<td>M</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/portalsettings/{signin,signup,delegation}</code></td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>none</td>
+<td><code>POST delegation/listSecrets</code></td>
+<td>engine-gap</td>
+<td>seeded singleton that GETs 200 before any PUT; <code>Actions</code></td>
+<td>M (Tier B only)</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/tenant/access</code></td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>none</td>
+<td><code>POST listSecrets</code>, <code>POST regeneratePrimaryKey</code>, <code>POST regenerateSecondaryKey</code></td>
+<td>engine-gap</td>
+<td>seeded singleton; <code>Actions</code></td>
+<td>M (Tier B only)</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/subscriptions</code></td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>none</td>
+<td><code>POST listSecrets</code>, regenerate keys</td>
+<td>hooks</td>
+<td><code>Actions</code>; seeded <code>master</code> subscription</td>
+<td>H</td>
+<td>M</td>
+</tr>
+<tr>
+<td><code>service/groups</code>, <code>service/groups/users</code>, <code>service/users</code></td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>users</td>
+<td>users: <code>generateSsoUrl</code>, <code>token</code></td>
+<td>hooks</td>
+<td>seeded system groups <code>administrators</code>, <code>developers</code>, <code>guests</code></td>
+<td>M</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/loggers</code>, <code>service/diagnostics</code>, <code>service/apis/diagnostics</code></td>
+<td>2022-08-01</td>
+<td>child of service or apis</td>
+<td>none</td>
+<td>none</td>
+<td>passthrough</td>
+<td><code>credentials</code> masking has no seam</td>
+<td>M</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/certificates</code></td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>none</td>
+<td>none</td>
+<td>hooks</td>
+<td><code>data</code> and <code>password</code> masking has no seam</td>
+<td>M</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/{products,apis}/policies/policy</code>, <code>operations/policies/policy</code></td>
+<td>2022-08-01</td>
+<td>scoped policy singleton</td>
+<td>none</td>
+<td><code>GET ?format=</code></td>
+<td>passthrough</td>
+<td>nested <code>Children</code> chain</td>
+<td>M</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/{identityProviders,authorizationServers,openidConnectProviders,authorizationProviders}</code></td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>none</td>
+<td><code>POST listSecrets</code></td>
+<td>hooks</td>
+<td><code>Actions</code>; secrets masked on GET in real Azure</td>
+<td>L to M</td>
+<td>S each</td>
+</tr>
+<tr>
+<td><code>service/{tags,apiVersionSets,schemas,policyFragments,policyRestrictions,templates,notifications,contentTypes,portalConfigs,documentations}</code></td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>none</td>
+<td>none</td>
+<td>passthrough</td>
+<td>none</td>
+<td>L to M</td>
+<td>S each</td>
+</tr>
+<tr>
+<td><code>service/apis/{releases,tagDescriptions,wikis,issues}</code></td>
+<td>2022-08-01</td>
+<td>child of apis</td>
+<td>none</td>
+<td>none</td>
+<td>passthrough</td>
+<td>none</td>
+<td>L</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/gateways</code> (+ <code>hostnameConfigurations</code>, <code>apis</code>)</td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>hostnameConfigurations, apis</td>
+<td><code>listKeys</code>, <code>regenerateKey</code>, <code>generateToken</code></td>
+<td>hooks</td>
+<td><code>Actions</code>; self-hosted gateway is not worth it</td>
+<td>L</td>
+<td>M</td>
+</tr>
+<tr>
+<td><code>service/privateEndpointConnections</code>, <code>outboundNetworkDependenciesEndpoints</code>, <code>networkStatus</code>, <code>skus</code></td>
+<td>2022-08-01</td>
+<td>child of service</td>
+<td>none</td>
+<td>list-only</td>
+<td>bespoke (static responses)</td>
+<td>none</td>
+<td>L</td>
+<td>S</td>
+</tr>
+<tr>
+<td><code>service/workspaces/*</code></td>
+<td>2023+ versions</td>
+<td>child of service</td>
+<td>many</td>
+<td>none</td>
+<td>passthrough</td>
+<td>none</td>
+<td>L</td>
+<td>M</td>
+</tr>
+</tbody>
+</table>
+<p>Everything without an azurerm resource (workspaces, portal configs, content types, templates, notifications) is reachable only through azapi and bicep. Those clients can hit any type at any api-version the type lists.</p>
+<h2 id="miniblue-gaps">miniblue gaps</h2>
+<p>Ordered by value. There are no existing APIM bugs to cite: the repo has no APIM code.</p>
+<ul>
+<li>No <code>Microsoft.ApiManagement</code> registration, so every azurerm, azapi and bicep call falls through to the not-found path. Slice 2 closes this for Tier A.</li>
+<li>Every <code>service</code> GET must carry the fields azurerm dereferences (<code>customProperties</code>, derived URLs, stable identity). That needs <code>Request.Current</code> (ADR-0003) so generated values survive repeated PUTs.</li>
+<li>azurerm updates the service with PATCH of <code>sku</code>, <code>properties</code>, <code>identity</code> and <code>tags</code>. Needs <code>PatchMerge</code> (PLAN 1.3). azapi <code>azapi_update_resource</code> sends a full PUT instead.</li>
+<li>No <code>tests/terraform/azurerm/apim_consumption</code> or azapi APIM fixture, and no matrix entry in <code>.github/workflows/acceptance-azurerm.yml</code>.</li>
+<li><code>deletedservices</code> is a strict 404 with no route (Slice 2). Soft-delete, purge and <code>recover_soft_deleted</code> have no seam: <code>Hooks</code> has no delete-time hook, so this needs an ADR-0003 amendment or a bespoke route.</li>
+<li><code>checkNameAvailability</code> is not served. It is a provider-level route, so it stays a chi route (ADR-0001) and is a later PR.</li>
+<li>Tier B has no seam: seeded singletons that GET 200 before any PUT, and <code>listSecrets</code>. chi ARM routes are frozen after G1 (ADR-0001), so this needs <code>Type.Actions</code> plus a seed mechanism (ADR amendment).</li>
+<li>ETag and <code>HEAD</code>: the engine sends no ETags and has no HEAD op (ADR-0003). Optional for azurerm, needed only for the ETag scenarios marked deferred below.</li>
+<li>Secret masking, paging (<code>$top</code>, <code>$skip</code>, <code>nextLink</code>) and <code>$filter</code> are not available. Documented deviations.</li>
+</ul>
+<h2 id="scenarios">Scenarios</h2>
+<p>Ids are stable. Tier is the test layer (T1 armtest row, T2 <code>tests/arm_apim_test.go</code> httptest or hook unit test, T3 Terraform, T4 client smoke). "Slice 2" in Notes means the scenario is inside the Consumption MVP; everything else is follow-on or deferred.</p>
+<h3 id="service">Service</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Behaviour (real Azure)</th>
+<th>Expect</th>
+<th>Tier</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>APIM-T1</td>
+<td>Create a Developer, capacity 1 service with location, tags, publisher fields in an existing RG</td>
+<td><code>PUT …/service/{n}</code> =&gt; 201; <code>type=Microsoft.ApiManagement/service</code>, <code>sku{Developer,1}</code>, <code>provisioningState=Succeeded</code>, publisher fields and tags echoed</td>
+<td>T1/T2</td>
+<td>Slice 2. armtest PutCreate and ProvisioningState cover the envelope; the sku and publisher echo is T2</td>
+</tr>
+<tr>
+<td>APIM-T2</td>
+<td>PUT the same name again</td>
+<td>=&gt; 200, document replaced; fields absent from the second body are gone</td>
+<td>T1</td>
+<td>Slice 2. armtest PutReplace</td>
+</tr>
+<tr>
+<td>APIM-T3</td>
+<td>GET an existing and an unknown service</td>
+<td>=&gt; 200; 404 <code>ResourceNotFound</code> with the error envelope</td>
+<td>T1</td>
+<td>Slice 2. armtest Get and GetMissing</td>
+</tr>
+<tr>
+<td>APIM-T4</td>
+<td>PATCH <code>tags</code>, then PATCH <code>sku</code> or <code>properties.publisherName</code></td>
+<td><code>PATCH</code> =&gt; 200; changed fields updated, untouched <code>sku</code> and <code>properties</code> kept</td>
+<td>T1/T2</td>
+<td>Slice 2 (<code>PatchMerge</code>). azurerm update is PATCH. verify: whether real APIM merges or replaces <code>tags</code> on PATCH</td>
+</tr>
+<tr>
+<td>APIM-T5</td>
+<td>DELETE then GET</td>
+<td><code>DELETE</code> =&gt; 200 when it existed, 204 when missing; then GET =&gt; 404</td>
+<td>T1</td>
+<td>Slice 2. armtest Delete and DeleteMissing. The spec allows 200, 202 or 204 (long-running); sync-only per ADR-0006</td>
+</tr>
+<tr>
+<td>APIM-T6</td>
+<td>List by RG and by subscription</td>
+<td><code>GET …/resourceGroups/{rg}/providers/Microsoft.ApiManagement/service</code> and <code>GET /subscriptions/{s}/providers/Microsoft.ApiManagement/service</code> =&gt; 200 <code>{value:[…]}</code> containing the created services</td>
+<td>T1</td>
+<td>Slice 2. armtest List and ListSubscription</td>
+</tr>
+<tr>
+<td>APIM-T7</td>
+<td>Create with <code>publisherEmail</code>, <code>publisherName</code>, <code>sku</code> or <code>location</code> missing, or a publisher field over 100 chars</td>
+<td><code>PUT</code> =&gt; 400; code <code>ValidationError</code> (verify); <code>target</code> is the property path</td>
+<td>T2</td>
+<td>Slice 2. Spec confirms required: <code>location</code>, <code>sku</code>, <code>properties</code>, <code>publisherEmail</code>, <code>publisherName</code>; max 100 on the publisher fields. Hook table test</td>
+</tr>
+<tr>
+<td>APIM-T8</td>
+<td>Create with an invalid name: leading digit, underscore, trailing <code>-</code>, 51 chars</td>
+<td><code>PUT</code> =&gt; 400 <code>InvalidResourceName</code> (verify real APIM code)</td>
+<td>T2</td>
+<td>Slice 2. Spec name: <code>^[a-zA-Z](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$</code>, 1 to 50. <code>CheckName</code> hook</td>
+</tr>
+<tr>
+<td>APIM-T9</td>
+<td>PUT in a resource group that does not exist</td>
+<td><code>PUT</code> =&gt; 404 <code>ResourceGroupNotFound</code></td>
+<td>T2</td>
+<td>Slice 2. ADR-0003 phase 5, applies to every engine type</td>
+</tr>
+<tr>
+<td>APIM-T10</td>
+<td>checkNameAvailability for a free name</td>
+<td><code>POST /subscriptions/{s}/providers/Microsoft.ApiManagement/checkNameAvailability</code> body <code>{name}</code> =&gt; 200 <code>{nameAvailable:true}</code>; <code>reason</code> for an available name is <code>Valid</code> (verify)</td>
+<td>T2</td>
+<td>Later PR; provider-level chi route (ADR-0001), not in Slice 2</td>
+</tr>
+<tr>
+<td>APIM-T11</td>
+<td>checkNameAvailability for the name of an existing service</td>
+<td>=&gt; 200 <code>{nameAvailable:false, reason:"AlreadyExists", message}</code></td>
+<td>T2</td>
+<td>Later PR. Subscription-local scan via <code>Reader.Under</code>; real Azure is DNS-global</td>
+</tr>
+<tr>
+<td>APIM-T12</td>
+<td>checkNameAvailability for an invalid name</td>
+<td>=&gt; 200 <code>{nameAvailable:false, reason:"Invalid", message}</code></td>
+<td>T2</td>
+<td>Later PR. Spec reason enum: <code>Valid</code>, <code>Invalid</code>, <code>AlreadyExists</code></td>
+</tr>
+<tr>
+<td>APIM-T13</td>
+<td><code>GET locations/{loc}/deletedservices/{n}</code> before and after deleting the service</td>
+<td>before: 404. After delete: 200 with <code>serviceId</code>, <code>location</code>, <code>scheduledPurgeDate</code>, <code>deletionDate</code></td>
+<td>T2</td>
+<td>Slice 2 asserts the 404 half only (strict 404, no route). The 200 half needs soft-delete (no seam)</td>
+</tr>
+<tr>
+<td>APIM-T14</td>
+<td>Purge a soft-deleted service, then recreate it; azurerm <code>purge_soft_delete_on_destroy=true</code> flow</td>
+<td><code>DELETE …/deletedservices/{n}</code> =&gt; 200, 202 or 204 (spec); name is free afterwards</td>
+<td>T2/T3</td>
+<td>Unsupported in Slice 2. Needs soft-delete. azurerm requires the preceding GET to succeed, so a bare no-op DELETE is not enough. Nightly fixture when built</td>
+</tr>
+<tr>
+<td>APIM-T15</td>
+<td>Recreate a name after delete without purge or restore</td>
+<td>Real: rejected while the soft-deleted record exists (code verify); <code>properties.restore=true</code> recovers it. Slice 2: 201</td>
+<td>T2</td>
+<td>Documented deviation in Slice 2; assert the lenient behaviour only until soft-delete lands</td>
+</tr>
+<tr>
+<td>APIM-T17</td>
+<td><code>az apim create</code>, <code>show</code>, <code>list</code>, <code>update</code>, <code>delete</code>, <code>check-name</code></td>
+<td><code>provisioningState=Succeeded</code>, <code>sku.name=Developer</code></td>
+<td>T4</td>
+<td>Deferred until an az harness exists (SPIKE §4). The wire calls are the service rows above</td>
+</tr>
+<tr>
+<td>APIM-T18</td>
+<td>azurerm <code>Developer_1</code> with <code>tenant_access</code> and <code>sign_in</code>: apply, plan, destroy</td>
+<td>apply succeeds; <code>plan -detailed-exitcode</code> is 0; destroy is clean</td>
+<td>T3</td>
+<td>Tier B. Nightly fixture <code>apim_developer</code>, not Slice 2</td>
+</tr>
+<tr>
+<td>APIM-T19</td>
+<td>azurerm <code>Consumption_0</code> service alone: apply, plan, destroy</td>
+<td>same three steps as above</td>
+<td>T3</td>
+<td>Slice 2 (opt-in fixture <code>apim_consumption</code>)</td>
+</tr>
+<tr>
+<td>APIM-T20</td>
+<td>Response shape of a created service</td>
+<td><code>customProperties</code> object present; <code>virtualNetworkType=None</code>; <code>publicNetworkAccess=Enabled</code>; derived <code>gatewayUrl</code>, <code>gatewayRegionalUrl</code>, <code>managementApiUrl</code>, <code>scmUrl</code>, <code>portalUrl</code>, <code>developerPortalUrl</code>; <code>provisioningState=Succeeded</code></td>
+<td>T2</td>
+<td>Slice 2. Spec marks the URLs, IPs and <code>provisioningState</code> read-only; exact URL shapes are verify</td>
+</tr>
+<tr>
+<td>APIM-T21</td>
+<td><code>identity.type=SystemAssigned</code> on repeated PUTs</td>
+<td><code>principalId</code> and <code>tenantId</code> set and identical across PUTs</td>
+<td>T1</td>
+<td>Slice 2. <code>DefaultIdentity</code> with <code>Current</code>; armtest DefaultsIdempotent</td>
+</tr>
+<tr>
+<td>APIM-T52</td>
+<td>Headers on write responses</td>
+<td>no <code>Azure-AsyncOperation</code>, no <code>Location</code>; <code>X-Go-Azure-Sdk-Skip-Polling-Delay: true</code> present; status is never 202</td>
+<td>T2</td>
+<td>Slice 2. The header is global (ADR-0006 <code>AzureHeaders</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="api">Api</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Behaviour (real Azure)</th>
+<th>Expect</th>
+<th>Tier</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>APIM-T22</td>
+<td>Create an API with <code>path</code>, <code>displayName</code>, <code>protocols</code>, <code>serviceUrl</code></td>
+<td><code>PUT …/apis/{id}</code> =&gt; 201; <code>type=Microsoft.ApiManagement/service/apis</code>; <code>authenticationSettings{oAuth2AuthenticationSettings:[], openidAuthenticationSettings:[]}</code>, <code>subscriptionKeyParameterNames</code>, <code>isCurrent=true</code></td>
+<td>T1/T2</td>
+<td>Slice 2. Defaults are what azurerm dereferences; see provider notes</td>
+</tr>
+<tr>
+<td>APIM-T23</td>
+<td>Address <code>apis/{id};rev=1</code> raw and as <code>%3Brev%3D1</code></td>
+<td>both resolve to one resource; <code>apiRevision="1"</code>; returned <code>id</code> keeps <code>;rev=1</code></td>
+<td>T1/T2</td>
+<td>Slice 2. Hook unit test plus an armtest Sample using a <code>;rev=</code> name</td>
+</tr>
+<tr>
+<td>APIM-T24</td>
+<td>Update an API with PUT: <code>If-Match: *</code>, a stale ETag, and no header</td>
+<td><code>*</code> and no header =&gt; 200 (spec: optional on PUT). Stale ETag =&gt; 200 in miniblue</td>
+<td>T2</td>
+<td>Slice 2. ADR-0003: <code>If-Match</code> is ignored and never required. Real APIM returns 412 on a stale ETag (verify); the lenience is deliberate</td>
+</tr>
+<tr>
+<td>APIM-T25</td>
+<td>Create an API without <code>path</code>, or without <code>displayName</code></td>
+<td><code>PUT</code> =&gt; 400</td>
+<td>T2</td>
+<td>Slice 2. Spec requires only <code>path</code> (min length 0, so an empty path is valid); <code>displayName</code> required on create is verify</td>
+</tr>
+<tr>
+<td>APIM-T26</td>
+<td>PATCH <code>displayName</code>, <code>description</code>, <code>subscriptionRequired</code> under <code>properties</code></td>
+<td><code>PATCH</code> =&gt; 200, merged document, other fields untouched</td>
+<td>T1/T2</td>
+<td>Slice 2 (<code>PatchMerge</code>). The spec marks <code>If-Match</code> required on PATCH; miniblue accepts it absent</td>
+</tr>
+<tr>
+<td>APIM-T27</td>
+<td>HEAD returns an ETag; PATCH with a matching ETag; PATCH with a stale ETag</td>
+<td>HEAD =&gt; 200 with <code>ETag</code>; match =&gt; 200; stale =&gt; 412 <code>PreconditionFailed</code> (verify)</td>
+<td>T2</td>
+<td>Deferred. No ETag or HEAD seam in ADR-0003. Optional for azurerm</td>
+</tr>
+<tr>
+<td>APIM-T28</td>
+<td>GET an unknown API; any verb on an API under an unknown service</td>
+<td>404 <code>ResourceNotFound</code>; 404 <code>ParentResourceNotFound</code> (verify real APIM code)</td>
+<td>T1</td>
+<td>Slice 2. armtest GetMissing and ParentMissing</td>
+</tr>
+<tr>
+<td>APIM-T29</td>
+<td>List APIs, including on an empty service</td>
+<td><code>{value:[…]}</code>; empty service =&gt; <code>{"value":[]}</code></td>
+<td>T1</td>
+<td>Slice 2. azurerm lists and deletes APIs right after service create</td>
+</tr>
+<tr>
+<td>APIM-T30</td>
+<td>DELETE an API with no <code>If-Match</code> and no query, then GET, then DELETE again</td>
+<td>200 (existed) or 204, then 404, then 204</td>
+<td>T1/T2</td>
+<td>Slice 2. Guard for <code>terraform destroy</code>. The spec lists 202 and 204 for this DELETE and the SDK accepts 200 and 204 (verify)</td>
+</tr>
+<tr>
+<td>APIM-T31</td>
+<td>Two revisions <code>x;rev=1</code> and <code>x;rev=2</code>; list revisions; DELETE with <code>deleteRevisions</code> true and false</td>
+<td><code>GET apis/x/revisions</code> lists both; <code>DELETE …;rev=2</code> removes that revision only; <code>deleteRevisions</code> semantics verify</td>
+<td>T2</td>
+<td>Follow-on. The revisions collection needs a list override or <code>Actions</code>; not in Slice 2</td>
+</tr>
+<tr>
+<td>APIM-T32</td>
+<td><code>Location</code> header on API write responses</td>
+<td>no <code>Location</code> header at all, so azurerm does not start its custom poller</td>
+<td>T2</td>
+<td>Slice 2. See provider notes (polling)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operation-product-backend-policy-named-value">Operation, product, backend, policy, named value</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Behaviour (real Azure)</th>
+<th>Expect</th>
+<th>Tier</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>APIM-T33</td>
+<td>CRUD and list of operations under an API; missing required field; missing parent API</td>
+<td><code>displayName</code>, <code>method</code>, <code>urlTemplate</code> required (spec); missing =&gt; 400; missing parent =&gt; 404 <code>ParentResourceNotFound</code></td>
+<td>T1/T2</td>
+<td>Slice 2. Name 1 to 80, <code>displayName</code> max 300, <code>urlTemplate</code> max 1000 (spec)</td>
+</tr>
+<tr>
+<td>APIM-T34</td>
+<td>Product CRUD; <code>state</code> honoured</td>
+<td><code>PUT</code> =&gt; 201; <code>state</code> <code>published</code> stays <code>published</code>, default <code>notPublished</code>; <code>displayName</code> 1 to 300, <code>description</code> max 1000; <code>subscriptionRequired</code>, <code>approvalRequired</code>, <code>subscriptionsLimit</code> echoed</td>
+<td>T2</td>
+<td>Slice 2. Spec <code>state</code> enum is <code>notPublished</code>, <code>published</code>. <code>approvalRequired</code> without <code>subscriptionRequired</code> =&gt; 400 (verify)</td>
+</tr>
+<tr>
+<td>APIM-T35</td>
+<td>Product HEAD returns an ETag; PATCH match and mismatch</td>
+<td>HEAD =&gt; 200 with <code>ETag</code>; mismatch =&gt; 412 (verify)</td>
+<td>T2</td>
+<td>Deferred, same reason as the API ETag row</td>
+</tr>
+<tr>
+<td>APIM-T36</td>
+<td>Update a product with PUT and no <code>If-Match</code></td>
+<td>=&gt; 200</td>
+<td>T1/T2</td>
+<td>Slice 2. Spec: <code>If-Match</code> is optional on PUT</td>
+</tr>
+<tr>
+<td>APIM-T37</td>
+<td>DELETE a product with <code>?deleteSubscriptions=true</code> and no <code>If-Match</code></td>
+<td>=&gt; 200 or 204; GET =&gt; 404</td>
+<td>T2</td>
+<td>Slice 2. Exactly what azurerm sends. The spec marks <code>If-Match</code> required on DELETE; azurerm omits it (verify the service accepts that)</td>
+</tr>
+<tr>
+<td>APIM-T38</td>
+<td>Assign an API to a product</td>
+<td><code>PUT products/{p}/apis/{a}</code> =&gt; 201 (new) or 200 (existing); list under the product returns API contracts; <code>DELETE</code> removes; <code>HEAD</code> =&gt; 204; unknown product or API =&gt; 404</td>
+<td>T2</td>
+<td><code>HEAD</code> deferred (no HEAD op). <code>products/apis</code> echoes its body in Slice 2</td>
+</tr>
+<tr>
+<td>APIM-T39</td>
+<td>Backend CRUD with <code>url</code>, <code>protocol</code>, <code>title</code>, <code>description</code>, <code>credentials</code>, <code>proxy</code>, <code>tls</code>, <code>circuitBreaker</code>; update by PUT without <code>If-Match</code></td>
+<td>PUT =&gt; 201 then 200; <code>protocol</code> in <code>http</code>, <code>soap</code>; <code>url</code> max 2000; fields echoed</td>
+<td>T2</td>
+<td>Slice 2. Spec leaves <code>url</code> and <code>protocol</code> optional (Pool backends exist); require them for single backends (verify)</td>
+</tr>
+<tr>
+<td>APIM-T40</td>
+<td><code>POST backends/{b}/reconnect</code></td>
+<td>=&gt; 202 (spec); unknown backend =&gt; 404</td>
+<td>T2</td>
+<td>Deferred. 202 conflicts with sync-only (ADR-0006); azurerm never calls it. Decide 200, 204 or 202 when <code>Actions</code> has a consumer</td>
+</tr>
+<tr>
+<td>APIM-T41</td>
+<td>Backend secret fields (<code>proxy.password</code>, <code>credentials.*</code>)</td>
+<td>stored and returned in clear text; real Azure masks some (verify)</td>
+<td>T2</td>
+<td>Documented drift, no <code>SecretPaths</code> seam</td>
+</tr>
+<tr>
+<td>APIM-T42</td>
+<td>Service-level policy</td>
+<td><code>PUT …/policies/policy</code> <code>{properties:{format:"xml", value:"&lt;policies&gt;…&lt;/policies&gt;"}}</code> =&gt; 201 or 200; GET returns <code>format</code> and <code>value</code>; missing <code>value</code> =&gt; 400; list works; absent =&gt; 404; <code>HEAD</code> returns an ETag; ETag changes on update</td>
+<td>T2</td>
+<td>Tier B (azurerm reads <code>GET policies/policy?format=xml</code>, tolerates 404). Spec <code>format</code> enum: <code>xml</code>, <code>xml-link</code>, <code>rawxml</code>, <code>rawxml-link</code>. ETag and format conversion deferred</td>
+</tr>
+<tr>
+<td>APIM-T43</td>
+<td>Named value create and read; secret handling; delete</td>
+<td><code>PUT</code> <code>displayName</code> plus <code>value</code> =&gt; 201; <code>secret=true</code> GET omits <code>value</code> (optional); DELETE without <code>If-Match</code> =&gt; 200 or 204</td>
+<td>T2/T3</td>
+<td>Slice 2 except masking. Spec: <code>displayName</code> 1 to 256 <code>^[A-Za-z0-9-._]+$</code>, <code>value</code> max 4096, name <code>^[^*#&amp;+:&lt;&gt;?]+$</code>. Masking has no seam (verify real behaviour)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="portal-settings-tenant-access-subscriptions">Portal settings, tenant access, subscriptions</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Behaviour (real Azure)</th>
+<th>Expect</th>
+<th>Tier</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>APIM-T44</td>
+<td>Portal settings before any PUT; update; delegation secrets</td>
+<td><code>GET portalsettings/{signin,signup,delegation}</code> =&gt; 200 with <code>properties</code>; <code>PUT</code> =&gt; 200 (the only success code in the spec); <code>POST delegation/listSecrets</code> =&gt; 200 <code>validationKey</code></td>
+<td>T2</td>
+<td>Tier B. Needs a seeded-singleton seam and <code>Actions</code></td>
+</tr>
+<tr>
+<td>APIM-T45</td>
+<td>Tenant access before any PUT; update; secrets</td>
+<td><code>GET tenant/access</code> =&gt; 200 <code>{id:"access", properties{enabled,…}}</code>; <code>PATCH</code> <code>enabled</code> =&gt; 200; <code>POST listSecrets</code> =&gt; 200 <code>{id, enabled, primaryKey, secondaryKey}</code>; regenerate =&gt; 204</td>
+<td>T2</td>
+<td>Tier B. Same seams as above</td>
+</tr>
+<tr>
+<td>APIM-T46</td>
+<td>Subscriptions</td>
+<td><code>PUT</code> =&gt; 201 or 200; GET, list, DELETE; <code>POST listSecrets</code> =&gt; 200 <code>{primaryKey, secondaryKey}</code>; <code>master</code> subscription exists</td>
+<td>T2</td>
+<td>Follow-on. Spec requires <code>scope</code> and <code>displayName</code> on create</td>
+</tr>
+</tbody>
+</table>
+<h3 id="terraform-and-lifecycle">Terraform and lifecycle</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Behaviour (real Azure)</th>
+<th>Expect</th>
+<th>Tier</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>APIM-T47</td>
+<td>azurerm: Consumption service, api, operation, product, named value, backend</td>
+<td>apply; <code>plan -detailed-exitcode</code> is 0; second apply is a no-op; destroy is clean</td>
+<td>T3</td>
+<td>Slice 2 (opt-in <code>tests/terraform/azurerm/apim_consumption</code>, PR 2.5). Fixture sets short <code>timeouts</code></td>
+</tr>
+<tr>
+<td>APIM-T48</td>
+<td>azapi: <code>Microsoft.ApiManagement/service@2024-05-01</code> plus child <code>apis@2022-08-01</code>, update tags with <code>azapi_update_resource</code></td>
+<td>apply, no diff, destroy; <code>response_export_values</code> returns the derived <code>gatewayUrl</code></td>
+<td>T3</td>
+<td>Slice 2 (opt-in azapi fixture). azapi treats 200 or 201 without async headers as complete</td>
+</tr>
+<tr>
+<td>APIM-T49</td>
+<td>azurerm rejects an invalid service name before any HTTP call</td>
+<td><code>terraform validate</code> or <code>plan</code> exits non-zero in seconds</td>
+<td>T3</td>
+<td>Opt-in. Exercises provider schema validation, not miniblue; server-side validation is the name-validation scenario above</td>
+</tr>
+<tr>
+<td>APIM-T50</td>
+<td>DELETE the service removes every child (apis, operations, products, backends, namedValues, singletons); recreate has none</td>
+<td>children GET =&gt; 404 after delete; a recreated service lists empty collections</td>
+<td>T1</td>
+<td>Slice 2. armtest ChildCascade</td>
+</tr>
+<tr>
+<td>APIM-T51</td>
+<td>List shape and paging</td>
+<td><code>{value}</code> with optional <code>count</code> and no <code>nextLink</code>; later <code>$top</code>, <code>$skip</code>, <code>$filter=contains(properties/displayName,'x')</code></td>
+<td>T2</td>
+<td>Deferred until paging lands; real lists return <code>{value, count, nextLink}</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="cost-tier-test-plan">Cost-tier test plan</h2>
+<p>Real APIM provisioning is never run from this repo, CI or an agent: Developer, Basic and Standard take 30 to 60+ minutes to create (Premium and multi-region longer, delete and purge also slow), and even Consumption takes minutes. azurerm's own timeouts are 3 h for service create, update and delete and 30 min for children. miniblue answers instantly, so the only cost is the harness.</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>What runs</th>
+<th>Where</th>
+<th>Cost</th>
+<th>Cadence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default CI</td>
+<td>armtest Samples for all 7 Slice 2 types (<code>Run</code>, <code>Coverage</code>, ChildCascade, ListSubscription); hook unit tests; httptest scenarios tagged T1 or T2 above</td>
+<td><code>tests/armsamples_apim_test.go</code>, <code>internal/services/apim/*_test.go</code>, <code>tests/arm_apim_test.go</code></td>
+<td>seconds, in-process, under 3 s for the APIM set</td>
+<td>every PR</td>
+</tr>
+<tr>
+<td>Opt-in fixture</td>
+<td>azurerm <code>apim_consumption</code>; azapi <code>apim_service_api</code>; the negative <code>terraform validate</code> case</td>
+<td><code>tests/terraform/azurerm/apim_consumption</code>, <code>tests/terraform/azapi/apim_service_api</code>, one matrix entry each</td>
+<td>about 1 to 2 min, dominated by <code>terraform init</code> and provider download; <code>run.sh</code> step limit is 600 s (<code>run.sh:107</code>) and the job limit 15 min (<code>acceptance-azurerm.yml:23</code>)</td>
+<td>on demand; not in default CI (Slice 2)</td>
+</tr>
+<tr>
+<td>Nightly</td>
+<td><code>apim_developer</code> (<code>Developer_1</code>, <code>tenant_access</code>, <code>sign_in</code>); <code>apim_purge</code> once soft-delete exists; latest-provider run</td>
+<td>same tree</td>
+<td>longer, more endpoints, higher drift risk</td>
+<td>scheduled, never PR-blocking</td>
+</tr>
+<tr>
+<td>Never</td>
+<td>real-Azure provisioning, VNet, zonal or multi-region, <code>az apim</code> against a live service</td>
+<td>none</td>
+<td>30 to 60+ min and real cost</td>
+<td>documentation only</td>
+</tr>
+</tbody>
+</table>
+<p>Fixture rules:</p>
+<ul>
+<li>Every APIM fixture sets <code>timeouts { create = "5m" update = "5m" delete = "5m" read = "2m" }</code> on the service and children. A hung or 202-without-status response then fails in minutes instead of waiting out the 3 h provider default. The 10 min step limit and 15 min job limit remain the backstop.</li>
+<li><code>run.sh</code> already exports <code>GO_AZURE_SDK_SKIP_POLLING_DELAY=true</code> (<code>run.sh:102</code>) and runs apply, <code>plan -detailed-exitcode</code> (must be 0), a second apply and destroy (<code>run.sh:117</code>). The global skip-polling header (ADR-0006) protects users who run the provider directly.</li>
+<li>Pin the provider exactly, as existing fixtures do (azurerm <code>= 5.10.0</code>, azapi <code>= 2.13.0</code>), and commit <code>.terraform.lock.hcl</code>: <code>run.sh</code> refuses a fixture without one (<code>run.sh:29</code>).</li>
+<li>Test data: subscription <code>00000000-0000-0000-0000-000000000000</code>, RG <code>apim-rg</code>, location <code>westeurope</code>, service names <code>apimtest-&lt;n&gt;</code>, publisher <code>Tests</code> and <code>admin@example.test</code>.</li>
+</ul>
+<h2 id="pitfalls">Pitfalls</h2>
+<ul>
+<li><strong>Never require <code>If-Match</code>.</strong> The spec marks it optional on PUT and required on PATCH and DELETE, but azurerm sends <code>*</code> only on API create and update and sends nothing on any DELETE. Requiring it on update or delete breaks <code>terraform destroy</code> and in-place updates. A stale ETag is 412 on real APIM (verify); ignoring it is the deliberate lenient choice (ADR-0003).</li>
+<li><strong>Tests that assert rejection of an update PUT without <code>If-Match</code> encode a wrong behaviour.</strong> Do not port them.</li>
+<li><strong><code>checkNameAvailability</code> for an invalid name is <code>nameAvailable:false</code>, <code>reason:"Invalid"</code>.</strong> An inverted validity check returning <code>true</code> is wrong.</li>
+<li><strong>Product <code>state</code> is honoured.</strong> <code>published</code> stays <code>published</code>; the default is <code>notPublished</code>. Forcing it breaks <code>azurerm_api_management_product</code> with <code>published = true</code>.</li>
+<li><strong>Properties live under <code>properties</code>.</strong> PATCH merges onto the stored document. Reading fields from the JSON root, or persisting the raw request instead of the merged document, loses data.</li>
+<li><strong>No async signals.</strong> A write response carrying <code>Location</code> with an <code>asyncId</code> query parameter makes azurerm start a custom poller. DELETE returns 200 or 204 only: 201 or 202 routes azurerm to a custom poller that needs an absolute URL. A bare 202 fails with "unexpected status 202 received with no body" (ADR-0006).</li>
+<li><strong>A malformed <code>Location</code> such as <code>?asyncCode=…=asyncId=…</code> is worse than none.</strong> Emit nothing.</li>
+<li><strong>Real <code>service</code> GETs are fully populated.</strong> <code>gatewayUrl</code>, <code>gatewayRegionalUrl</code>, <code>portalUrl</code>, <code>developerPortalUrl</code>, <code>managementApiUrl</code>, <code>scmUrl</code>, <code>publicIPAddresses</code>, <code>platformVersion</code> and <code>identity</code> are all returned, and azapi <code>response_export_values</code> and azurerm outputs read them. Hard-coding only <code>provisioningState</code> is not enough.</li>
+<li><strong><code>createdAtUtc</code> cannot be stable without the stored document.</strong> Do not emit it unless it is copied from <code>Current</code> (Slice 2 emits none).</li>
+<li><strong>Soft-delete.</strong> Real DELETE of a service soft-deletes it for a retention window (about 48 h, verify) and keeps the name reserved; <code>deletedservices</code> GET then returns 200. Name uniqueness is DNS-global (<code>{name}.azure-api.net</code>), across subscriptions. miniblue is subscription-local and allows immediate recreate.</li>
+<li><strong><code>apis/{id};rev=N</code> is a distinct address per revision.</strong> Real APIM also aliases <code>apis/{id}</code> to the current revision. azurerm always uses <code>;rev=1</code>; CLI and bicep may use the bare name (out of scope in Slice 2).</li>
+<li><strong>sku.name enum in 2024-05-01 is <code>Developer</code>, <code>Standard</code>, <code>Premium</code>, <code>Basic</code>, <code>Consumption</code>, <code>Isolated</code>, <code>BasicV2</code>, <code>StandardV2</code>.</strong> <code>PremiumV2</code> is not in it. <code>sku.capacity</code> is required (Consumption 0, Developer 1; others verify).</li>
+<li><strong>Do not seed APIs or products.</strong> azurerm lists and deletes them right after create. Real APIM does seed system groups (<code>administrators</code>, <code>developers</code>, <code>guests</code>), a <code>master</code> subscription and admin user 1; add those only when the group and subscription types land.</li>
+<li><strong>Real lists are <code>{value, count, nextLink}</code>.</strong> Clients treat an empty or missing <code>nextLink</code> as done, so returning all items is safe.</li>
+<li><strong>Secrets are masked on real GET</strong> for secret named values, subscription keys and similar fields, and served through <code>listValue</code> or <code>listSecrets</code> (verify per field). Echoing them in clear text is a documented deviation, not Azure behaviour.</li>
+</ul>
+<h2 id="dropped">Dropped</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>APIM-T16</td>
+<td>ARM-template deployment of an APIM resource: depends on deployments dispatching in-process (ADR-0007 wave 3) and adds no APIM-specific assertion beyond the service lifecycle rows. Revisit with the deployments work</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/moabukar/miniblue" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://hub.docker.com/r/moabukar/miniblue" target="_blank" rel="noopener" title="hub.docker.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M349.9 236.3h-66.1v-59.4h66.1zm0-204.3h-66.1v60.7h66.1zm78.2 144.8H362v59.4h66.1zm-156.3-72.1h-66.1v60.1h66.1zm78.1 0h-66.1v60.1h66.1zm276.8 100c-14.4-9.7-47.6-13.2-73.1-8.4-3.3-24-16.7-44.9-41.1-63.7l-14-9.3-9.3 14c-18.4 27.8-23.4 73.6-3.7 103.8-8.7 4.7-25.8 11.1-48.4 10.7H2.4c-8.7 50.8 5.8 116.8 44 162.1 37.1 43.9 92.7 66.2 165.4 66.2 157.4 0 273.9-72.5 328.4-204.2 21.4.4 67.6.1 91.3-45.2 1.5-2.5 6.6-13.2 8.5-17.1zm-511.1-27.9h-66v59.4h66.1v-59.4zm78.1 0h-66.1v59.4h66.1zm78.1 0h-66.1v59.4h66.1zm-78.1-72.1h-66.1v60.1h66.1z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

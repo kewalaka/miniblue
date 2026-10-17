@@ -298,10 +298,10 @@ func TestSanitizeDockerName(t *testing.T) {
 	}
 }
 
-// TestCleanupClustersInRGIsSafeWithoutBackends verifies the public helper
-// used by resourcegroups during cascade delete is a no-op for stub-mode
-// clusters and does not panic on missing/empty/malformed handles.
-func TestCleanupClustersInRGIsSafeWithoutBackends(t *testing.T) {
+// TestCleanupRGIsSafeWithoutBackends verifies the cleaner run by resourcegroups
+// during cascade delete does not shell out for stub-mode clusters, does not
+// panic on missing/empty/malformed handles, and removes the cluster records.
+func TestCleanupRGIsSafeWithoutBackends(t *testing.T) {
 	t.Setenv("AKS_BACKEND", "")
 	t.Setenv("MINIBLUE_AKS_REAL", "")
 	s := store.New()
@@ -316,13 +316,11 @@ func TestCleanupClustersInRGIsSafeWithoutBackends(t *testing.T) {
 		r.ServeHTTP(httptest.NewRecorder(), req)
 	}
 
-	// No backend handles set in stub mode; this should be a no-op (and not
-	// shell out to docker for anything).
-	CleanupClustersInRG(s, "sub1", "rg1")
+	// No backend handles set in stub mode, so there is nothing to shell out
+	// to docker for; only the store records are removed.
+	CleanupRG(s, "sub1", "rg1")
 
-	// The clusters themselves are still in the store; the helper only cleans
-	// real backend containers, leaving the store delete to the caller.
-	if got := len(s.ListByPrefix("aks:cluster:sub1:rg1:")); got != 3 {
-		t.Errorf("CleanupClustersInRG should not delete store keys, want 3 left, got %d", got)
+	if got := len(s.ListByPrefix("aks:cluster:sub1:rg1:")); got != 0 {
+		t.Errorf("CleanupRG should delete the cluster records, want 0 left, got %d", got)
 	}
 }

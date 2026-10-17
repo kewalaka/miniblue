@@ -6,17 +6,18 @@ import (
 	"github.com/moabukar/miniblue/internal/store"
 )
 
-// CleanupVMsInRG detaches the NICs and disks of every VM of the given
+// CleanupRG detaches the NICs and disks of every VM of the given
 // subscription/resource group (they may live in other resource groups),
 // removes the Docker containers, networks and identity-secret index entries,
-// and drops auto-created OS disks, exactly as a direct VM delete does.
-// Intended to be invoked by the resourcegroups handler during cascade
-// delete, BEFORE it removes the vm:/vmsvc: keys from the store. Safe to call
-// in stub mode and when the RG has no VMs; Docker errors are logged inside
-// the helpers, never returned — the ARM-level delete must always succeed.
-func CleanupVMsInRG(s *store.Store, sub, rg string) {
+// and drops auto-created OS disks, exactly as a direct VM delete does. It then
+// removes the VM, service and extension records. Run it before the disks and
+// networkinterfaces cleaners so the detach finds them. Safe to call in stub
+// mode and when the RG has no VMs; Docker errors are logged inside the
+// helpers, never returned — the ARM-level delete must always succeed.
+func CleanupRG(s *store.Store, sub, rg string) {
+	p := sub + ":" + rg + ":"
 	dockerOK := checkDockerCached()
-	for _, item := range s.ListByPrefix("vm:" + sub + ":" + rg + ":") {
+	for _, item := range s.ListByPrefix("vm:" + p) {
 		rec, ok := item.(map[string]interface{})
 		if !ok {
 			continue
@@ -29,7 +30,7 @@ func CleanupVMsInRG(s *store.Store, sub, rg string) {
 		if !dockerOK || name == "" {
 			continue
 		}
-		for _, svcItem := range s.ListByPrefix("vmsvc:" + sub + ":" + rg + ":" + name + ":") {
+		for _, svcItem := range s.ListByPrefix("vmsvc:" + p + name + ":") {
 			svc, _ := svcItem.(map[string]interface{})
 			if cn, _ := svc["_containerName"].(string); cn != "" {
 				dockerRemove(cn)
@@ -38,6 +39,9 @@ func CleanupVMsInRG(s *store.Store, sub, rg string) {
 		dockerRemove(vmContainerName(rg, name))
 		dockerNetworkRemove(vmNetworkName(rg, name))
 	}
+	s.DeleteByPrefix("vm:" + p)
+	s.DeleteByPrefix("vmsvc:" + p)
+	s.DeleteByPrefix("vmext:" + p)
 }
 
 // checkDockerCached memoizes the Docker probe for cascade calls, which run in

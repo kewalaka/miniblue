@@ -4,6 +4,52 @@ All notable changes to miniblue are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.9.0](https://github.com/kewalaka/miniblue/compare/v0.8.0...v0.9.0) (2026-10-17)
+
+
+### Features
+
+* **arm:** generic ARM resource engine with policyDefinitions via azapi ([#2](https://github.com/kewalaka/miniblue/issues/2)) ([1b276fd](https://github.com/kewalaka/miniblue/commit/1b276fd5eddf3e272c95589dd9d338a7bac77e94))
+* **azerr:** typed Error and skip-polling-delay header ([7599e86](https://github.com/kewalaka/miniblue/commit/7599e867b49ee54356dd5ed26c5851413213639e))
+* **azerr:** typed Error with target and details ([7e67c80](https://github.com/kewalaka/miniblue/commit/7e67c80326c53226cdc1a99a215b58190a175dd1))
+* merge lonegunmanb fork (ARM case-insensitivity, RBAC, KV, disks, NICs, VM fidelity) ([ab096b9](https://github.com/kewalaka/miniblue/commit/ab096b905a868ace6c99d50f9d48c561443abf82))
+* **server:** send skip-polling-delay header ([6772d84](https://github.com/kewalaka/miniblue/commit/6772d84965b4fc3c1d00c84f46d2e77a2fb4eb67))
+* **store:** schema version stamp with reset-required startup error ([2a8b3ec](https://github.com/kewalaka/miniblue/commit/2a8b3ec1883727da937194c4923d1758dc472528))
+
+
+### Bug Fixes
+
+* **acceptance:** isolate runner miniblue and fail fast on bind errors or non-loopback hosts ([ea4f36a](https://github.com/kewalaka/miniblue/commit/ea4f36a5ce543cd8c2b28e35a2ad71e9957fa71c))
+* **acr:** return azureADAuthenticationAsArmPolicy and roleAssignmentMode ([7faf89d](https://github.com/kewalaka/miniblue/commit/7faf89ddb472d8f614977b6147874efa1f4876b4))
+* **azerr:** treat typed-nil *Error as unexpected in Write ([ad00b2c](https://github.com/kewalaka/miniblue/commit/ad00b2c51f7b7c3e0efaeba32e482d5aa7eb457f))
+* **blob:** persist blob content across restarts ([6dc8cca](https://github.com/kewalaka/miniblue/commit/6dc8cca2851a9ba0ba3870787863030133b58c26))
+* **blob:** persist blob content across restarts ([2d02432](https://github.com/kewalaka/miniblue/commit/2d02432c8d1317ce2d206f431e7ee768478b1839))
+* **compute:** return bare arrays for image lists and flatten image version properties ([8b596e8](https://github.com/kewalaka/miniblue/commit/8b596e8330666e635998efda4511387e7889d4de))
+* **disks:** return 200 on PUT and tolerate deleting a missing disk ([b9ed3ea](https://github.com/kewalaka/miniblue/commit/b9ed3ea07706bb885278455bc71d5553616939f0))
+* **identity:** publish a copy on PATCH instead of mutating the stored record ([f696aa1](https://github.com/kewalaka/miniblue/commit/f696aa14b27ca0df3e91a2e6f27bc10596b8eee5))
+* **keyvault:** match vault name case-insensitively in RG cascade ([eae8559](https://github.com/kewalaka/miniblue/commit/eae85593990c46abd7cecdd43755dba4fc87155d))
+* **keyvault:** return 200 on vault delete and add deletedVaults purge POST ([e2cec13](https://github.com/kewalaka/miniblue/commit/e2cec134df30dcf016149a7d061ba39b4262f263))
+* **keyvault:** validate vault name and resource group on PUT ([d4094c9](https://github.com/kewalaka/miniblue/commit/d4094c9fa2e44014b3bb52eb18f8bff692009f4d))
+* **loadbalancer:** keep resourceGuid stable across PUTs ([d23571b](https://github.com/kewalaka/miniblue/commit/d23571bd2eb52089406d0e9949806feb227c722c))
+* **main:** open state before binding ports ([d287c19](https://github.com/kewalaka/miniblue/commit/d287c1987179341298a49cd8a37429a3eb82063d))
+* **metadata:** use core.windows.net storage suffix unless MINIBLUE_STORAGE_ENDPOINT is set ([e104cbe](https://github.com/kewalaka/miniblue/commit/e104cbe35ef7e2ea9750aea02835ec5bd1540146))
+* **nsg:** persist inline securityRules from NSG PUT ([538d042](https://github.com/kewalaka/miniblue/commit/538d0423fccb686da4ddfe45dcc896b3ab3b6d7d))
+* **publicip:** echo zones and ipTags so azurerm plans clean ([898b1b6](https://github.com/kewalaka/miniblue/commit/898b1b66eb1a5560f5ca0139903ff9ec1f897be5))
+* **redis:** persist location, tags and sku from PUT body ([32ffa57](https://github.com/kewalaka/miniblue/commit/32ffa57c7a92faa5d8be957ecb613a8889fbd3f1))
+* **release:** drop component prefix from release-please tags ([4abf834](https://github.com/kewalaka/miniblue/commit/4abf834bbf3e0562dc719201a1c4d697f6fd4726))
+* **release:** drop component prefix from release-please tags ([b3688dc](https://github.com/kewalaka/miniblue/commit/b3688dcb9b9e37f34789dcc96cfda381b08768e3))
+* **server:** keep streaming, 405 and deployment dispatch working behind case-insensitive routing ([f332ca9](https://github.com/kewalaka/miniblue/commit/f332ca9de5cd78629fab25e02352b4f1b5ba8073))
+* **server:** mirror case only in ARM paths and scope RBAC middleware ([f4482cc](https://github.com/kewalaka/miniblue/commit/f4482cce3dd45b2c3daa011af8eec23953da7001))
+* small fidelity fixes from the spike ([860fb98](https://github.com/kewalaka/miniblue/commit/860fb981c503c78d555c076362dde37a0a9a13e1))
+* **storageaccounts:** add accountMigrations/default and return 200 on container delete ([ee5254b](https://github.com/kewalaka/miniblue/commit/ee5254bb6b217425e0d1397df0a23fa79ad53be9))
+* **storage:** merge service properties on PATCH and clean up account children ([4b0a57b](https://github.com/kewalaka/miniblue/commit/4b0a57b077a5e10dbd2fcd085ec717443ed0c410))
+* **store:** add Decode and GetAs; fix struct-asserting call sites ([c9da10e](https://github.com/kewalaka/miniblue/commit/c9da10e8460df94e1540cf19a4c3aec236a9a0f5))
+* **store:** add Decode and GetAs; fix struct-asserting call sites ([6419bab](https://github.com/kewalaka/miniblue/commit/6419bab8c25ab70a0f62e969164cb29f05f3e1a5))
+* **store:** escape LIKE prefixes and add prefix index ([38211ff](https://github.com/kewalaka/miniblue/commit/38211ff065c00550f992846ba280c9620420f0f8))
+* **store:** escape LIKE prefixes, add prefix index and schema stamp ([6748d07](https://github.com/kewalaka/miniblue/commit/6748d077476dbbb3a214dfad4c879065336b996f))
+* **store:** keep schema stamp across reset, abort on failed read, scope key listing ([87bd186](https://github.com/kewalaka/miniblue/commit/87bd186e26f7adc5139e4a8c266af8a6d2c882a6))
+* **vm:** protect existing disks, copy on write references and detach on RG delete ([65dee0e](https://github.com/kewalaka/miniblue/commit/65dee0eb81824e7215616b454bcd0f5112f1cd00))
+
 ## [0.8.0] - 2026-06-21
 
 ### Added

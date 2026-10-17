@@ -107,10 +107,17 @@ func (m *MemoryBackend) DeleteByPrefix(prefix string) int {
 	return count
 }
 
+// Reset drops all state except the schema stamp, which describes this miniblue
+// version rather than the data. Doing it under the lock means the stamp is
+// never absent, even to a concurrent Reset or Snapshot.
 func (m *MemoryBackend) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	stamp, stamped := m.data[schemaKey]
 	m.data = make(map[string]interface{})
+	if stamped {
+		m.data[schemaKey] = stamp
+	}
 }
 
 func (m *MemoryBackend) Snapshot() map[string]interface{} {
@@ -178,7 +185,13 @@ func (s *Store) ListKeysByPrefix(prefix string) []string {
 	if mb, ok := s.backend.(*MemoryBackend); ok {
 		return mb.ListKeysByPrefix(prefix)
 	}
-	return s.backend.List()
+	keys := make([]string, 0)
+	for _, k := range s.backend.List() {
+		if strings.HasPrefix(k, prefix) {
+			keys = append(keys, k)
+		}
+	}
+	return keys
 }
 
 func (s *Store) CountByPrefix(prefix string) int {
@@ -189,14 +202,9 @@ func (s *Store) DeleteByPrefix(prefix string) int {
 	return s.backend.DeleteByPrefix(prefix)
 }
 
-// Reset wipes all state except the schema stamp, which describes this miniblue
-// version rather than the data.
+// Reset wipes all state except the schema stamp, which each backend keeps.
 func (s *Store) Reset() {
-	stamp, stamped := s.backend.Get(schemaKey)
 	s.backend.Reset()
-	if stamped {
-		_ = s.backend.Set(schemaKey, stamp)
-	}
 }
 
 // Save persists state to disk if the backend supports it (e.g. FileBackend).

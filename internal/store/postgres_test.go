@@ -26,7 +26,8 @@ func TestLikePrefix(t *testing.T) {
 
 // testPostgres connects to the database named by MINIBLUE_TEST_POSTGRES_URL
 // and skips when it is not set. DATABASE_URL is deliberately not used, so a
-// developer's own database is never touched.
+// developer's own database is never touched. The database must be a throwaway:
+// TestPostgresResetKeepsSchemaStamp clears it.
 func testPostgres(t *testing.T) *PostgresBackend {
 	t.Helper()
 	url := os.Getenv("MINIBLUE_TEST_POSTGRES_URL")
@@ -51,6 +52,28 @@ func TestPostgresPrefixIndex(t *testing.T) {
 	).Scan(&n)
 	if err != nil || n != 1 {
 		t.Fatalf("prefix index: count = %d, err = %v", n, err)
+	}
+}
+
+func TestPostgresResetKeepsSchemaStamp(t *testing.T) {
+	pg := testPostgres(t)
+	s := NewWithBackend(pg)
+
+	pg.Reset()
+	if err := CheckSchema(s, "test-postgres"); err != nil {
+		t.Fatal(err)
+	}
+	s.Set("k", "v")
+	s.Reset()
+
+	if s.Exists("k") {
+		t.Error("Reset did not clear state")
+	}
+	if got := s.List(); len(got) != 1 || got[0] != schemaKey {
+		t.Errorf("keys after Reset = %v, want only the stamp", got)
+	}
+	if err := CheckSchema(s, "test-postgres"); err != nil {
+		t.Errorf("CheckSchema after Reset: %v", err)
 	}
 }
 

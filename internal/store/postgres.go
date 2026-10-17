@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"strings"
 
@@ -164,6 +165,26 @@ func (p *PostgresBackend) DeleteByPrefix(prefix string) int {
 	return int(n)
 }
 
+// Reset drops all state except the schema stamp. It is one statement, so the
+// stamp is never absent.
 func (p *PostgresBackend) Reset() {
-	_, _ = p.db.Exec(`TRUNCATE miniblue_store`)
+	_, _ = p.db.Exec(`DELETE FROM miniblue_store WHERE key <> $1`, schemaKey)
+}
+
+// readSchema implements schemaReader, reporting query and decode failures
+// instead of folding them into "absent" as Get and List do.
+func (p *PostgresBackend) readSchema() (stamp interface{}, stamped, hasState bool, err error) {
+	var data []byte
+	err = p.db.QueryRow(`SELECT value FROM miniblue_store WHERE key = $1`, schemaKey).Scan(&data)
+	switch {
+	case err == nil:
+		if err := json.Unmarshal(data, &stamp); err != nil {
+			return nil, false, false, err
+		}
+		return stamp, true, true, nil
+	case !errors.Is(err, sql.ErrNoRows):
+		return nil, false, false, err
+	}
+	err = p.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM miniblue_store)`).Scan(&hasState)
+	return nil, false, hasState, err
 }

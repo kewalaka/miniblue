@@ -33,6 +33,8 @@ func AzureHeaders(next http.Handler) http.Handler {
 		w.Header().Set("x-ms-correlation-request-id", correlationID)
 		w.Header().Set("x-ms-routing-request-id", "LOCALAZURE:"+requestID)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		// go-azure-sdk skips its ~10s provisioningState poll delay on this header (ADR-0006).
+		w.Header().Set("X-Go-Azure-Sdk-Skip-Polling-Delay", "true")
 
 		next.ServeHTTP(w, r)
 	})

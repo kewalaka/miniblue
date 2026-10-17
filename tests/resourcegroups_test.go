@@ -178,6 +178,40 @@ func TestResourceGroupDeleteCascadeKeyVault(t *testing.T) {
 	expectStatus(t, resp, 200)
 }
 
+// A case-only PATCH rewrites the stored vault name, but secrets written on the
+// path form keep the original spelling; the cascade must still remove them.
+func TestResourceGroupDeleteCascadeKeyVaultCaseRename(t *testing.T) {
+	ts := setupServer()
+	defer ts.Close()
+
+	av := "?api-version=2023-07-01"
+	base := ts.URL + "/subscriptions/sub1"
+	vaultURL := base + "/resourceGroups/myRG/providers/Microsoft.KeyVault/vaults/"
+
+	resp := doRequest(t, "PUT", base+"/resourcegroups/myRG"+av, `{"location":"eastus"}`)
+	resp.Body.Close()
+	expectStatus(t, resp, 201)
+	resp = doRequest(t, "PUT", vaultURL+"MyVault"+av, `{"location":"eastus","properties":{"tenantId":"00000000-0000-0000-0000-000000000000","sku":{"family":"A","name":"standard"}}}`)
+	resp.Body.Close()
+	expectStatus(t, resp, 201)
+
+	resp = doRequest(t, "PUT", ts.URL+"/keyvault/MyVault/secrets/db-pass", `{"value":"supersecret"}`)
+	resp.Body.Close()
+	expectStatus(t, resp, 200)
+
+	resp = doRequest(t, "PATCH", vaultURL+"myvault"+av, `{"tags":{"env":"test"}}`)
+	resp.Body.Close()
+	expectStatus(t, resp, 200)
+
+	resp = doRequest(t, "DELETE", base+"/resourcegroups/myRG"+av, "")
+	resp.Body.Close()
+	expectStatus(t, resp, 202)
+
+	resp = doRequest(t, "GET", ts.URL+"/keyvault/MyVault/secrets/db-pass", "")
+	resp.Body.Close()
+	expectStatus(t, resp, 404)
+}
+
 func TestResourceGroupMissingLocation(t *testing.T) {
 	ts := setupServer()
 	defer ts.Close()

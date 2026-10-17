@@ -79,6 +79,16 @@ func (h *Handler) lbRuleKey(sub, rg, lb, rule string) string {
 	return "lb:rule:" + sub + ":" + rg + ":" + lb + ":" + rule
 }
 
+// resourceGUID keeps the stored resourceGuid across PUTs and only generates one on create.
+func resourceGUID(existing interface{}) string {
+	doc, _ := existing.(map[string]interface{})
+	props, _ := doc["properties"].(map[string]interface{})
+	if guid, _ := props["resourceGuid"].(string); guid != "" {
+		return guid
+	}
+	return uuid.New().String()
+}
+
 func getArray(props map[string]interface{}, field string) []interface{} {
 	if v, ok := props[field].([]interface{}); ok {
 		return v
@@ -120,7 +130,7 @@ func frontendIPConfigurations(id string, props map[string]interface{}) []interfa
 // 	return nil
 // }
 
-func buildResponse(sub, rg, name string, input map[string]interface{}) map[string]interface{} {
+func buildResponse(sub, rg, name string, input map[string]interface{}, existing interface{}) map[string]interface{} {
 	id := "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.Network/loadBalancers/" + name
 
 	props, _ := input["properties"].(map[string]interface{})
@@ -153,7 +163,7 @@ func buildResponse(sub, rg, name string, input map[string]interface{}) map[strin
 		"sku":      sku,
 		"properties": map[string]interface{}{
 			"provisioningState":        "Succeeded",
-			"resourceGuid":             uuid.New().String(),
+			"resourceGuid":             resourceGUID(existing),
 			"frontendIPConfigurations": frontendIPConfigurations(id, props),
 			"backendAddressPools":      getArray(props, "backendAddressPools"),
 			"loadBalancingRules":       getArray(props, "loadBalancingRules"),
@@ -165,7 +175,7 @@ func buildResponse(sub, rg, name string, input map[string]interface{}) map[strin
 	}
 }
 
-func buildBackendAddressPoolResponse(sub, rg, lb, name string, input map[string]interface{}) map[string]interface{} {
+func buildBackendAddressPoolResponse(sub, rg, lb, name string, input map[string]interface{}, existing interface{}) map[string]interface{} {
 	id := "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.Network/loadBalancers/" + lb + "/backendAddressPools/" + name
 
 	props, _ := input["properties"].(map[string]interface{})
@@ -185,13 +195,13 @@ func buildBackendAddressPoolResponse(sub, rg, lb, name string, input map[string]
 		"etag": "W/\"miniblue\"",
 		"properties": map[string]interface{}{
 			"provisioningState":            "Succeeded",
-			"resourceGuid":                 uuid.New().String(),
+			"resourceGuid":                 resourceGUID(existing),
 			"loadBalancerBackendAddresses": backendAddresses,
 		},
 	}
 }
 
-func buildProbeResponse(sub, rg, lb, name string, input map[string]interface{}) map[string]interface{} {
+func buildProbeResponse(sub, rg, lb, name string, input map[string]interface{}, existing interface{}) map[string]interface{} {
 	id := "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.Network/loadBalancers/" + lb + "/probes/" + name
 
 	props, _ := input["properties"].(map[string]interface{})
@@ -216,7 +226,7 @@ func buildProbeResponse(sub, rg, lb, name string, input map[string]interface{}) 
 		"etag": "W/\"miniblue\"",
 		"properties": map[string]interface{}{
 			"provisioningState": "Succeeded",
-			"resourceGuid":      uuid.New().String(),
+			"resourceGuid":      resourceGUID(existing),
 			"protocol":          protocol,
 			"port":              port,
 			"intervalInSeconds": 15,
@@ -225,7 +235,7 @@ func buildProbeResponse(sub, rg, lb, name string, input map[string]interface{}) 
 	}
 }
 
-func buildLoadBalancingRuleResponse(sub, rg, lb, name string, input map[string]interface{}) map[string]interface{} {
+func buildLoadBalancingRuleResponse(sub, rg, lb, name string, input map[string]interface{}, existing interface{}) map[string]interface{} {
 	id := "/subscriptions/" + sub + "/resourceGroups/" + rg + "/providers/Microsoft.Network/loadBalancers/" + lb + "/loadBalancingRules/" + name
 
 	props, _ := input["properties"].(map[string]interface{})
@@ -235,7 +245,7 @@ func buildLoadBalancingRuleResponse(sub, rg, lb, name string, input map[string]i
 
 	ruleProps := map[string]interface{}{
 		"provisioningState": "Succeeded",
-		"resourceGuid":      uuid.New().String(),
+		"resourceGuid":      resourceGUID(existing),
 		"protocol":          props["protocol"],
 		"frontendPort":      props["frontendPort"],
 		"backendPort":       props["backendPort"],
@@ -273,9 +283,9 @@ func (h *Handler) CreateOrUpdate(w http.ResponseWriter, r *http.Request) {
 	var input map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&input)
 
-	lb := buildResponse(sub, rg, name, input)
 	k := h.key(sub, rg, name)
-	_, exists := h.store.Get(k)
+	existing, exists := h.store.Get(k)
+	lb := buildResponse(sub, rg, name, input, existing)
 	h.store.Set(k, lb)
 
 	if exists {
@@ -335,9 +345,9 @@ func (h *Handler) CreateOrUpdateBackendAddressPool(w http.ResponseWriter, r *htt
 	var input map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&input)
 
-	pool := buildBackendAddressPoolResponse(sub, rg, lb, name, input)
 	k := h.backendPoolKey(sub, rg, lb, name)
-	_, exists := h.store.Get(k)
+	existing, exists := h.store.Get(k)
+	pool := buildBackendAddressPoolResponse(sub, rg, lb, name, input, existing)
 	h.store.Set(k, pool)
 
 	if exists {
@@ -392,9 +402,9 @@ func (h *Handler) CreateOrUpdateProbe(w http.ResponseWriter, r *http.Request) {
 	var input map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&input)
 
-	probe := buildProbeResponse(sub, rg, lb, name, input)
 	k := h.probeKey(sub, rg, lb, name)
-	_, exists := h.store.Get(k)
+	existing, exists := h.store.Get(k)
+	probe := buildProbeResponse(sub, rg, lb, name, input, existing)
 	h.store.Set(k, probe)
 
 	if exists {
@@ -449,9 +459,9 @@ func (h *Handler) CreateOrUpdateLoadBalancingRule(w http.ResponseWriter, r *http
 	var input map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&input)
 
-	rule := buildLoadBalancingRuleResponse(sub, rg, lb, name, input)
 	k := h.lbRuleKey(sub, rg, lb, name)
-	_, exists := h.store.Get(k)
+	existing, exists := h.store.Get(k)
+	rule := buildLoadBalancingRuleResponse(sub, rg, lb, name, input, existing)
 	h.store.Set(k, rule)
 
 	if exists {

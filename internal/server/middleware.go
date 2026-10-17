@@ -23,6 +23,8 @@ func CORS(next http.Handler) http.Handler {
 }
 
 // AzureHeaders adds standard Azure response headers to every request.
+// CORS preflight (OPTIONS) is answered earlier in the chain and is intentionally
+// exempt: the skip-polling header only matters to SDK pollers, never to browsers.
 func AzureHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := uuid.New().String()
@@ -33,6 +35,8 @@ func AzureHeaders(next http.Handler) http.Handler {
 		w.Header().Set("x-ms-correlation-request-id", correlationID)
 		w.Header().Set("x-ms-routing-request-id", "LOCALAZURE:"+requestID)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		// go-azure-sdk skips its ~10s provisioningState poll delay on this header (ADR-0006).
+		w.Header().Set("X-Go-Azure-Sdk-Skip-Polling-Delay", "true")
 
 		next.ServeHTTP(w, r)
 	})

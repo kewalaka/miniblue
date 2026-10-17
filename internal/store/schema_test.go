@@ -75,7 +75,10 @@ func TestCheckSchema(t *testing.T) {
 
 func TestCheckSchemaSurvivesFileReload(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state.json")
-	fb := NewFileBackend(path)
+	fb, err := NewFileBackend(path)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := CheckSchema(NewWithBackend(fb), path); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +87,11 @@ func TestCheckSchemaSurvivesFileReload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reloaded := NewWithBackend(NewFileBackend(path))
+	reloadedFB, err := NewFileBackend(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reloaded := NewWithBackend(reloadedFB)
 	if err := CheckSchema(reloaded, path); err != nil {
 		t.Fatalf("CheckSchema after reload: %v", err)
 	}
@@ -118,7 +125,10 @@ func TestResetKeepsSchemaStamp(t *testing.T) {
 
 func TestConcurrentResetKeepsSchemaStamp(t *testing.T) {
 	mb := NewMemoryBackend()
-	fb := NewFileBackend(filepath.Join(t.TempDir(), "state.json"))
+	fb, err := NewFileBackend(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	backends := map[string]struct {
 		backend  Backend
 		snapshot func() map[string]interface{}
@@ -212,7 +222,11 @@ func TestCheckSchemaPostgresReadFailure(t *testing.T) {
 
 func TestListKeysByPrefixSkipsSchemaStamp(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state.json")
-	s := NewWithBackend(NewFileBackend(path))
+	fb, err := NewFileBackend(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := NewWithBackend(fb)
 	if err := CheckSchema(s, path); err != nil {
 		t.Fatal(err)
 	}

@@ -2,6 +2,9 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,31 +18,41 @@ type FileBackend struct {
 	mu   sync.Mutex
 }
 
-func NewFileBackend(path string) *FileBackend {
+// NewFileBackend loads the snapshot at path. A missing file starts empty; a
+// snapshot that cannot be read or parsed is an error and the file is left
+// untouched, because starting empty would let autosave overwrite it.
+func NewFileBackend(path string) (*FileBackend, error) {
 	fb := &FileBackend{
 		mem:  NewMemoryBackend(),
 		path: path,
 	}
-	fb.load()
-	return fb
+	if err := fb.load(); err != nil {
+		return nil, err
+	}
+	return fb, nil
 }
 
-func (f *FileBackend) load() {
+func (f *FileBackend) load() error {
 	data, err := os.ReadFile(f.path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil // no file yet, start fresh
+	}
 	if err != nil {
-		return // no file yet, start fresh
+		return fmt.Errorf("read state %s: %w", f.path, err)
 	}
 	var state map[string]json.RawMessage
 	if err := json.Unmarshal(data, &state); err != nil {
-		log.Printf("failed to load state from %s: %v", f.path, err)
-		return
+		return fmt.Errorf("parse state %s: %w", f.path, err)
 	}
 	for k, v := range state {
 		var val interface{}
-		json.Unmarshal(v, &val)
+		if err := json.Unmarshal(v, &val); err != nil {
+			return fmt.Errorf("parse state %s key %q: %w", f.path, k, err)
+		}
 		f.mem.Set(k, val)
 	}
 	log.Printf("loaded %d items from %s", len(state), f.path)
+	return nil
 }
 
 // Save atomically persists all in-memory state to disk.

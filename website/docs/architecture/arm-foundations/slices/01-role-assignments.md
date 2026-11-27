@@ -1,4 +1,4 @@
-# Slice 1: Role assignments on the engine, with opt-in enforcement
+# Slice 1: role assignments on the engine, with opt-in enforcement
 
 Proves:
 

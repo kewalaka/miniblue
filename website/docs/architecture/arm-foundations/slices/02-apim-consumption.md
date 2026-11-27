@@ -60,12 +60,12 @@ Rules:
 
 ## Client behaviours to honour
 
-- **azurerm service create:**
-    - GET `locations/{loc}/deletedservices/{n}`: strict 404 is enough, so no route is needed.
-    - PUT, then LIST `apis` and `products`. Both must return `{"value":[]}`.
+- **azurerm service create.**
+    - GET `locations/{loc}/deletedservices/{n}` returns a strict 404, so no route is needed.
+    - PUT is followed by LIST `apis` and `products`, and both must return `{"value":[]}`.
 - **azurerm service update is PATCH** (sku, properties, identity, tags), so it needs `PatchMerge`.
 - **azurerm api paths are always `apis/{name};rev=1` with `If-Match: *`.**
-    - The name is opaque: key on the decoded segment, echo it in `id` and `name`.
+    - The name is opaque. Key on the decoded segment and echo it in `id` and `name`.
     - armtest covers both raw `;` and `%3B`.
     - Never require `If-Match`.
 - **Never send a `Location` header** (an `asyncId` one triggers azurerm's custom poller), and never return 202.
@@ -74,7 +74,7 @@ Rules:
 ## Out of scope (documented deviations)
 
 - `checkNameAvailability`.
-- Soft-delete, `deletedservices` and purge: `purge_soft_delete_on_destroy=true` is unsupported.
+- Soft-delete, `deletedservices`, and purge. Setting `purge_soft_delete_on_destroy=true` is unsupported.
 - Tier B SKUs: portalsettings, tenant access, `listSecrets`.
 - Subscriptions, users, groups, policies, loggers, diagnostics, certificates, gateways.
 - `apis/{name}` to `;rev=<current>` aliasing.
@@ -86,16 +86,16 @@ Each of these is a later PR. `Actions` lands with the first one that needs it (`
 
 ## Acceptance
 
-- **armtest:** Samples for all 7 types. `Coverage` passes. ChildCascade on service delete. RGCascade. ListSubscription for service.
-- **Unit tests** (`internal/services/apim`):
-    - Defaults idempotency: identity `principalId` stable across PUTs;
+- **armtest.** Samples for all 7 types. `Coverage` passes, covering ChildCascade on service delete, RGCascade, and ListSubscription for service.
+- **Unit tests (`internal/services/apim`).**
+    - Defaults idempotency, verifying that identity `principalId` is stable across PUTs;
     - URL derivation;
     - `;rev=` parsing;
     - PATCH sku change preserves properties.
-- **Terraform fixtures** (opt-in, `tests/terraform/azurerm/apim_consumption`, not in default CI):
+- **Terraform fixtures (opt-in, `tests/terraform/azurerm/apim_consumption`, not in default CI).**
     - `azurerm_api_management` (Consumption_0), `_api`, `_api_operation`, `_product`, `_named_value`, `_backend`.
-    - apply, then a second plan is empty, then destroy is clean.
-    - A matching `azapi_resource` fixture for service plus api, with `azapi_update_resource` on tags.
+    - Apply succeeds, a second plan is empty, and destroy is clean.
+    - A matching `azapi_resource` fixture covers service and api, with `azapi_update_resource` on tags.
 - Startup time and memory are unchanged within noise.
 
 ## PRs

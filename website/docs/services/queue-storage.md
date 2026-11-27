@@ -1,6 +1,6 @@
 # Queue Storage
 
-miniblue emulates Azure Queue Storage via data plane endpoints. Supports queue creation, message send, receive, peek, clear and delete with dequeue count tracking.
+miniblue emulates Azure Queue Storage via data plane endpoints. It supports creating, clearing and deleting queues, plus sending, receiving and peeking messages with dequeue count tracking.
 
 ## API endpoints
 
@@ -15,6 +15,6 @@ miniblue emulates Azure Queue Storage via data plane endpoints. Supports queue c
 
 ## Limitations
 
-- No visibility timeout on receive
-- No message TTL
-- No poison queue support
+- Visibility timeout on receive is not supported.
+- Message TTL is not supported.
+- Poison queues are not supported.

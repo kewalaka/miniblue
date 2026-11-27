@@ -1,10 +1,11 @@
-# ARM Resource Engine
+# ARM resource engine
 
 Most miniblue services are hand-written chi route trees over `map[string]interface{}` bodies. That does not scale to azapi-driven Terraform (arbitrary bodies, 100+ resource types, resources at management-group scope). `internal/arm` is a generic ARM resource engine that serves registered resource types with one shared implementation. It is introduced incrementally and coexists with the existing handlers.
 
 Status: the engine serves `Microsoft.Authorization/policyDefinitions@2023-04-01` at subscription scope. Everything else still uses its own handler.
 
-The agreed design direction for evolving the engine is recorded in [ARM foundations](arm-foundations/index.md).
+The design direction for evolving the engine is in [ARM foundations](arm-foundations/index.md).
+
 ## Request flow
 
 The engine is a chi **root middleware**, registered in `server.setupRoutes` before the authorization middleware:
@@ -23,13 +24,13 @@ Why a middleware and not chi sub-routes:
 - A registered type claims its own paths, so there is no route conflict with the existing `/subscriptions/{sub}/resourceGroups/...` trees. Migrating a handler is "register its type, delete its chi routes".
 - It must run before the authorization middleware, which 404s every `Microsoft.Authorization` path except role assignments and definitions.
 - It inherits request IDs, structured logging, panic recovery and Azure response headers.
-- It does not depend on `casemirror.go`: the parser is case-insensitive itself, and casemirror only rewrites paths that match a chi route, which engine paths do not. The engine works with or without it.
+- It does not depend on `casemirror.go`. The parser is case-insensitive itself, and casemirror only rewrites paths that match a chi route, which engine paths do not. The engine works with or without it.
 
-Services are gated like the others: types are registered only when the `policy` service is enabled (`SERVICES` env var, default all).
+Services are gated like the others. The server registers these types only when the `policy` service is enabled via `SERVICES` (default all).
 
 ## Resource IDs
 
-`arm.ParseID` is case-insensitive and scope-agnostic. Keywords are canonicalised, names keep the casing they were parsed with. Subscriptions, resource groups and management groups are modelled as resources, so a scope is just another ID.
+`arm.ParseID` is case-insensitive and scope-agnostic. Keywords are canonicalised, and names keep the casing they were parsed with. Subscriptions, resource groups and management groups are modelled as resources, so a scope is another ID.
 
 | Shape | Example |
 |-------|---------|
@@ -41,7 +42,7 @@ Services are gated like the others: types are registered only when the `policy` 
 | Extension resource | `{any resource ID}/providers/Microsoft.Authorization/.../x` |
 | Collection (list) | `{scope}/providers/{ns}/{type}` |
 
-The last `providers/{ns}/{type}` group is the resource; everything before it is its scope, parsed recursively. A `providers` segment only delimits a group at an even position (names sit at odd positions), so a resource may be named `providers`. `ID.ScopeKind()` classifies the scope, `ID.Key()` is the lowercased identity.
+The last `providers/{ns}/{type}` group is the resource; everything before it is its scope, parsed recursively. A `providers` segment only delimits a group at an even position (names sit at odd positions), so a resource may be named `providers`. `ID.ScopeKind()` classifies the scope, and `ID.Key()` returns the lowercased identity.
 
 ## Store
 
@@ -53,10 +54,10 @@ The last `providers/{ns}/{type}` group is the resource; everything before it is 
 | `arm:i:<lowercased parent>\|<lowercased type>` | sorted list of child resource keys |
 
 - Lookups are case-insensitive; the stored document keeps the casing of the PUT that created it, so `id` and `name` never change with the casing of later requests.
-- Listing reads the index and then each child: O(children). It does not call `ListByPrefix`, which is O(n) on the memory backend (upstream issue #95).
+- Listing reads the index and then each child in O(children). It does not call `ListByPrefix`, which is O(n) on the memory backend (upstream issue #95).
 - Only `DeleteTree` scans by prefix. The engine uses it only for types that declare `Children`, never on a plain delete.
 - Documents are stored as JSON text and decoded with `json.Number`. The file and Postgres backends decode stored values into `interface{}`, which turns numbers into `float64` and corrupts integers above 2^53; a string survives every backend unchanged. Request bodies are decoded the same way, so numbers round-trip verbatim. Hooks therefore see `json.Number`, not `float64`. Callers never share state with the backend.
-- Writes are atomic within the process. `Store.Update(id, fn)` runs the read, the change and the write under one store lock, shared with `Delete` and `DeleteTree`. PUT (create-or-replace, and keeping the creating casing) and PATCH (update-if-present, `404` if not) are each a single `Update`, so a concurrent DELETE or PUT cannot be undone or overwritten by a PATCH, and concurrent first PUTs agree on one creator. The lock is one mutex per `Store`, not per resource: operations are small and an emulator does not need more. It does not coordinate several miniblue processes sharing one Postgres.
+- Writes are atomic within the process. `Store.Update(id, fn)` runs the read, the change and the write under one store lock, shared with `Delete` and `DeleteTree`. PUT (create-or-replace, and keeping the creating casing) and PATCH (update-if-present, `404` if not) are each a single `Update`, so a concurrent DELETE or PUT cannot be undone or overwritten by a PATCH, and concurrent first PUTs agree on one creator. The lock is one mutex per `Store`, not per resource, because operations are small and an emulator does not need more. It does not coordinate several miniblue processes sharing one Postgres.
 - State lives only in the backend, so `/_miniblue/reset` clears it.
 
 ## Behaviour
@@ -94,7 +95,7 @@ reg.Register(arm.Type{
 | `Hooks.Validate` | `func(ID, body) error`, a returned error becomes a `400` |
 | `Hooks.Defaults` | `func(ID, body)`, fill server-side defaults after validation |
 
-Hooks are optional and exist for clients that drift on fields the server does not fill (azurerm). azapi tolerates raw passthrough, so `policyDefinitions` has none. Registration panics on a malformed or duplicate type, so mistakes surface at startup. Put registrations in `internal/services/<name>/` and enable them in `server.setupRoutes` behind `serviceEnabled`.
+Hooks are optional and exist for clients that drift on fields the server does not fill (azurerm). azapi tolerates raw passthrough, so `policyDefinitions` has none. Registration panics on a malformed or duplicate type, so mistakes fail at startup. Put registrations in `internal/services/<name>/` and enable them in `server.setupRoutes` behind `serviceEnabled`.
 
 Moving `policyDefinitions` to management-group scope is adding `arm.ScopeManagementGroup` to `Scopes`; the engine is covered at every scope by unit tests.
 
@@ -102,7 +103,7 @@ Moving `policyDefinitions` to management-group scope is adding `arm.ScopeManagem
 
 - `internal/arm`: parser (every scope shape, casing, resources named `providers`, invalid paths), store (memory, a JSON round-trip backend and a file reload; exact numbers; `Update` atomicity), engine CRUD with synthetic types at every scope, children, hooks, PATCH, concurrent PUT/PATCH/DELETE, error cases.
 - `tests/arm_policydefinition_test.go`: policyDefinitions through the real server, including coexistence with the authorization handlers.
-- `tests/terraform/azapi/policy_definition`: the acceptance test. `terraform apply`, `terraform plan -detailed-exitcode` must report no drift, GET with mangled URL casing must return the canonical `id`, `terraform destroy`, GET must be `404`. It runs in CI (`.github/workflows/acceptance.yml`) with pinned Terraform and azapi versions.
+- `tests/terraform/azapi/policy_definition`: the acceptance test. It runs `terraform apply`, checks that `terraform plan -detailed-exitcode` reports no drift, verifies that GET with mangled URL casing returns the canonical `id`, runs `terraform destroy`, and checks that GET returns `404`. It runs in CI (`.github/workflows/acceptance.yml`) with pinned Terraform and azapi versions.
 
 To run the acceptance test locally (Linux/macOS/WSL):
 

@@ -2,11 +2,11 @@
 
 miniblue covers two parts of Azure managed identity:
 
-1. The **Instance Metadata Service (IMDS)** token endpoint, used by Azure
-   SDKs running "inside" a VM/container to obtain an OAuth2 access token.
-2. **User-assigned managed identities** (`Microsoft.ManagedIdentity/userAssignedIdentities`),
+1. The Instance Metadata Service (IMDS) token endpoint, used by Azure
+   SDKs running inside a VM or container to obtain an OAuth2 access token.
+2. User-assigned managed identities (`Microsoft.ManagedIdentity/userAssignedIdentities`),
    used by Terraform and the Azure CLI to model identities as standalone ARM
-   resources that can be referenced from role assignments and VMs.
+   resources that role assignments and VMs can reference.
 
 ## IMDS endpoints (data plane)
 
@@ -20,8 +20,8 @@ curl "http://localhost:4566/metadata/identity/oauth2/token?resource=https://mana
   -H "Metadata: true"
 ```
 
-The token is a mock JWT — it is accepted by miniblue's other services but
-will not validate against real Azure.
+The token is a mock JWT. miniblue's other services accept it, but it will not
+validate against real Azure.
 
 ## User-assigned identity ARM endpoints
 
@@ -33,8 +33,8 @@ will not validate against real Azure.
 | `DELETE` | `/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{name}` | Delete |
 | `GET` | `/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities` | List in resource group |
 
-`principalId`, `clientId` and `tenantId` are deterministically derived from
-the identity's resource ID so they remain stable across restarts.
+miniblue derives `principalId`, `clientId` and `tenantId` deterministically
+from the identity's resource ID so they remain stable across restarts.
 
 ## Create a user-assigned identity
 
@@ -73,15 +73,15 @@ azlocal identity delete --resource-group myRG --name myid
 
 ## Limitations
 
-- The IMDS token is a static mock — it carries no real claims and is not
+- The IMDS token is a static mock. It carries no real claims and is not
   signed.
 - Federated identity credentials (`federatedIdentityCredentials`) are not
   implemented.
-- Virtual machines accept user-assigned identities only: a `SystemAssigned`
-  identity (alone or combined with `UserAssigned`) is rejected with `400`.
+- Virtual machines accept user-assigned identities only. miniblue rejects a
+  `SystemAssigned` identity, alone or combined with `UserAssigned`, with `400`.
   See [Virtual Machines](virtual-machines.md#managed-identity-attestation).
-- System-assigned identities are not modelled for any resource. Storage
-  accounts and AKS clusters echo the `identity` block they were sent without
-  validating or resolving it (AKS adds a placeholder `SystemAssigned` identity
-  when none is sent), and the token endpoint only issues identity-bound
-  tokens for user-assigned identities on VMs.
+- miniblue does not model system-assigned identities for any resource. Storage
+  accounts and AKS clusters echo the `identity` block they receive without
+  validating or resolving it, and AKS adds a placeholder `SystemAssigned`
+  identity when none is sent. The token endpoint issues identity-bound tokens
+  only for user-assigned identities on VMs.

@@ -1,6 +1,6 @@
 # Blob Storage
 
-miniblue emulates Azure Blob Storage with container and blob CRUD operations. Data is stored in memory.
+miniblue emulates Azure Blob Storage with container and blob CRUD operations. It stores data in memory.
 
 ## API endpoints
 
@@ -25,19 +25,20 @@ miniblue emulates Azure Blob Storage with container and blob CRUD operations. Da
 | `PUT` | `/blob/{account}/{container}/{blob}?comp=properties` | Set blob system properties (`x-ms-blob-*` headers) |
 | `PUT` | `/blob/{account}/{container}/{blob}?comp=lease` | Lease operations (acquire/renew/change/release/break) |
 
-Blob names may contain forward slashes (e.g. `env:/prod/terraform.tfstate`) —
-miniblue treats everything after the container segment as the blob name so
-multi-segment paths used by the Terraform `azurerm` backend work as expected.
+Blob names may contain forward slashes, for example
+`env:/prod/terraform.tfstate`. miniblue treats everything after the container
+segment as the blob name, so multi-segment paths used by the Terraform
+`azurerm` backend work.
 
 ### Authentication
 
 The blob data plane verifies Azure SharedKey signatures using the
 auto-generated account keys returned by `listKeys`. For local scripting
-where signing is impractical, set `MINIBLUE_DISABLE_SHAREDKEY_AUTH=1`
-(accepted values: `1`, `true`, `yes`, `on`) to skip **all** blob data-plane
-authentication, SharedKey and Bearer alike; tokens are never validated. This
-is **dev-only** — never enable it in an environment that pretends to model
-production.
+where signing is impractical, set `MINIBLUE_DISABLE_SHAREDKEY_AUTH=1` to skip
+all blob data-plane authentication for both SharedKey and Bearer requests.
+Accepted values are `1`, `true`, `yes`, and `on`. When enabled, miniblue does
+not validate tokens. Use this setting only in local development, never in an
+environment that models production.
 
 ## Create a container
 
@@ -97,10 +98,10 @@ The response includes Azure-compatible headers:
 curl "http://localhost:4566/blob/myaccount/mycontainer"
 ```
 
-`List Blobs` returns an Azure spec-compliant XML `EnumerationResults`
-document by default (matching what the Azure SDKs and the Terraform
-`azurerm` backend expect). The legacy JSON shape is preserved for tooling
-that requests `Accept: application/json`:
+`List Blobs` returns an Azure XML `EnumerationResults` document by default,
+matching the format expected by the Azure SDKs and the Terraform `azurerm`
+backend. For tooling that requests `Accept: application/json`, miniblue returns
+the legacy JSON format:
 
 ```json
 {
@@ -120,9 +121,9 @@ that requests `Accept: application/json`:
 
 ## Lease a blob
 
-miniblue implements the `Lease Blob` API (acquire, renew, change, release,
-break) needed by the Terraform `azurerm` backend to coordinate concurrent
-state writes.
+miniblue implements the `Lease Blob` API operations (`acquire`, `renew`,
+`change`, `release`, and `break`) needed by the Terraform `azurerm` backend to
+coordinate concurrent state writes.
 
 ```bash
 # Acquire a 60-second lease
@@ -141,8 +142,8 @@ curl -X PUT "http://localhost:4566/blob/myaccount/mycontainer/terraform.tfstate?
   -H "x-ms-lease-id: <lease-id>"
 ```
 
-Lease state is surfaced as `x-ms-lease-status`, `x-ms-lease-state` and
-`x-ms-lease-duration` headers on `GET`/`HEAD`/`List Blobs`.
+miniblue returns lease state in the `x-ms-lease-status`, `x-ms-lease-state`,
+and `x-ms-lease-duration` headers on `GET`, `HEAD`, and `List Blobs` responses.
 
 ## Delete a blob
 

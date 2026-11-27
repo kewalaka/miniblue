@@ -1,20 +1,20 @@
 # Contributing to miniblue
 
-Thanks for your interest in contributing! Here is how you can help.
+Read [CODING_STANDARDS.md](CODING_STANDARDS.md) before writing code and during code review.
 
-## Getting Started
+## Getting started
 
-1. Fork the repository
+1. Fork the repository.
 2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/miniblue.git`
 3. Create a branch: `git checkout -b feature/my-feature`
-4. Make your changes
-5. Test: `go build ./... && go test ./...`
-6. Commit and push
-7. Open a Pull Request
+4. Make your changes.
+5. Run the build and tests: `go build ./... && go test ./...`
+6. Commit and push your branch.
+7. Open a pull request.
 
-## Prerequisites for Python Examples
+## Prerequisites for Python examples
 
-On Debian/Ubuntu you need `python3-venv` (or the version-specific variant) before creating a virtualenv:
+On Debian and Ubuntu, install `python3-venv` (or the version-specific package) before creating a virtual environment:
 
 ```bash
 # Debian/Ubuntu
@@ -26,15 +26,15 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Adding a New Azure Service
+## Adding a new Azure service
 
-Each service lives in its own package under `internal/services/`. Follow the existing pattern:
+Each service is in its own package under `internal/services/`. Follow this pattern:
 
-1. Create `internal/services/yourservice/handler.go`
-2. Define a `Handler` struct with a `*store.Store` field
-3. Implement `NewHandler(s *store.Store) *Handler`
-4. Implement `Register(r chi.Router)` to set up routes
-5. Register your handler in `internal/server/server.go`
+1. Create `internal/services/yourservice/handler.go`.
+2. Define a `Handler` struct with a `*store.Store` field.
+3. Implement `NewHandler(s *store.Store) *Handler`.
+4. Implement `Register(r chi.Router)` to set up routes.
+5. Register your handler in `internal/server/server.go`.
 
 ### Example skeleton
 
@@ -59,24 +59,26 @@ func (h *Handler) Register(r chi.Router) {
 }
 ```
 
-## Code Style
+## Code style
 
-- Run `go vet ./...` before committing
-- Use standard Go formatting (`gofmt`)
-- Keep handlers focused - one service per package
-- Use regular dashes (-) not em dashes
-- British spelling in docs (colour, behaviour, etc.)
+Follow [CODING_STANDARDS.md](CODING_STANDARDS.md) before writing code and at review.
 
-## Reporting Bugs
+- Run `go vet ./...` before committing.
+- Use standard Go formatting (`gofmt`).
+- Keep handlers focused on one service per package.
+- Use regular hyphens (`-`), not em dashes.
+- Use British spelling in documentation (colour, behaviour).
+
+## Reporting bugs
 
 Use the bug report template when opening an issue. Include:
 - Steps to reproduce
-- Expected vs actual behaviour
+- Expected and actual behaviour
 - Your environment (OS, Go version, Docker or binary)
 
-## Suggesting Services
+## Suggesting services
 
-Open a feature request issue with the Azure service name and links to the relevant Azure REST API docs. This helps us match the real API surface.
+Open a feature request issue with the Azure service name and links to the relevant Azure REST API docs. This helps us match the real Azure API.
 
 ## License
 

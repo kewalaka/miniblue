@@ -1,6 +1,6 @@
 # Load Balancer
 
-miniblue emulates Azure Load Balancer via ARM endpoints. Supports frontend IP configurations, backend address pools, load balancing rules, probes, inbound NAT rules and outbound rules.
+miniblue emulates Azure Load Balancer via ARM endpoints. It supports frontend IP configurations, backend address pools, load balancing rules, probes, inbound NAT rules, and outbound rules.
 
 ## API endpoints
 
@@ -46,6 +46,6 @@ resource "azurerm_lb" "example" {
 
 ## Limitations
 
-- No actual traffic routing or health checking
-- Backend pool members are stored but not validated
+- No traffic routing or health checking
+- miniblue stores backend pool members without validating them
 - No cross-region load balancer support

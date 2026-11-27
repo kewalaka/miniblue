@@ -24,7 +24,7 @@
 - Account PUT returns 200 always (`handler.go:291`), which matches the spec but conflicts with the ADR-0006 "201 on create" rule. Account DELETE returns 202 (`handler.go:317`).
 - `documentEndpoint` is fixed to `https://{name}.documents.azure.com:443/` (`handler.go:239`).
 - Data plane is served at a miniblue path, `/cosmosdb/{account}/dbs/{db}/colls/{coll}/docs` (`handler.go:64`), not on the account endpoint host. `ReplaceDocument` (`handler.go:118`) upserts instead of returning 404 and can panic on a nil document; document DELETE returns 204 even when missing (`handler.go:139`); `QueryDocuments` (`handler.go:142`) returns every document with no SQL; there is no `If-Match` / 412, no PATCH, no `/dbs` or `/colls` CRUD, no pkranges.
-- Existing coverage: `tests/cosmosdb_test.go` (3 document tests), `tests/cosmosdbarm_test.go` (12 ARM tests), `internal/services/cosmosdb/handler_test.go`. No azurerm Cosmos fixture.
+- Existing coverage is `tests/cosmosdb_test.go` (3 document tests), `tests/cosmosdbarm_test.go` (12 ARM tests), and `internal/services/cosmosdb/handler_test.go`. There is no azurerm Cosmos fixture.
 
 ## Scenarios
 
@@ -32,28 +32,28 @@
 
 | ID | Behaviour (real Azure) | Expect | Tier | Notes |
 |---|---|---|---|---|
-| G1-T98 | PUT an account: `kind=GlobalDocumentDB`, `Session` consistency, `databaseAccountOfferType=Standard`, one location | PUT => 200 (spec: 200 only, LRO; no 201); `kind`, `databaseAccountOfferType=Standard`, `consistencyPolicy`, `documentEndpoint=https://{name}.documents.azure.com:443/`, `provisioningState=Succeeded` | T2 | Spec requires `properties.locations` and `databaseAccountOfferType`; error code on omission `(verify)`. Name is 3-50 characters, `^[a-z0-9]+(-[a-z0-9]+)*`. Needs a per-type create-status override. The endpoint host should follow miniblue's configured host `(verify)` |
+| G1-T98 | PUT an account with `kind=GlobalDocumentDB`, `Session` consistency, `databaseAccountOfferType=Standard`, and one location | PUT returns 200 (200 only in the spec, LRO, no 201); `kind`, `databaseAccountOfferType=Standard`, `consistencyPolicy`, `documentEndpoint=https://{name}.documents.azure.com:443/`, `provisioningState=Succeeded` | T2 | Spec requires `properties.locations` and `databaseAccountOfferType`; error code on omission `(verify)`. Name is 3 to 50 characters, `^[a-z0-9]+(-[a-z0-9]+)*`. Needs a per-type create-status override. The endpoint host should follow miniblue's configured host `(verify)` |
 | G1-T99 | Derived fields on a created account | `writeLocations` and `readLocations` computed from `locations` (failoverPriority 0 is the write region), each with `id`, `locationName`, `documentEndpoint`, `provisioningState`; `failoverPolicies` derived; `backupPolicy` Periodic with 240 minutes interval and 8 hours retention; `publicNetworkAccess=Enabled` | T2 | `Hooks.Defaults`. `backupStorageRedundancy` default `(verify)`. Property list from the spec: `readLocations`, `writeLocations`, `failoverPolicies`, `backupPolicy`, `publicNetworkAccess` |
 | G1-T100 | `disableLocalAuth` default and explicit true | Default reads back `false`; `true` is stored and echoed on GET | T2 | Property exists in the spec. Not echoed by miniblue today. Behaviour of the data plane when true is dropped (see Dropped) |
-| G1-T101 | PATCH tags, GET, DELETE, GET again | PATCH => 200 with new tags and other properties intact; GET => 200; DELETE => 200 or 204 in the sync engine (spec 202/204); GET after => 404 `ResourceNotFound` `(verify)` | T2 | `PatchMode` merge. The account-specific code `DatabaseAccountNotFound` is not an ARM code; exact real code for a missing account `(verify)` |
-| G1-T102 | List by RG and by subscription | Both 200 and contain the account | T1 | Sub-wide list is engine behaviour (ADR-0003) |
-| G1-T103 | POST `listKeys`, POST/GET `readonlykeys`, POST `listConnectionStrings`, POST `regenerateKey` with `keyKind`; an invalid `keyKind` | `listKeys` => `primaryMasterKey`, `secondaryMasterKey`; `readonlykeys` => `primaryReadonlyMasterKey`, `secondaryReadonlyMasterKey`; `listConnectionStrings` => `connectionStrings[]`; `regenerateKey` (spec 200/202; 200 in the sync engine) changes only the chosen key; invalid `keyKind` => 400 `InvalidKeyKind` `(verify)` | T2 | `Type.Actions` lands with the first consumer of this scenario. `keyKind` values: `primary`, `secondary`, `primaryReadonly`, `secondaryReadonly` (spec enum). Key format is base64 `(verify)`. Stable between calls until regenerated |
-| G1-T104 | HEAD `/providers/Microsoft.DocumentDB/databaseAccountNames/{name}` for a free and a used name | Free => 404; used => 200; no body either way | T2 | Spec: HEAD returns 200 or 404 only. The reason string `AlreadyExists` does not apply to a HEAD |
+| G1-T101 | PATCH tags, GET, DELETE, GET again | PATCH returns 200 with new tags and other properties intact; GET returns 200; DELETE returns 200 or 204 in the sync engine (spec allows 202 or 204); GET after returns 404 `ResourceNotFound` `(verify)` | T2 | `PatchMode` merge. The account-specific code `DatabaseAccountNotFound` is not an ARM code; exact real code for a missing account `(verify)` |
+| G1-T102 | List by RG and by subscription | Both return 200 and contain the account | T1 | Sub-wide list is engine behaviour (ADR-0003) |
+| G1-T103 | POST `listKeys`, POST/GET `readonlykeys`, POST `listConnectionStrings`, POST `regenerateKey` with `keyKind`; an invalid `keyKind` | `listKeys` returns `primaryMasterKey`, `secondaryMasterKey`; `readonlykeys` returns `primaryReadonlyMasterKey`, `secondaryReadonlyMasterKey`; `listConnectionStrings` returns `connectionStrings[]`; `regenerateKey` (spec allows 200 or 202; 200 in the sync engine) changes only the chosen key; invalid `keyKind` returns 400 `InvalidKeyKind` `(verify)` | T2 | `Type.Actions` lands with the first consumer of this scenario. `keyKind` values: `primary`, `secondary`, `primaryReadonly`, `secondaryReadonly` (spec enum). Key format is base64 `(verify)`. Stable between calls until regenerated |
+| G1-T104 | HEAD `/providers/Microsoft.DocumentDB/databaseAccountNames/{name}` for a free and a used name | Free returns 404; used returns 200; no body either way | T2 | HEAD returns 200 or 404 only in the spec. The reason string `AlreadyExists` does not apply to a HEAD |
 
 ### sqlDatabases
 
 | ID | Behaviour (real Azure) | Expect | Tier | Notes |
 |---|---|---|---|---|
-| G1-T105 | PUT, GET, list and DELETE a SQL database; PUT under a missing account; GET a missing database | PUT => 200 (spec 200/202) echoing `properties.resource.id`; GET 200; list contains it; DELETE => 200 or 204 (spec 202/204); missing account => 404 `ParentResourceNotFound`; missing database => 404 `ResourceNotFound` | T1/T2 | Parent and not-found rows are generic (T1); the body echo is T2. Spec requires `properties.resource`. Service-specific `*NotFound` codes are not ARM codes |
-| G1-T106 | GET and PUT `sqlDatabases/{db}/throughputSettings/default` | GET => 200 with `properties.resource.throughput` or `autoscaleSettings`; PUT (spec 200/202) sets it; a later GET shows the new value | T2 | PUT needs `throughput` or `autoscaleSettings`, not both. GET for a database with no dedicated throughput is 404 in real Azure `(verify)`. Minimum values `(verify)` |
+| G1-T105 | PUT, GET, list, and DELETE a SQL database; PUT under a missing account; GET a missing database | PUT returns 200 (spec allows 200 or 202) echoing `properties.resource.id`; GET returns 200; list contains it; DELETE returns 200 or 204 (spec allows 202 or 204); missing account returns 404 `ParentResourceNotFound`; missing database returns 404 `ResourceNotFound` | T1/T2 | Parent and not-found rows are generic (T1); the body echo is T2. Spec requires `properties.resource`. Service-specific `*NotFound` codes are not ARM codes |
+| G1-T106 | GET and PUT `sqlDatabases/{db}/throughputSettings/default` | GET returns 200 with `properties.resource.throughput` or `autoscaleSettings`; PUT (spec allows 200 or 202) sets it; a later GET shows the new value | T2 | PUT needs `throughput` or `autoscaleSettings`, not both. GET for a database with no dedicated throughput is 404 in real Azure `(verify)`. Minimum values `(verify)` |
 
 ### sqlDatabases/containers
 
 | ID | Behaviour (real Azure) | Expect | Tier | Notes |
 |---|---|---|---|---|
-| G1-T107 | PUT a container with `partitionKey.paths=["/pk"]`; GET, list, DELETE; missing container; missing database | PUT => 200 (spec 200/202) echoing `partitionKey.paths`, `kind` (default `Hash`) and `version` (1 or 2); GET and list match; DELETE => 200 or 204; missing container => 404 `ResourceNotFound`; missing database => 404 `ParentResourceNotFound` | T2 | Spec requires `resource.id`. Echo must come from the request body, not a constant. Default `indexingPolicy` shape `(verify)` |
+| G1-T107 | PUT a container with `partitionKey.paths=["/pk"]`; GET, list, DELETE; missing container; missing database | PUT returns 200 (spec allows 200 or 202) echoing `partitionKey.paths`, `kind` (default `Hash`), and `version` (1 or 2); GET and list match; DELETE returns 200 or 204; missing container returns 404 `ResourceNotFound`; missing database returns 404 `ParentResourceNotFound` | T2 | Spec requires `resource.id`. Echo must come from the request body, not a constant. Default `indexingPolicy` shape `(verify)` |
 | G1-T108 | GET and PUT `containers/{c}/throughputSettings/default` | As the database throughput row, on the container; a container created with throughput 400 reads back 400, and a PUT with a new value is reflected | T2 | Dedicated container throughput only. Migrate POSTs are not covered by the source `(verify)` |
-| G1-T110 | `azurerm_cosmosdb_account` + `azurerm_cosmosdb_sql_database` + `azurerm_cosmosdb_sql_container` (partition key `/pk`, throughput 400) | apply then refresh => clean plan; endpoint is `https://{name}.documents.*`; throughput reads back 400 | T3 | New fixture `tests/terraform/azurerm/cosmosdb`. Needs the account, key, database and container rows first. Provider read calls (keys, connection strings, throughput) `(verify)` |
+| G1-T110 | `azurerm_cosmosdb_account`, `azurerm_cosmosdb_sql_database`, and `azurerm_cosmosdb_sql_container` (partition key `/pk`, throughput 400) | apply then refresh produces a clean plan; endpoint is `https://{name}.documents.*`; throughput reads back 400 | T3 | New fixture `tests/terraform/azurerm/cosmosdb`. Needs the account, key, database, and container rows first. Provider read calls (keys, connection strings, throughput) `(verify)` |
 
 ### Data plane (bespoke)
 
@@ -61,17 +61,17 @@ The data plane keeps its own routes and never migrates to the engine (ADR-0007).
 
 | ID | Behaviour (real Azure) | Expect | Tier | Notes |
 |---|---|---|---|---|
-| G1-T111 | GET `/` on the account endpoint | 200 with account properties: writable and readable locations and consistency policy | T2 | bespoke; shape `(verify)` |
-| G1-T112 | `/dbs`: create, read, list, delete | Create => 201; read => 200; list contains it; delete => 204 then 404 | T2 | bespoke. Success codes per the Cosmos REST API docs `(verify)` |
-| G1-T113 | `/colls`: create, read, replace, delete, list; cross-plane visibility | 201; 200; replace => 200; delete => 204; a database or container made through ARM is visible on the data plane, and the reverse | T2 | bespoke. Needs the ARM and data-plane stores to share state |
-| G1-T114 | Documents: create; duplicate id; missing id or missing partition key; read; replace; delete; stale `If-Match` | Create => 201; duplicate => 409; missing id or partition key => 400; read => 200; replace => 200 (404 if the document is absent, never an upsert); delete => 204 then 404; stale `If-Match` => 412 `PreconditionFailed` | T2 | bespoke. Replace and delete on a missing document are 404 `(verify)` |
+| G1-T111 | GET `/` on the account endpoint | returns 200 with account properties: writable and readable locations and consistency policy | T2 | bespoke; shape `(verify)` |
+| G1-T112 | `/dbs` create, read, list, and delete | Create returns 201; read returns 200; list contains it; delete returns 204 then 404 | T2 | bespoke. Success codes per the Cosmos REST API docs `(verify)` |
+| G1-T113 | `/colls` create, read, replace, delete, list, and cross-plane visibility | Create returns 201; read returns 200; replace returns 200; delete returns 204; a database or container made through ARM is visible on the data plane, and the reverse | T2 | bespoke. Needs the ARM and data-plane stores to share state |
+| G1-T114 | Documents create, duplicate ID, missing ID or missing partition key, read, replace, delete, and stale `If-Match` | Create returns 201; duplicate returns 409; missing ID or partition key returns 400; read returns 200; replace returns 200 (404 if the document is absent, never an upsert); delete returns 204 then 404; stale `If-Match` returns 412 `PreconditionFailed` | T2 | bespoke. Replace and delete on a missing document are 404 `(verify)` |
 | G1-T115 | List documents; PATCH operations | List contains the created items; a PATCH with an operation changes only the targeted field | T2 | bespoke. Operation set (`set`, `replace`, `add`, `remove`, `incr`) `(verify)` |
-| G1-T116 | SQL query: `SELECT *`, `WHERE` with equality, `>`, `IN`, `IS_DEFINED`, parameterised queries | Only matching documents returned | T2 | bespoke; needs a SQL parser. Query is a POST with the query content type and `x-ms-documentdb-isquery` `(verify)` |
-| G1-T117 | SQL query: field projection, `SELECT VALUE`, `ORDER BY` ascending and descending, `COUNT` | Results have the requested shape and order | T2 | bespoke |
-| G1-T118 | SQL query pagination with a continuation token | Walking every page yields each document exactly once | T2 | bespoke; `x-ms-continuation` and `x-ms-max-item-count` `(verify)` |
-| G1-T119 | SQL query: `GROUP BY` with `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`; `ORDER BY` on an aggregate or group field; empty collection | One row per group; an empty collection yields an empty result | T2 | bespoke |
+| G1-T116 | SQL query with `SELECT *`, `WHERE` equality, `>`, `IN`, `IS_DEFINED`, and parameterised queries | Only matching documents returned | T2 | bespoke; needs a SQL parser. Query is a POST with the query content type and `x-ms-documentdb-isquery` `(verify)` |
+| G1-T117 | SQL query with field projection, `SELECT VALUE`, `ORDER BY` ascending and descending, and `COUNT` | Results have the requested shape and order | T2 | bespoke |
+| G1-T118 | SQL query pagination with a continuation token | Walking every page yields each document once | T2 | bespoke; `x-ms-continuation` and `x-ms-max-item-count` `(verify)` |
+| G1-T119 | SQL query with `GROUP BY` (`COUNT`, `SUM`, `AVG`, `MIN`, `MAX`), `ORDER BY` on an aggregate or group field, and empty collection | One row per group; an empty collection yields an empty result | T2 | bespoke |
 | G1-T120 | TTL expiry on documents | An expired document is no longer readable | T2 | bespoke; test the purge function as a unit. Real expiry is lazy and approximate, so assert eventual absence |
-| G1-T121 | GET `.../colls/{c}/pkranges` | 200 with at least one partition key range | T2 | bespoke; SDKs call it before cross-partition queries. Response shape `(verify)` |
+| G1-T121 | GET `.../colls/{c}/pkranges` | returns 200 with at least one partition key range | T2 | bespoke; SDKs call it before cross-partition queries. Response shape `(verify)` |
 
 ## Pitfalls
 
@@ -80,8 +80,8 @@ The data plane keeps its own routes and never migrates to the engine (ADR-0007).
 - Database and container PUT bodies carry `properties.resource`. Echo it. A constant partition key makes azurerm detect drift and force a replace.
 - `throughputSettings` PUT takes `throughput` or `autoscaleSettings`, never both. GET on a resource without dedicated throughput can be 404 `(verify)`.
 - `listKeys` is a POST. `readonlykeys` accepts GET and POST. Static keys make `regenerateKey` untestable; the chosen key must change and the others must not.
-- `regenerateKey` is a spec LRO (200/202). The sync engine returns 200.
-- HEAD on `databaseAccountNames` returns no body: 404 means the name is free.
+- `regenerateKey` is a spec LRO (200 or 202). The sync engine returns 200.
+- HEAD on `databaseAccountNames` returns no body, and 404 means the name is free.
 - Account `kind` can only be set at creation. PATCH merges and does not change `location`.
 - Document replace is not an upsert, and DELETE on a missing document is 404.
 - Data-plane auth (master-key HMAC, RBAC) is separate from ARM auth and is not modelled here.

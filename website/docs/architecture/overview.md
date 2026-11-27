@@ -8,7 +8,7 @@
 
 [Download .drawio source](miniblue-architecture.drawio)
 
-## Request Flow
+## Request flow
 
 ```
 Client (curl/azlocal/Terraform/SDK)
@@ -48,7 +48,7 @@ Store (Backend interface)
     +-- PostgresBackend (when DATABASE_URL is set)
 ```
 
-## Project Structure
+## Project structure
 
 ```
 cmd/
@@ -93,25 +93,25 @@ internal/
     table/        Table Storage (data plane)
 ```
 
-## Adding a New Service
+## Adding a new service
 
-1. Create `internal/services/yourservice/handler.go`
-2. Implement `NewHandler(s *store.Store) *Handler` and `Register(r chi.Router)`
-3. Register in `internal/server/server.go` (import + call in `setupRoutes`)
-4. Add to health endpoint service list
-5. Add to `supportedProviders` in subscriptions handler (if ARM)
-6. Write tests in `tests/yourservice_test.go`
+1. Create `internal/services/yourservice/handler.go`.
+2. Implement `NewHandler(s *store.Store) *Handler` and `Register(r chi.Router)`.
+3. Register the service in `internal/server/server.go` (import and call in `setupRoutes`).
+4. Add the service to the health endpoint service list.
+5. Add the provider to `supportedProviders` in the subscriptions handler (if ARM).
+6. Write tests in `tests/yourservice_test.go`.
 
 ## Storage
 
 The `Store` wraps a `Backend` interface. All handlers use `*store.Store` without knowing which backend is active.
 
-- **Set/Get/Delete**: Key-value operations
-- **ListByPrefix**: Used for listing resources within a scope (e.g., all VNets in a resource group)
-- **DeleteByPrefix**: Cascade deletes (e.g., deleting a resource group removes all child resources)
+- **Set, Get, and Delete.** Key-value operations.
+- **ListByPrefix.** Lists resources within a scope, such as all VNets in a resource group.
+- **DeleteByPrefix.** Runs cascade deletes, such as removing all child resources when deleting a resource group.
 
-Keys follow the pattern: `service:subscriptionId:resourceGroupName:resourceName`
+Keys follow the pattern `service:subscriptionId:resourceGroupName:resourceName`.
 
 ## Auth
 
-miniblue returns mock JWT tokens with valid structure (`header.payload.signature`). The payload includes `oid`, `tid`, `appid` claims that Terraform and Azure SDKs parse. No real token validation is performed.
+miniblue returns mock JWT tokens with valid structure (`header.payload.signature`). The payload includes `oid`, `tid`, and `appid` claims that Terraform and Azure SDKs parse. miniblue does not validate tokens.

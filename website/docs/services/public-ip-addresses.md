@@ -1,6 +1,6 @@
 # Public IP Addresses
 
-miniblue emulates Azure Public IP Addresses via ARM endpoints. IPs are auto-generated with mock addresses in the `20.0.x.x` range.
+miniblue emulates Azure Public IP Addresses via ARM endpoints. miniblue generates mock IP addresses in the `20.0.x.x` range.
 
 ## API endpoints
 
@@ -40,6 +40,6 @@ resource "azurerm_public_ip" "example" {
 
 ## Limitations
 
-- IP addresses are mock values in the `20.0.x.x` range
-- DNS settings are stored but not functional
-- No availability zone support
+- IP addresses are mock values in the `20.0.x.x` range.
+- DNS settings are stored but not applied.
+- Availability zones are not supported.

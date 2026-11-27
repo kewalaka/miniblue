@@ -85,7 +85,7 @@ Response (`201 Created`):
 curl "http://localhost:4566/servicebus/my-namespace/queues/my-queue/messages/head"
 ```
 
-Returns the oldest message in the queue. Returns `204 No Content` if the queue is empty.
+The endpoint returns the oldest message in the queue, or `204 No Content` if the queue is empty.
 
 !!! note
     Receiving a message does not delete it from the queue. Messages persist until the queue is deleted.
@@ -164,7 +164,7 @@ azlocal servicebus topic send --namespace my-ns --name my-topic \
 azlocal servicebus topic delete --namespace my-ns --name my-topic
 ```
 
-## Full example -- task queue
+## Task queue example
 
 ```bash
 #!/bin/bash
@@ -192,8 +192,8 @@ curl -s "http://localhost:4566/servicebus/${NS}/queues/${QUEUE}" | jq .propertie
 
 ## Limitations
 
-- Topic subscriptions are not yet implemented (topics accept messages but there is no subscription/consumer model)
-- No dead-letter queue
-- No message scheduling or deferral
-- No message sessions or duplicate detection
-- Receive is a peek operation -- messages are not removed from the queue
+- Topic subscriptions are not implemented. Topics accept messages, but there is no subscription or consumer model.
+- Dead-letter queues are not supported.
+- Message scheduling and deferral are not supported.
+- Message sessions and duplicate detection are not supported.
+- Receive is a peek operation, so messages are not removed from the queue.

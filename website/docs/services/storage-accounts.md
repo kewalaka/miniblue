@@ -45,16 +45,16 @@ resource "azurerm_storage_account" "example" {
 miniblue supports Azure shared key authentication for storage data plane operations. Keys are auto-generated when a storage account is created.
 
 For local scripting where SharedKey signing is impractical, set
-`MINIBLUE_DISABLE_SHAREDKEY_AUTH=1` to skip **all** blob data-plane
-authentication (SharedKey and Bearer); tokens are never validated. This is
-**only** for development workflows — never enable it in an environment that
-pretends to model production.
+`MINIBLUE_DISABLE_SHAREDKEY_AUTH=1` to skip all blob data-plane
+authentication, including SharedKey and Bearer tokens, without validating
+tokens. Use this setting only for development workflows, never in an
+environment meant to match production.
 
 ## Lifecycle management policies
 
 miniblue accepts and round-trips Azure storage lifecycle management policies
-via the `managementPolicies/default` sub-resource. The rule bodies are stored
-verbatim but are **not enforced** against blob data.
+via the `managementPolicies/default` sub-resource. miniblue stores the rule
+bodies verbatim and does not enforce them against blob data.
 
 ```bash
 curl -X PUT "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Microsoft.Storage/storageAccounts/mystorageacct/managementPolicies/default?api-version=2023-05-01" \
@@ -87,7 +87,7 @@ azlocal storage account management-policy delete --name mystorageacct --resource
 
 ## Limitations
 
-- No private endpoints or firewall rules
-- No geo-replication
-- Management policies are stored but not enforced
-- File storage data plane is not yet implemented
+- Private endpoints and firewall rules are not supported.
+- Geo-replication is not supported.
+- Management policies are stored but not enforced.
+- The file storage data plane is not implemented.

@@ -1,6 +1,6 @@
 # Pulumi
 
-miniblue works with Pulumi using dynamic providers. No Azure credentials needed -- the providers make HTTP calls directly to miniblue's REST API.
+miniblue works with Pulumi through dynamic providers. No Azure credentials are needed because the providers send HTTP calls to miniblue's REST API.
 
 ## Prerequisites
 
@@ -31,9 +31,9 @@ pulumi up --yes --skip-preview
 
 ## How it works
 
-The official `pulumi-azure-native` provider requires real Azure credentials and HTTPS endpoints. Instead, miniblue uses **Pulumi dynamic providers** -- lightweight Python classes that make HTTP calls to `http://localhost:4566`.
+The official `pulumi-azure-native` provider requires real Azure credentials and HTTPS endpoints. Instead, miniblue uses Pulumi dynamic providers, which are Python classes that send HTTP calls to `http://localhost:4566`.
 
-Each provider implements `create()` and `delete()` methods that call the miniblue REST API directly.
+Each provider implements `create()` and `delete()` methods that call the miniblue REST API.
 
 ## Example
 

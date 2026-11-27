@@ -60,7 +60,7 @@ curl "http://localhost:4566/subscriptions/sub1/resourcegroups/myRG?api-version=2
 curl -I "http://localhost:4566/subscriptions/sub1/resourcegroups/myRG?api-version=2020-06-01"
 ```
 
-Returns `204 No Content` if it exists, `404 Not Found` otherwise.
+The endpoint returns `204 No Content` if the resource group exists and `404 Not Found` otherwise.
 
 ## Update tags
 
@@ -104,7 +104,7 @@ Response:
 curl -X DELETE "http://localhost:4566/subscriptions/sub1/resourcegroups/myRG?api-version=2020-06-01"
 ```
 
-Returns `202 Accepted` with a `Location` header for async polling. Deleting a resource group also cleans up all resources inside it (VNets, subnets, DNS zones, ACR registries, functions, Event Grid topics).
+The endpoint returns `202 Accepted` with a `Location` header for async polling. Deleting a resource group also deletes all resources inside it, including VNets, subnets, DNS zones, ACR registries, functions and Event Grid topics.
 
 ## List resources in a group
 
@@ -113,7 +113,7 @@ curl "http://localhost:4566/subscriptions/sub1/resourcegroups/myRG/resources?api
 ```
 
 !!! info
-    This endpoint currently returns an empty array. It exists for Terraform compatibility (the azurerm provider calls it before deleting a resource group).
+    This endpoint returns an empty array. It exists for Terraform compatibility because the azurerm provider calls it before deleting a resource group.
 
 ## azlocal
 

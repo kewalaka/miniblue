@@ -134,7 +134,7 @@ See [Configuration](../getting-started/configuration.md) for all available varia
 
 ## Accessing the TLS certificate
 
-miniblue generates a self-signed certificate inside the container. To use it on the host (e.g. for Terraform), mount the cert directory:
+miniblue generates a self-signed certificate inside the container. To use it on the host, for example with Terraform, mount the certificate directory:
 
 ```bash
 docker run -d \
@@ -174,7 +174,7 @@ make docker-run
 | Exposed port | `4566` |
 | User | `65534` (non-root, scratch) |
 
-The image uses a two-stage build: Go compilation in `golang:1.26-alpine`, then the static binary is copied into a scratch (empty) image.
+The image uses a two-stage build. It compiles the Go binary in `golang:1.26-alpine` and copies the static binary into a scratch image.
 
 ## Stopping and removing
 

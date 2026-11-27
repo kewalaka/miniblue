@@ -16,13 +16,13 @@
   <a href="https://miniblue.io"><img src="https://img.shields.io/badge/docs-miniblue.io-blue" alt="Docs"></a>
 </p>
 
-<p align="center">Local Azure development. One binary. No account needed.</p>
+<p align="center">Run local Azure services from one binary without an Azure account.</p>
 
 > **Disclaimer:** miniblue is an independent open-source project. It is not affiliated with, endorsed by, or associated with Microsoft or Azure.
 
 ---
 
-## Quick Start
+## Quick start
 
 ```bash
 # Homebrew
@@ -41,11 +41,11 @@ azlocal keyvault secret set --vault myvault --name db-pass --value secret123
 azlocal storage blob upload --account myacct --container data --name file.txt --data "Hello!"
 ```
 
-No Azure account or credentials needed.
+No Azure account or credentials are needed.
 
 ## What it does
 
-32 Azure services emulated behind a single port. Works with Terraform, Pulumi, Azure SDKs, and curl.
+miniblue emulates 32 Azure services behind a single port. It works with Terraform, Pulumi, Azure SDKs, and curl.
 
 | Service | Service | Service |
 |---------|---------|---------|
@@ -91,12 +91,12 @@ provider "azurerm" {
 }
 ```
 
-Targets azurerm v4/v5 (CI runs 5.10.0); `skip_provider_registration` was removed in v4. See [examples/terraform/](examples/terraform/) for full examples including three-tier, serverless, and microservices scenarios. Go on Windows ignores `SSL_CERT_FILE`, so run Terraform from WSL2/Linux or import the cert into the Windows store.
+This configuration targets azurerm v4 and v5 (CI runs 5.10.0). The `skip_provider_registration` argument was removed in v4. See [examples/terraform/](examples/terraform/) for full examples, including three-tier, serverless, and microservices scenarios. Go on Windows ignores `SSL_CERT_FILE`, so run Terraform from WSL2 or Linux, or import the certificate into the Windows certificate store.
 
-## Real Backends (optional)
+## Real backends (optional)
 
-| Feature | Env var |
-|---------|---------|
+| Feature | Environment variable |
+|---------|----------------------|
 | Real PostgreSQL databases | `POSTGRES_URL=postgres://user:pass@host:5432/db` |
 | Real Redis connectivity | `REDIS_URL=redis://host:6379` |
 | Real Docker containers (ACI) | Docker daemon running |
@@ -104,7 +104,7 @@ Targets azurerm v4/v5 (CI runs 5.10.0); `skip_provider_registration` was removed
 | File persistence | `PERSISTENCE=1` |
 | Postgres persistence | `DATABASE_URL=postgres://...` |
 
-Real backends shell out to the host Docker daemon. The default `moabukar/miniblue:latest` image is `FROM scratch` and has no docker CLI, so use the binary install (Homebrew, releases page) **or** the `full` Docker target which adds it:
+Real backends shell out to the host Docker daemon. The default `moabukar/miniblue:latest` image is `FROM scratch` and has no Docker CLI, so use the binary install (Homebrew or the releases page) or the `full` Docker target, which includes it:
 
 ```bash
 docker build --target=full -t miniblue:full .
@@ -113,7 +113,7 @@ docker run -v /var/run/docker.sock:/var/run/docker.sock \
   -e AKS_BACKEND=k3s miniblue:full
 ```
 
-miniblue tears down its k3s containers on graceful shutdown (`SIGTERM`/`SIGINT`/`docker stop`); orphans from a forced kill are reaped by the next start.
+miniblue stops and removes its k3s containers on graceful shutdown (`SIGTERM`, `SIGINT`, or `docker stop`). The next startup removes any leftover containers from a forced kill.
 
 ## Configuration
 
@@ -125,11 +125,11 @@ miniblue tears down its k3s containers on graceful shutdown (`SIGTERM`/`SIGINT`/
 | `SERVICES` | all | Comma-separated list to enable selectively |
 | `PERSISTENCE` | off | Set to `1` for file-based persistence |
 
-Full configuration reference in the [docs](https://miniblue.io/getting-started/configuration/).
+See the full configuration reference in the [docs](https://miniblue.io/getting-started/configuration/).
 
 ## Documentation
 
-Full docs at **[miniblue.io](https://miniblue.io)** covering:
+Full documentation is at [miniblue.io](https://miniblue.io):
 
 - [Installation](https://miniblue.io/getting-started/installation/) (Homebrew, Docker, binary, Helm)
 - [Quick Start](https://miniblue.io/getting-started/quickstart/)
@@ -150,4 +150,4 @@ If miniblue is useful to you, get in touch, and let me know if you'd be interest
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

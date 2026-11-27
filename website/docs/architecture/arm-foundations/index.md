@@ -1,12 +1,12 @@
 # miniblue ARM architecture review
 
-Reviewed: `main` @ d86ed0d. Scope: control-plane foundations ahead of roughly 25 new ARM types, APIM, and azapi-heavy use. Review only. No repo changes.
+This review covers `main` at `d86ed0d` and focuses on control-plane foundations ahead of roughly 25 new ARM types, APIM, and azapi-heavy use. It is a review only, with no repo changes.
 
 ## Verdict
 
 **Evolve the engine. Don't rewrite it.** The brief's hypothesis is mostly right, but it has the wrong top risk.
 
-1. **The top risk is the store value contract, not missing hooks.** Memory stores Go structs by reference. File and Postgres hand back decoded `map[string]any`: file does so after a restart, Postgres always. Handlers type-assert structs, so after a `PERSISTENCE=1` restart, or on Postgres, they panic or silently drop data today. Blob payloads are not persisted at all. The test suite cannot see any of it. Every new type adds to this. Fix it first (ADR-004).
+1. **The top risk is the store value contract, not missing hooks.** Memory stores Go structs by reference. File and Postgres hand back decoded `map[string]any`. File does so after a restart, and Postgres does so always. Handlers type-assert structs, so after a `PERSISTENCE=1` restart, or on Postgres, they panic or silently drop data today. Blob payloads are not persisted at all. The test suite cannot see any of it. Every new type adds to this. Fix it first (ADR-004).
 2. **The engine has no transport-independent entry point.** It is an `http.Handler` and nothing more. Deployments therefore re-dispatch over `httptest`. RBAC and policy have nowhere to sit, and hooks are blind (no current doc, untyped errors, outside the write lock). Add `Engine.Do` (ADR-003).
 3. **Coexistence is cheap if it is mechanically guarded.** It is not a long, risky period if three guards land in Phase 1: a legacy ARM route freeze, a boot-time engine/chi overlap panic, and scope cleaners for RG cascade. With those in place, migration becomes optional per type rather than a deadline. Data-plane handlers never migrate. vm, aks and sites may stay bespoke indefinitely (ADR-007).
 4. **Remove machinery, don't add it.** Drop the engine's list index in favour of a prefix scan. Make api-version lists metadata, not gates. Unknown types stay strict, and passthrough is designed but not built until someone needs it.
@@ -75,13 +75,13 @@ These are tagged `(verify)` in the ADRs. Resolve each one with a single real ARM
 
 - The real ARM error code for an unregistered type (`InvalidResourceType` vs `NoRegisteredProviderFound`).
 - Role assignment error codes: invalid name, missing role definition, invalid principal, update not permitted.
-- Role assignment list with no `$filter`: confirm it returns at, above and below scope. Confirm the `InvalidFilter` code.
-- `PolicyDefinitionNotFound` on a policyAssignment with a bad definition id.
-- APIM validation error code (`ValidationError`) and required-field rules.
-- ARM `NotFound` and `AuthorizationFailed` message wording.
-- `%2F` and `%3B` handling. `ParseID` uses the decoded `r.URL.Path`. `;rev=` works decoded, but an encoded `/` inside a name would split. Consider `RawPath` if a type needs it.
-- A user-assigned identity in `userAssignedIdentities` that does not exist: rejected (which code) or echoed (ADR-0003).
-- A template resource without `apiVersion`: confirm `InvalidTemplate` (ADR-0001).
+- Confirm whether a role assignment list with no `$filter` returns assignments at, above, and below scope, and confirm the `InvalidFilter` code.
+- Confirm `PolicyDefinitionNotFound` on a policyAssignment with a bad definition id.
+- Confirm the APIM validation error code (`ValidationError`) and required-field rules.
+- Confirm ARM `NotFound` and `AuthorizationFailed` message wording.
+- Check `%2F` and `%3B` handling. `ParseID` uses the decoded `r.URL.Path`. `;rev=` works decoded, but an encoded `/` inside a name would split. Consider `RawPath` if a type needs it.
+- Confirm whether a missing user-assigned identity in `userAssignedIdentities` is rejected (and with which code) or echoed (ADR-0003).
+- Confirm that a template resource without `apiVersion` returns `InvalidTemplate` (ADR-0001).
 
 Resolved during review:
 

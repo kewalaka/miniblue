@@ -1,6 +1,6 @@
 # DNS Zones
 
-miniblue emulates Azure DNS zones and record sets. Creating a zone automatically generates SOA and NS records, matching Azure's behaviour.
+miniblue emulates Azure DNS zones and record sets. Creating a zone generates SOA and NS records, matching Azure's behaviour.
 
 ## API endpoints
 
@@ -13,7 +13,7 @@ miniblue emulates Azure DNS zones and record sets. Creating a zone automatically
 | `DELETE` | `/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/dnsZones/{zone}` | Delete |
 | `GET` | `/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/dnsZones` | List |
 
-### Record Sets
+### Record sets
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -48,7 +48,7 @@ Response (`201 Created`):
 ```
 
 !!! note
-    miniblue automatically creates SOA and NS records for new zones, just like Azure does.
+    miniblue creates SOA and NS records for every new zone, matching Azure's behaviour.
 
 ## Get a DNS zone
 
@@ -164,7 +164,7 @@ Deleting a zone also deletes all its record sets.
 
 ## Supported record types
 
-miniblue accepts any record type in the URL path. The `properties` payload is stored as-is. Common types:
+miniblue accepts any record type in the URL path and stores the `properties` payload as-is. Common types:
 
 | Type | Example property |
 |------|-----------------|

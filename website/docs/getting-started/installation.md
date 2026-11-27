@@ -5,7 +5,7 @@
 **To run miniblue (basic):**
 
 - Docker **or** Go 1.26+ (for building from source)
-- That's it. No Azure account, no credentials, no config.
+- No Azure account, credentials, or configuration are required.
 
 **For real backends (optional):**
 
@@ -20,7 +20,7 @@
 **For Terraform:**
 
 - Terraform 1.5+
-- Trust the self-signed cert: `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.miniblue/cert.pem` (macOS, one-time)
+- Trust the self-signed certificate: `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.miniblue/cert.pem` (macOS, one-time)
 
 **For Pulumi:**
 
@@ -141,6 +141,6 @@ curl -X DELETE "http://localhost:4566/subscriptions/sub1/resourcegroups/test-rg?
 
 ## Next steps
 
-- [Quick Start](quickstart.md) -- your first 5 minutes with miniblue
-- [Configuration](configuration.md) -- ports, environment variables, TLS
-- [Docker guide](../guides/docker.md) -- docker-compose, health checks
+- [Quick start](quickstart.md): run your first commands in 5 minutes.
+- [Configuration](configuration.md): configure ports, environment variables, and TLS.
+- [Docker guide](../guides/docker.md): run with Docker Compose and health checks.

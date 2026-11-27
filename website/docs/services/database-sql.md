@@ -1,10 +1,10 @@
 # Azure SQL Database
 
-miniblue emulates Azure SQL Database via ARM endpoints. This is a stub implementation -- it stores server and database metadata but does not connect to a real SQL Server instance.
+miniblue emulates Azure SQL Database via ARM endpoints. This stub implementation stores server and database metadata, but it does not connect to a real SQL Server instance.
 
 ## API endpoints
 
-### SQL Servers
+### SQL servers
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -71,7 +71,7 @@ curl "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Mic
 curl -X DELETE "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Microsoft.Sql/servers/my-sql-server"
 ```
 
-Returns `202 Accepted`. Deleting a server also removes all child database metadata.
+This request returns `202 Accepted`. Deleting a server also removes all child database metadata.
 
 ## Create a database
 
@@ -130,7 +130,7 @@ curl "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Mic
 curl -X DELETE "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Microsoft.Sql/servers/my-sql-server/databases/appdb"
 ```
 
-Returns `202 Accepted`.
+This request returns `202 Accepted`.
 
 ## azlocal
 
@@ -182,6 +182,6 @@ curl -s -X DELETE "${BASE}/my-sql"
 
 ## Limitations
 
-- Stub only -- no real SQL Server backend. Server and database metadata is stored in memory.
-- Request body properties (SKU, location, collation) are accepted and reflected in responses but have no backend effect.
+- Stub implementation with no SQL Server backend. miniblue stores server and database metadata in memory.
+- miniblue accepts and echoes request body properties such as SKU, location, and collation, but they have no backend effect.
 - No elastic pools, firewall rules, or auditing.

@@ -103,7 +103,7 @@ Setting the same secret name again overwrites the value.
 curl "http://localhost:4566/keyvault/myvault/secrets/db-password"
 ```
 
-Returns the same JSON structure as above. Returns `404` if the secret does not exist.
+This request returns the same JSON structure as setting a secret, or `404` if the secret does not exist.
 
 ## List all secrets in a vault
 
@@ -134,7 +134,7 @@ curl "http://localhost:4566/keyvault/myvault/secrets"
 }
 ```
 
-List responses return metadata only; secret values are intentionally omitted, matching Azure Key Vault behavior.
+List responses return metadata only and omit secret values, matching Azure Key Vault behavior.
 
 ## Delete a secret
 
@@ -183,7 +183,7 @@ azlocal keyvault secret delete --vault myvault --name db-password
 
 ## Terraform
 
-The ARM vault endpoints are designed for `azurerm_key_vault`, `azurerm_key_vault_secret`, and `azurerm_role_assignment` workflows. RBAC assignments are stored by the `Microsoft.Authorization` emulator; miniblue does not enforce access control on Key Vault data-plane requests.
+The ARM vault endpoints support `azurerm_key_vault`, `azurerm_key_vault_secret`, and `azurerm_role_assignment` workflows. The `Microsoft.Authorization` emulator stores RBAC assignments, and miniblue does not enforce access control on Key Vault data-plane requests.
 
 ## Full example
 

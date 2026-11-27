@@ -1,13 +1,13 @@
-# Role-Based Access Control (RBAC)
+# Role-based access control (RBAC)
 
 miniblue emulates `Microsoft.Authorization` role assignment and role
 definition endpoints. It ships a fixed catalog of common built-in roles and
 accepts custom role definitions and assignments at any scope.
 
-This is sufficient for Terraform's `azurerm_role_assignment` /
+This is sufficient for Terraform's `azurerm_role_assignment` and
 `azurerm_role_definition` resources and for the Azure CLI `az role` commands
-to plan and apply against miniblue. **No access control is enforced** —
-assignments are stored for round-trip fidelity only.
+to plan and apply against miniblue. miniblue does not enforce access control.
+It stores assignments for round-trip fidelity only.
 
 ## ARM endpoints
 
@@ -95,9 +95,9 @@ applies remain idempotent.
 
 ## Limitations
 
-- No access control is enforced — every other miniblue service still serves
-  every request without authorization checks.
-- No deny assignments, no eligible/PIM role assignments, no scope inheritance
-  evaluation.
-- The built-in role catalog is intentionally small; custom roles created via
-  PUT are stored verbatim.
+- Access control is not enforced. Every other miniblue service serves
+  requests without authorization checks.
+- Deny assignments, eligible or PIM role assignments, and scope inheritance
+  evaluation are not supported.
+- The built-in role catalog is small. Custom roles created via `PUT` are
+  stored verbatim.

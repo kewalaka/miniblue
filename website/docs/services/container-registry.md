@@ -4,7 +4,7 @@ miniblue emulates Azure Container Registry (ACR) with ARM management endpoints a
 
 ## API endpoints
 
-### ARM (management)
+### ARM management
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -14,7 +14,7 @@ miniblue emulates Azure Container Registry (ACR) with ARM management endpoints a
 | `GET` | `/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.ContainerRegistry/registries` | List |
 | `POST` | `/subscriptions/{sub}/providers/Microsoft.ContainerRegistry/checkNameAvailability` | Check name |
 
-### Docker Registry v2 (stubs)
+### Docker Registry v2 stubs
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -130,7 +130,7 @@ curl "http://localhost:4566/acr/myregistry/v2/myapp/tags/list"
 ```
 
 !!! info
-    The Docker v2 endpoints are stubs for basic compatibility. Actual image push/pull is not yet supported.
+    The Docker v2 endpoints are stubs for basic compatibility. Image push and pull are not supported.
 
 ## Terraform
 

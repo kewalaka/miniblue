@@ -1,10 +1,10 @@
 # Database for MySQL
 
-miniblue emulates Azure Database for MySQL Flexible Servers via ARM endpoints. This is a stub implementation -- it stores server and database metadata but does not connect to a real MySQL instance.
+miniblue emulates Azure Database for MySQL Flexible Servers via ARM endpoints. This stub implementation stores server and database metadata, but it does not connect to a real MySQL instance.
 
 ## API endpoints
 
-### Flexible Servers
+### Flexible servers
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -77,7 +77,7 @@ curl "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Mic
 curl -X DELETE "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Microsoft.DBforMySQL/flexibleServers/my-mysql"
 ```
 
-Returns `202 Accepted`. Deleting a server also removes all child database metadata.
+This request returns `202 Accepted`. Deleting a server also removes all child database metadata.
 
 ## Create a database
 
@@ -127,7 +127,7 @@ curl "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Mic
 curl -X DELETE "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Microsoft.DBforMySQL/flexibleServers/my-mysql/databases/appdb"
 ```
 
-Returns `202 Accepted`.
+This request returns `202 Accepted`.
 
 ## azlocal
 
@@ -179,6 +179,6 @@ curl -s -X DELETE "${BASE}/my-mysql"
 
 ## Limitations
 
-- Stub only -- no real MySQL backend. Server and database metadata is stored in memory.
-- Request body properties (charset, collation, SKU) are accepted and reflected in responses but have no backend effect.
+- Stub implementation with no MySQL backend. miniblue stores server and database metadata in memory.
+- miniblue accepts and echoes request body properties such as charset, collation, and SKU, but they have no backend effect.
 - No firewall rules, private endpoints, or replication.

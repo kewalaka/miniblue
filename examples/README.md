@@ -1,6 +1,6 @@
-# miniblue Examples
+# miniblue examples
 
-Code examples showing how to use miniblue with different languages and tools.
+These examples show how to use miniblue with different languages and tools.
 
 ## Examples
 

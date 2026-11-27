@@ -99,7 +99,7 @@ Response (`201 Created`):
 }
 ```
 
-When Docker is available, this runs `docker run -d --name miniblue-my-app -e APP_ENV=development -p 8080:8080 nginx:latest` under the hood. The container name is prefixed with `miniblue-`.
+When Docker is available, miniblue runs `docker run -d --name miniblue-my-app -e APP_ENV=development -p 8080:8080 nginx:latest` and prefixes the container name with `miniblue-`.
 
 ## Get a container group
 
@@ -107,7 +107,7 @@ When Docker is available, this runs `docker run -d --name miniblue-my-app -e APP
 curl "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Microsoft.ContainerInstance/containerGroups/my-app"
 ```
 
-When Docker is available, the `state` field is refreshed from the real container (via `docker inspect`).
+When Docker is available, miniblue refreshes the `state` field from the real container using `docker inspect`.
 
 ## List container groups
 
@@ -121,7 +121,7 @@ curl "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Mic
 curl -X DELETE "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Microsoft.ContainerInstance/containerGroups/my-app"
 ```
 
-Returns `204 No Content`. When Docker is available, this runs `docker stop` and `docker rm` on the container.
+This request returns `204 No Content`. When Docker is available, miniblue runs `docker stop` and `docker rm` on the container.
 
 ## Container spec reference
 
@@ -213,8 +213,8 @@ curl -s -X DELETE "${BASE}/web-app"
 
 ## Limitations
 
-- Only the first container in the group is used for Docker execution
+- miniblue runs only the first container in the group in Docker
 - No volume mounts, init containers, or GPU resources
-- IP address is always `127.0.0.1`
+- The IP address is always `127.0.0.1`
 - Without Docker, all operations are metadata-only stubs
-- Container names are prefixed with `miniblue-` in Docker (e.g., `miniblue-my-app`)
+- miniblue prefixes Docker container names with `miniblue-`, for example `miniblue-my-app`

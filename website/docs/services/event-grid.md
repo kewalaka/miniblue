@@ -1,6 +1,6 @@
 # Event Grid
 
-miniblue emulates Azure Event Grid via ARM and data plane endpoints. Supports topic creation, deletion and event publishing.
+miniblue emulates Azure Event Grid via ARM and data plane endpoints. It supports topic creation, topic deletion, and event publishing.
 
 ## API endpoints
 
@@ -17,4 +17,4 @@ miniblue emulates Azure Event Grid via ARM and data plane endpoints. Supports to
 - No event subscriptions or delivery
 - No dead-lettering
 - No event filtering
-- Published events are accepted but not forwarded
+- miniblue accepts published events but does not forward them

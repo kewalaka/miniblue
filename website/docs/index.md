@@ -6,11 +6,11 @@
 
 <p align="center"><strong>Local Azure development. One binary. No account needed.</strong></p>
 
-miniblue is a free, open-source Azure emulator that runs entirely on your machine. Test your Azure apps locally without an Azure account, network connection, or credit card.
+miniblue is a free, open-source Azure emulator that runs on your machine. Test your Azure apps locally without an Azure account, network connection, or credit card.
 
 ## Why miniblue?
 
-Azure developers have to juggle 5+ separate emulators (Azurite, Cosmos DB Emulator, Functions Core Tools, etc.) just to get basic local dev working. miniblue replaces all of them with a single binary on a single port.
+Azure developers often run five or more separate emulators, such as Azurite, the Cosmos DB Emulator, and Functions Core Tools, for local development. miniblue replaces them with one binary on one port.
 
 ```bash
 docker run -p 4566:4566 -p 443:4567 -p 4567:4567 moabukar/miniblue:latest
@@ -49,11 +49,11 @@ That's it. 32 Azure services are now running locally.
 
 ## Works with your tools
 
-- **Terraform** - `metadata_host = "localhost:4567"` and you're done
-- **azlocal CLI** - like `awslocal` for LocalStack
-- **Azure CLI** - custom cloud registration
-- **Any Azure SDK** - just point the endpoint to `http://localhost:4566`
-- **curl** - standard REST API
+- **Terraform.** Set `metadata_host = "localhost:4567"` in the provider block.
+- **azlocal CLI.** A local CLI similar to `awslocal` for LocalStack.
+- **Azure CLI.** Works via custom cloud registration.
+- **Azure SDKs.** Point the endpoint to `http://localhost:4566`.
+- **curl.** Call the REST API directly.
 
 ## Quick start
 
@@ -70,4 +70,4 @@ curl -X PUT "http://localhost:4566/subscriptions/sub1/resourcegroups/myRG?api-ve
   -d '{"location": "eastus"}'
 ```
 
-[Get started →](getting-started/installation.md)
+[Get started](getting-started/installation.md)

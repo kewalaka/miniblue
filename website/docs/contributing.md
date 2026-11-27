@@ -46,6 +46,7 @@ miniblue/
       queue/           # Queue Storage
       resourcegroups/  # Resource Groups
       servicebus/      # Service Bus
+      sites/           # App Service (sites, serverfarms, slots)
       subscriptions/   # Subscription + tenant listing
       table/           # Table Storage
     store/
@@ -211,10 +212,11 @@ r.Route("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/prov
 
 ## Code style
 
+- Read [CODING_STANDARDS.md](https://github.com/moabukar/miniblue/blob/main/CODING_STANDARDS.md) at the repository root for design and review standards
 - Run `go vet ./...` before committing
 - Use `gofmt` formatting
 - One service per package under `internal/services/`
-- Keep handlers focused -- no cross-service dependencies
+- Keep handlers focused, with no cross-service dependencies
 - Use regular dashes (`-`) not em dashes
 
 ## Development workflow
@@ -243,7 +245,7 @@ make clean
 3. Make your changes and add tests
 4. Run `go build ./... && go test ./...`
 5. Commit and push
-6. Open a Pull Request
+6. Open a pull request
 
 ## Reporting bugs
 
@@ -255,7 +257,7 @@ Open an issue at [github.com/moabukar/miniblue/issues](https://github.com/moabuk
 
 ## Suggesting new services
 
-Open a feature request issue with the Azure service name and a link to its [REST API documentation](https://learn.microsoft.com/en-us/rest/api/azure/). This helps match the real API surface.
+Open a feature request issue with the Azure service name and a link to its [REST API documentation](https://learn.microsoft.com/en-us/rest/api/azure/). This helps match the real REST API.
 
 ## Licence
 

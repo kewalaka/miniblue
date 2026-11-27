@@ -1,6 +1,6 @@
 # Application Gateway
 
-miniblue emulates Azure Application Gateway via ARM endpoints. Supports full L7 configuration including SKU, gateway IP configs, frontend IPs/ports, backend pools, HTTP settings, listeners, routing rules, probes, SSL certificates, URL path maps, redirect configs and WAF.
+miniblue emulates Azure Application Gateway via ARM endpoints. It supports full Layer 7 configuration, including SKU, gateway IP configurations, frontend IPs and ports, backend pools, HTTP settings, listeners, routing rules, probes, SSL certificates, URL path maps, redirect configurations, and WAF.
 
 ## API endpoints
 
@@ -93,11 +93,11 @@ resource "azurerm_application_gateway" "example" {
 - Standard_v2
 - WAF_v2
 
-Default SKU is Standard_v2 with capacity 2 if not specified.
+The default SKU is `Standard_v2` with a capacity of 2 when omitted.
 
 ## Limitations
 
-- No actual L7 routing or traffic processing
-- WAF configuration is stored but not enforced
+- No Layer 7 routing or traffic processing
+- miniblue stores WAF configuration but does not enforce it
 - No SSL termination
-- No autoscaling (capacity is static)
+- No autoscaling. Capacity is static.

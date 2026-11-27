@@ -1,6 +1,6 @@
 # AKS example
 
-Provisions a minimal `azurerm_kubernetes_cluster` against miniblue.
+This example provisions a minimal `azurerm_kubernetes_cluster` against miniblue.
 
 ## Prerequisites
 
@@ -16,13 +16,13 @@ terraform init
 terraform apply -auto-approve
 ```
 
-The cluster shows up in `azlocal aks list --resource-group aks-example-rg` and is destroyable via `terraform destroy`.
+The cluster appears in `azlocal aks list --resource-group aks-example-rg` and can be removed with `terraform destroy`.
 
 ## Two backends
 
-By default, AKS in miniblue is **stub-only**. The cluster exists in the ARM API so Terraform plans, applies, and destroys cleanly, but `kubectl` against the returned kubeconfig will not connect (no real Kubernetes is running).
+By default, AKS in miniblue is stub-only. The cluster exists in the ARM API so Terraform plans, applies, and destroys it, but `kubectl` cannot connect using the returned kubeconfig because no Kubernetes cluster is running.
 
-To run a **real Kubernetes cluster** behind the AKS resource:
+To run a real Kubernetes cluster behind the AKS resource:
 
 ```bash
 # Binary (recommended for local dev):
@@ -44,20 +44,20 @@ kubectl get nodes
 kubectl create deployment hello --image=nginx
 ```
 
-Requires Docker (or OrbStack / Rancher Desktop) running on the host. There is a short gap of a few seconds between cluster create returning and the node showing as Ready in `kubectl get nodes`.
+This backend requires Docker, OrbStack, or Rancher Desktop running on the host. Expect a short delay of a few seconds between cluster creation returning and the node reporting `Ready` in `kubectl get nodes`.
 
 ### Cleanup
 
-The k3s container backing each AKS resource is torn down on every normal exit path:
+miniblue removes the k3s container backing each AKS resource on every normal exit path:
 
 | Trigger | What happens |
 |---|---|
 | `terraform destroy` / `azlocal aks delete` / direct `DELETE` on the cluster | container removed immediately |
 | Resource group cascade delete | every cluster's container in that RG removed |
 | miniblue `SIGTERM` / `SIGINT` / `docker stop` | every running k3s container torn down before miniblue exits |
-| miniblue `SIGKILL` / OOM / host crash | containers persist; next miniblue start with `AKS_BACKEND=k3s` reaps any orphans (or preserves them if `PERSISTENCE=1` shows they are still owned by a stored cluster) |
+| miniblue `SIGKILL` / OOM / host crash | containers persist; the next miniblue start with `AKS_BACKEND=k3s` removes any orphaned containers, or keeps them if `PERSISTENCE=1` shows a stored cluster still owns them |
 
-Manual purge if needed:
+To remove leftover containers manually:
 
 ```bash
 docker ps --filter name=miniblue-aks- -q | xargs -r docker rm -f

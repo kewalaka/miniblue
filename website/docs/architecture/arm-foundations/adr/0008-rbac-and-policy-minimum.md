@@ -1,4 +1,4 @@
-# ADR-0008: RBAC and Policy, the useful minimum
+# ADR-0008: RBAC and policy, the useful minimum
 
 Status: Proposed
 
@@ -16,7 +16,7 @@ Status: Proposed
 
 **Policy.** Only `policyDefinitions` exists, as an engine type. There are no assignments and no evaluation.
 
-The useful target: let users test "this principal can't do that" and "this policy denies that" locally, without emulating Azure's full semantics.
+The goal is to let users test "this principal can't do that" and "this policy denies that" locally, without emulating Azure's full semantics.
 
 ## Decision
 
@@ -68,7 +68,7 @@ Matching:
 
 Out of scope: dataActions, deny assignments, ABAC conditions, groups, PIM, and data-plane enforcement.
 
-**Tokens:** one `internal/token` package replaces both builders.
+**Tokens.** One `internal/token` package replaces both builders.
 
 ```go
 type Claims struct{ OID, Sub, TID, AppID, Aud string /* ... */ }
@@ -77,9 +77,9 @@ func Issue(c Claims) string                 // alg none, as today
 func Parse(bearer string) (Claims, bool)    // no signature check
 ```
 
-- Client tokens: `oid` = `uuid.NewSHA1(tenantUUID, client_id)`. The `google/uuid` package is already a dependency. The default client `miniblue` keeps `...0002`, so existing users see no change.
-- MI tokens: `oid` = principalId.
-- CHANGELOG: non-default client ids now get distinct, stable `oid`s.
+- **Client tokens.** Set `oid` to `uuid.NewSHA1(tenantUUID, client_id)`. The `google/uuid` package is already a dependency. The default client `miniblue` keeps `...0002`, so existing users see no change.
+- **MI tokens.** Set `oid` to `principalId`.
+- **CHANGELOG.** Note that non-default client ids now get distinct, stable `oid`s.
 
 **Legacy guard (optional, not on any gate's critical path).** `authorization.Guard(a arm.Authorizer, ad arm.Admitter) func(http.Handler) http.Handler` applies the same checks to legacy chi ARM routes. It derives the action from the method and from `arm.ParseID(path)`. Build it only if users ask for enforcement on unmigrated types. Until then, **enforcement covers engine types only**, and the user docs say so. That includes resources created through deployments: the in-process `Dispatcher.Put` carries `ctx` (and so the principal) into `Engine.Do`. The HTTP fallback forwards the original `Authorization` header, so a Guard, if built later, sees the same principal.
 
@@ -89,9 +89,9 @@ func Parse(bearer string) (Claims, bool)    // no signature check
 
 **Unsupported rules fail closed, at configuration time.** A silent "doesn't match" is a false allow, which is the worst outcome for a test tool. `policy.Compile(def, params) (Rule, error)` turns a definition plus assignment parameters into an evaluable rule. It returns an error for any construct outside the subset below: unknown aliases, operators, functions, `value`, `count`, and the `denyAction` effect.
 
-- **Enforcement on:** policyAssignment Validate calls `Compile`. An unsupported rule gives 400 `MinibluePolicyUnsupported`, naming the construct. The code is deliberately emulator-specific, so nobody mistakes it for Azure behaviour.
-- **Evaluation** compiles again, because the definition may have changed since assignment. A compile failure there gives the same 400. It never allows.
-- **Enforcement off:** assignments are CRUD only and `Compile` is not called, so any definition can be assigned.
+- **Enforcement on.** policyAssignment Validate calls `Compile`. An unsupported rule gives 400 `MinibluePolicyUnsupported` and names the construct. The code is emulator-specific, so nobody mistakes it for Azure behaviour.
+- **Evaluation.** Compiles again, because the definition may have changed since assignment. A compile failure gives the same 400 and never allows.
+- **Enforcement off.** Assignments are CRUD only and `Compile` is not called, so any definition can be assigned.
 
 **Enforcement** is off by default. `MINIBLUE_POLICY=enforce` wires `policy.Admitter`, which runs on PUT and PATCH proposed docs (`r.Doc`):
 
@@ -128,11 +128,11 @@ Package layout:
 
 ## Rejected alternatives
 
-- **RBAC on by default:** it breaks every existing user whose client id is not the default.
-- **Full ARM action catalogue** (an operations list per RP): large and unmaintainable. Derived `{type}/read|write|delete` actions are what built-in roles mostly use.
-- **Real token signing and validation:** real authn is a non-goal.
-- **Heuristic alias mapping** (`<type>/x` to `properties.x`): right often enough to mislead.
-- **Unsupported policy input evaluates as "no match"** (fail open): a user would believe a deny policy works when it never fires.
-- **Making the legacy Guard a gate prerequisite:** it doubles the enforcement surface for types that are about to migrate anyway.
-- **`modify`, `append` and `deployIfNotExists`:** they mutate requests or create resources. Explicitly out of scope.
-- **Policy evaluation on GET** (compliance state): not useful without the remediation machinery.
+- **RBAC on by default.** This breaks every existing user whose client id is not the default.
+- **Full ARM action catalogue (an operations list per RP).** This is large and unmaintainable. Derived `{type}/read|write|delete` actions are what built-in roles mostly use.
+- **Real token signing and validation.** Real authn is out of scope.
+- **Heuristic alias mapping (`<type>/x` to `properties.x`).** Heuristics are right often enough to mislead.
+- **Unsupported policy input evaluates as "no match" (fail open).** A user would believe a deny policy works when it never fires.
+- **Making the legacy Guard a gate prerequisite.** This doubles the enforcement code for types that are about to migrate anyway.
+- **`modify`, `append`, and `deployIfNotExists`.** These mutate requests or create resources, and are out of scope.
+- **Policy evaluation on GET (compliance state).** Compliance evaluation is not useful without remediation machinery.

@@ -95,7 +95,7 @@ Key settings explained:
 
 ## Step 3: Full example
 
-This creates a resource group, virtual network, subnet, DNS zone, and container registry -- all locally.
+This creates a resource group, virtual network, subnet, DNS zone, and container registry locally.
 
 ```hcl
 terraform {
@@ -238,8 +238,8 @@ resource "azapi_resource" "policy" {
 }
 ```
 
-- azapi has no `metadata_host`, and it must use the HTTPS port (4567): the Azure SDK refuses plain HTTP credentials.
-- Certificate trust is the same as above (`SSL_CERT_FILE`), with one caveat: Go on **Windows ignores `SSL_CERT_FILE`**, so on Windows add miniblue's certificate to the system store or run Terraform from WSL/Linux.
+- `azapi` has no `metadata_host` setting and must use the HTTPS port (4567), because the Azure SDK refuses plain HTTP credentials.
+- Certificate trust uses `SSL_CERT_FILE` as shown above. Go on Windows ignores `SSL_CERT_FILE`, so on Windows add miniblue's certificate to the system store or run Terraform from WSL or Linux.
 - The same settings can be supplied as environment variables: `ARM_RESOURCE_MANAGER_ENDPOINT`, `ARM_ACTIVE_DIRECTORY_AUTHORITY_HOST`, `ARM_RESOURCE_MANAGER_AUDIENCE`, `ARM_DISABLE_INSTANCE_DISCOVERY`, `ARM_USE_CLI`.
 - Working fixture: `tests/terraform/azapi/policy_definition`.
 
@@ -291,7 +291,7 @@ jobs:
 
 ### "tls: failed to verify certificate"
 
-The miniblue certificate is not trusted. Follow [Step 1](#step-1-trust-the-certificate), or permanently trust it with `bash scripts/trust-cert.sh`. On Windows, Go ignores `SSL_CERT_FILE`: import the certificate into the Windows store or use WSL2.
+The miniblue certificate is not trusted. Follow [Step 1](#step-1-trust-the-certificate), or permanently trust it with `bash scripts/trust-cert.sh`. On Windows, Go ignores `SSL_CERT_FILE`, so import the certificate into the Windows store or use WSL2.
 
 ### "x509: certificate signed by unknown authority" on `terraform init`
 
@@ -307,4 +307,4 @@ curl -k https://localhost:4567/health
 
 ### "provider registration" errors
 
-Ensure `resource_provider_registrations = "none"` is set in the provider block. (`skip_provider_registration` only exists in azurerm v3; v4+ rejects it.)
+Set `resource_provider_registrations = "none"` in the provider block. `skip_provider_registration` only exists in azurerm v3, and v4+ rejects it.

@@ -1,6 +1,6 @@
 # Helm / Kubernetes deployment
 
-Run miniblue inside a Kubernetes cluster (kind, minikube, EKS, AKS, GKE, OrbStack k8s) so other pods in the cluster can target it as a fake Azure endpoint.
+Run miniblue inside a Kubernetes cluster (kind, minikube, EKS, AKS, GKE, or OrbStack Kubernetes) so other pods in the cluster can target it as a fake Azure endpoint.
 
 ## Quick install
 
@@ -9,7 +9,7 @@ git clone https://github.com/moabukar/miniblue.git
 helm install miniblue ./miniblue/charts/miniblue
 ```
 
-The chart is in-tree under `charts/miniblue`. There is no published chart repo yet.
+The chart is in-tree under `charts/miniblue`. There is no published chart repository yet.
 
 Verify:
 
@@ -35,11 +35,11 @@ persistence:
 helm upgrade --install miniblue ./charts/miniblue -f values.yaml
 ```
 
-A `PersistentVolumeClaim` is mounted at `/home/miniblue` and miniblue saves its in-memory store to a JSON file there every 30 seconds. Survives pod restarts and rescheduling.
+The chart mounts a `PersistentVolumeClaim` at `/home/miniblue`, and miniblue writes its in-memory store to a JSON file there every 30 seconds. State survives pod restarts and rescheduling.
 
 ### Use PostgreSQL as the backend
 
-For multi-replica or shared-state setups, point miniblue at a real PostgreSQL.
+For multi-replica or shared-state setups, point miniblue at a PostgreSQL database.
 
 Inline:
 
@@ -62,7 +62,7 @@ databaseUrlSecret:
 
 ### Expose outside the cluster
 
-Default service is `ClusterIP`. Switch to `NodePort` or `LoadBalancer`:
+The default service type is `ClusterIP`. Switch to `NodePort` or `LoadBalancer`:
 
 ```yaml
 service:
@@ -84,7 +84,7 @@ Each release gets its own deployment, service, and PVC keyed by release name.
 
 ## Pointing apps at miniblue
 
-Apps inside the same cluster talk to it via the cluster service DNS:
+Apps inside the same cluster connect to miniblue via the cluster service DNS:
 
 ```yaml
 env:
@@ -100,11 +100,11 @@ env:
     value: "https://miniblue.default.svc.cluster.local:4567"
 ```
 
-The chart's container ships with miniblue's self-signed cert; trust it inside your app's container or set `AZURE_INSECURE_SKIP_VERIFY=true` for non-prod use.
+The chart's container ships with miniblue's self-signed certificate. Trust it inside your app's container or set `AZURE_INSECURE_SKIP_VERIFY=true` for non-production use.
 
 ## Limitations
 
-The chart is intended for **in-cluster development workloads**, not production-like Azure. Real backends that shell out to Docker on the host (ACI, AKS, in-pod) **do not work** in a normal Kubernetes deployment because the miniblue process has no Docker daemon to reach. Specifically:
+The chart is for in-cluster development workloads, not production Azure environments. Real backends that call Docker on the host (ACI and AKS) do not work in a standard Kubernetes deployment because the miniblue pod has no Docker daemon.
 
 | Real backend | Works in Helm? |
 |---|---|
@@ -143,7 +143,7 @@ Stub mode is the default for ACI and AKS, so `terraform apply` against the chart
 helm uninstall miniblue
 ```
 
-The PVC is preserved by default (Kubernetes' `Reclaim` policy). Delete it explicitly if you want a clean slate:
+Kubernetes preserves the PVC by default under its `Reclaim` policy. Delete it to clear saved state:
 
 ```bash
 kubectl delete pvc miniblue-data

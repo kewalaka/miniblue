@@ -1,4 +1,4 @@
-# ADR-0007: Migration strategy (strangler)
+# ADR-0007: migration strategy (strangler)
 
 Status: Proposed
 
@@ -25,7 +25,7 @@ A big-bang move is out (ADR-0001). The risk is a long coexistence period, so it 
 4. Delete the chi ARM routes and their lines in `legacy_arm_routes.txt`. Keep the data-plane and provider-level routes.
 5. Bump `store.SchemaVersion` and add a CHANGELOG line: `state reset required: <type> moved to the ARM engine`.
 6. Remove the type's prefixes from the package's RG cleaner. Delete the cleaner if it is now empty.
-7. Existing `tests/` stay green. Any intentional behaviour change (fidelity fix) is listed in the PR body and the CHANGELOG. A test that PUTs without creating its RG now gets 404 `ResourceGroupNotFound`: fix the test setup, not the engine.
+7. Existing `tests/` stay green. Any intentional behaviour change (fidelity fix) is listed in the PR body and the CHANGELOG. A test that PUTs without creating its RG now gets 404 `ResourceGroupNotFound`. Fix the test setup, not the engine.
 8. PR title: `refactor(<rp>): serve <type> via arm engine`. Behaviour changes go in a separate `fix(<rp>): ...` commit.
 
 ### Waves
@@ -62,12 +62,12 @@ Progress is the line count of `legacy_arm_routes.txt` plus the number of cleaner
 ## Consequences
 
 - Coexistence has no deadline and no cliff. Every intermediate state is tested and shippable.
-- The freeze file and the cleaners make the remaining legacy surface explicit.
+- The freeze file and the cleaners make the remaining legacy routes explicit.
 - Wave work is mechanical enough for lesser agents to do with the recipe alone.
 
 ## Rejected alternatives
 
-- **Migrate everything before adding new types:** it delays APIM and the new types for weeks of no-op churn.
-- **Never migrate, and add new types only on the engine:** RBAC, policy, cascade and sub-wide list would stay split forever. Waves 2 to 4 are cheap with the recipe.
-- **Migrate by package rather than by type:** the large packages (`network`, `vm`) would become unreviewable PRs.
-- **A compatibility layer that serves legacy keys through the engine:** read fallbacks forever, to preserve disposable data.
+- **Migrate everything before adding new types.** This delays APIM and the new types for weeks of no-op churn.
+- **Never migrate, and add new types only on the engine.** RBAC, policy, cascade, and sub-wide list would stay split forever. Waves 2 to 4 are cheap with the recipe.
+- **Migrate by package rather than by type.** Large packages (`network`, `vm`) would become unreviewable PRs.
+- **A compatibility layer that serves legacy keys through the engine.** This keeps read fallbacks forever to preserve disposable data.

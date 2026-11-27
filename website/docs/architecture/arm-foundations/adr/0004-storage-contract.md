@@ -1,4 +1,4 @@
-# ADR-0004: Storage contract
+# ADR-0004: storage contract
 
 Status: Proposed
 
@@ -82,7 +82,7 @@ Order matters:
 - One `likePrefix(s string) string` escape helper, used by `Scan`, `DeleteByPrefix` and `Count`.
 - `CREATE INDEX IF NOT EXISTS miniblue_store_key_prefix ON miniblue_store (key text_pattern_ops)`. The PK btree cannot serve `LIKE 'x%'` under non-C collations.
 - `Scan` uses `ORDER BY key`.
-- `Reset` runs `DELETE FROM miniblue_store WHERE key <> $1` (preserving the `meta:schema` stamp in a single statement rather than `TRUNCATE`).
+- `Reset` runs `DELETE FROM miniblue_store WHERE key <> $1` to preserve the `meta:schema` stamp in a single statement rather than `TRUNCATE`.
 - **Single writer.** One miniblue process per database. A shared database across processes is unsupported and documented. The engine mutex is in-process.
 
 ### 3. Engine store
@@ -118,7 +118,7 @@ func New(st *store.Store, eng *arm.Engine, cleaners ...Cleaner) *Handler
 - RG delete runs `eng.DeleteScope(rg)` and then the cleaners.
 - A migrated type deletes its cleaner in the same PR.
 
-### 5. State is disposable: a schema stamp, not migrations
+### 5. Schema stamp for disposable state
 
 Persisted state is test data. It does not need to survive an upgrade that changes its shape, but it must never be silently misread. Misread state is how a migrated type returns 404 and Terraform quietly recreates resources.
 
@@ -129,10 +129,10 @@ const SchemaVersion = 1 // bump when the key or value shape of an existing persi
 func CheckSchema(s *Store, location string) error // called once at startup, before serving
 ```
 
-- **Empty store:** write `meta:schema` = `SchemaVersion`.
-- **Stamp matches:** continue.
-- **No stamp on a non-empty store:** treat it as version 1. That is state written by current main, which has the same shape. Stamp it and continue.
-- **Stamp differs:** fail startup, leaving the store untouched. The message names both versions and how to reset, for example: `state in ./data/state.json is schema 2; this miniblue needs 3: delete the file (or TRUNCATE miniblue_store on Postgres) and restart`. There is no auto-wipe flag.
+- **Empty store.** Write `meta:schema` = `SchemaVersion`.
+- **Stamp matches.** Continue.
+- **No stamp on a non-empty store.** Treat it as version 1. That is state written by current main, which has the same shape. Stamp it and continue.
+- **Stamp differs.** Fail startup and leave the store untouched. The message names both versions and how to reset, for example: `state in ./data/state.json is schema 2; this miniblue needs 3: delete the file (or TRUNCATE miniblue_store on Postgres) and restart`. There is no auto-wipe flag.
 
 Bump rules:
 
@@ -140,7 +140,7 @@ Bump rules:
 - Adding a new type, or a new field that old readers tolerate, does not.
 - Every bump adds a CHANGELOG line: `state reset required: <why>`.
 
-Test: one table test covering the empty, matching, unstamped and mismatched cases, asserting that the store is unchanged on mismatch.
+Add one table test for the empty, matching, unstamped, and mismatched cases. Assert that the store is unchanged on mismatch.
 
 ## Consequences
 
@@ -152,11 +152,11 @@ Test: one table test covering the empty, matching, unstamped and mismatched case
 
 ## Rejected alternatives
 
-- **Rewrite all 424 call sites to typed repositories now:** right in the long term, wrong before expansion. The uniform contract plus `Decode[T]` gets the safety at a fraction of the cost.
-- **Keep the list index and add subscription and type indexes:** more keys to keep consistent, plus hot rows, to speed up scans that are already cheap.
-- **Postgres-native schema** (`sub`, `rg` and `type` columns): backend-specific behaviour and migrations, for no emulator benefit.
-- **Store `arm:` docs as JSONB objects:** float64 decoding corrupts large integers and json.Number semantics.
-- **RG cascade via global `DeleteByPrefix` on every service prefix:** this is today's approach, and it is exactly what misses keyvault.
-- **Lazy, on-read migration of legacy keys:** each type would need read fallbacks forever, which defeats the strangler exit.
-- **Per-type data migrations** (a migrations registry, planned key moves, case-collision detection, fixture tests for each): real code and tests on every migrated type, all to preserve disposable test data. Decision: state does not need to survive shape changes.
-- **Raw-byte side keys for blob content:** Postgres stores JSONB, so a raw value needs a second column or table. Base64 in JSON keeps one contract on every backend.
+- **Rewrite all 424 call sites to typed repositories now.** Right in the long term, wrong before expansion. The uniform contract plus `Decode[T]` gets the safety at a fraction of the cost.
+- **Keep the list index and add subscription and type indexes.** This adds more keys to keep consistent and hot rows to speed up scans that are already cheap.
+- **Postgres-native schema (`sub`, `rg`, and `type` columns).** This introduces backend-specific behaviour and migrations for no emulator benefit.
+- **Store `arm:` docs as JSONB objects.** `float64` decoding corrupts large integers and `json.Number` semantics.
+- **RG cascade via global `DeleteByPrefix` on every service prefix.** This is today's approach, and it misses keyvault.
+- **Lazy, on-read migration of legacy keys.** Each type would need read fallbacks forever, which defeats the strangler exit.
+- **Per-type data migrations (a migrations registry, planned key moves, case-collision detection, fixture tests for each).** This adds real code and tests on every migrated type to preserve disposable test data. State does not need to survive shape changes.
+- **Raw-byte side keys for blob content.** Postgres stores JSONB, so a raw value needs a second column or table. Base64 in JSON keeps one contract on every backend.

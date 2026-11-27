@@ -19,14 +19,14 @@ One small scenario per client, the same shape everywhere: create an RG, tag it, 
 
 Isolation today is one hard-coded subscription (the all-zeros GUID). Until a multi-subscription model exists, every test uses a unique RG name and cleans it up.
 
-## Harness pattern
+## Test runner pattern
 
 | Step | Pattern | miniblue today | Action |
 |---|---|---|---|
 | Start the emulator | a fresh process or image per suite, private ports, in-memory state | `tests/terraform/azurerm/run.sh` starts the binary in stub mode (`MINIBLUE_DISABLE_DOCKER=1`), on private ports, with `PERSISTENCE` and `DATABASE_URL` ignored, and refuses to run if the port is already taken | Reuse for SDK and `az` jobs. Test the shipped image in at least one job (`e2e.yml` already builds it) |
 | TLS | a throwaway certificate generated per run | `LOCAL_AZURE_CERT_DIR` points the child at a temp dir; the CA bundle is built from system roots plus the run's cert | Keep generating per run. Never commit keys or certificates |
 | Trust | append the cert to every CA store the client reads | `SSL_CERT_FILE` only (Go, Terraform) | Add the per-client rows in the next section |
-| Endpoint discovery | clients get their endpoints from configuration, not from DNS tricks | azurerm: `ARM_METADATA_HOSTNAME=localhost:<tls port>`; azapi: provider endpoint variables | Add a `cloud.json` template for `az` and reuse it for the scripted scenario |
+| Endpoint discovery | clients get their endpoints from configuration, not from DNS tricks | azurerm uses `ARM_METADATA_HOSTNAME=localhost:<tls port>`; azapi uses provider endpoint variables | Add a `cloud.json` template for `az` and reuse it for the scripted scenario |
 | Auth | a fake credential for SDKs, a service principal login for `az` and Terraform | miniblue's token endpoint returns a mock JWT for any client (`internal/services/auth/handler.go:71-95`); `ARM_CLIENT_ID`/`ARM_CLIENT_SECRET` are placeholders | A fake `TokenCredential` is enough for SDKs. Any bearer is accepted |
 | Polling | skip artificial poll delays | `GO_AZURE_SDK_SKIP_POLLING_DELAY=true` in `run.sh`; the header equivalent lands with PLAN 0.8 | Keep both until the header is on every response |
 | Speed | initialise providers once, reuse | `-lockfile=readonly`, `init` per fixture, no cache | Add `TF_PLUGIN_CACHE_DIR` plus an `actions/cache` step |
@@ -87,7 +87,7 @@ Current workflows, checked in the worktree:
 | Nightly | a scheduled full run on unpinned versions | no `schedule` trigger in any workflow | Add one nightly workflow for drift and the slow suites |
 | Manual runs | `workflow_dispatch` on expensive suites | `e2e.yml` and `aks-e2e.yml` have it; the acceptance workflows do not | Add to every new suite that misses the PR budget |
 | Provider cache | cache the plugin directory | none | `TF_PLUGIN_CACHE_DIR` and `actions/cache`; serialise `init` if a cache is shared between parallel fixtures |
-| Reporting | publish test results and coverage | raw logs; `acceptance.yml` uploads the log on failure | Low priority: `gotestsum --junitfile` plus a coverage upload |
+| Reporting | publish test results and coverage | raw logs; `acceptance.yml` uploads the log on failure | Low priority (`gotestsum --junitfile` plus a coverage upload) |
 | Unit tests | the same pipeline runs unit and integration tests | `ci.yml` runs `go test -race -v ./...` | Done (PLAN 0.1) |
 
 ## Cost rule
@@ -101,19 +101,19 @@ Anything expected to take more than about 2 minutes is nightly or opt-in (`sched
 | Nightly | over 2 minutes | scheduled, plus manual | latest-provider drift (azurerm and azapi unpinned), PowerShell, any combined cross-service fixture, `az` against older versions |
 | Opt-in | any | `workflow_dispatch` or path filter | real-backend suites (AKS style), anything needing a real cloud |
 
-Never run any suite against real Azure. No suite needs a subscription, a login or a credit.
+Never run any suite against real Azure. No suite needs a subscription, a login, or a credit.
 
 ## Adoption backlog
 
-Ordered. Effort: XS under half a day, S about a day, M two to four days, L engine work.
+Ordered by priority. Effort scale: XS under half a day, S about a day, M two to four days, L engine work.
 
 | # | Item | Effort | Depends on | Why |
 |---|---|---|---|---|
-| A1 | `go test ./...` with `-race` in `ci.yml` | XS | none (PLAN 0.1, done) | guards engine, store, id and deployments tests in CI |
-| A2 | Go SDK smoke in `tests/sdk/go`: own module, no `replace`, custom transport or `SSL_CERT_FILE`, fake credential | M | A1 | exercises the LRO poller and id casing in Go; Terraform's Go provider shares the same SDK base |
-| A3 | Python SDK smoke: `azure-mgmt-resource`, `azure-mgmt-authorization`, `base_url`, fake credential | M | A2 | cheap once A2 exists; `begin_*().result()` covers polling |
+| A1 | `go test ./...` with `-race` in `ci.yml` | XS | none (PLAN 0.1, done) | guards engine, store, ID, and deployments tests in CI |
+| A2 | Go SDK smoke in `tests/sdk/go` with its own module, no `replace`, custom transport or `SSL_CERT_FILE`, and a fake credential | M | A1 | exercises the LRO poller and ID casing in Go; Terraform's Go provider shares the same SDK base |
+| A3 | Python SDK smoke using `azure-mgmt-resource`, `azure-mgmt-authorization`, `base_url`, and a fake credential | M | A2 | cheap once A2 exists; `begin_*().result()` covers polling |
 | A4 | `az` scripted scenario plus `cloud.json` and a three-version matrix; feasibility spike first, then update `azure-cli.md` | M | A1 | the most common local-dev client; catches discovery and metadata drift |
-| A5 | Negative Terraform fixture: invalid name fails apply and the message is asserted | S | a name-validation hook on at least one type | locks the `CheckName` hooks end to end |
+| A5 | Negative Terraform fixture where an invalid name fails apply and the message is asserted | S | a name-validation hook on at least one type | locks the `CheckName` hooks end to end |
 | A6 | `TF_PLUGIN_CACHE_DIR` cache and a nightly latest-provider job | S | none | speed and early drift detection |
 | A7 | Path filter on the acceptance workflows | S | matrix over about ten jobs | cost |
 | A8 | Subscription-per-suite isolation | L | multi-subscription model (no PLAN row) | removes unique-name discipline |
@@ -121,7 +121,7 @@ Ordered. Effort: XS under half a day, S about a day, M two to four days, L engin
 
 ## Pitfalls
 
-- Go on Windows ignores `SSL_CERT_FILE`. Run the shell harness on Linux or WSL2, or pass an explicit transport in SDK tests.
+- Go on Windows ignores `SSL_CERT_FILE`. Run the shell runner on Linux or WSL2, or pass an explicit transport in SDK tests.
 - `SSL_CERT_FILE` replaces the system roots. Concatenate the public roots and the miniblue cert, or provider downloads fail.
 - `az` ignores the OS trust store and needs the cert in its `certifi` bundle. Without `AZURE_CORE_INSTANCE_DISCOVERY=false` it tries the real discovery endpoints.
 - SDKs refuse bearer tokens over HTTP. Point them at the TLS port.

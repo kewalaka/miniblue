@@ -1,14 +1,14 @@
-# API Parity Matrix
+# API parity matrix
 
-What's implemented, stubbed, and unsupported in miniblue compared to real Azure APIs.
+This page lists what miniblue implements, stubs, and omits compared to Azure APIs.
 
 ## Legend
 
-- **Full**: API works and returns realistic responses
-- **Stub**: API accepts requests and returns valid responses but no real backend processing
-- **None**: API not implemented (returns 404)
+- **Full.** The API works and returns realistic responses.
+- **Stub.** The API accepts requests and returns valid responses with no real backend processing.
+- **None.** The API is not implemented and returns `404`.
 
-## ARM Management APIs
+## ARM management APIs
 
 | Service | Create | Get | List | Delete | Update | Notes |
 |---------|--------|-----|------|--------|--------|-------|
@@ -20,7 +20,7 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | Container Registry | Full | Full | Full | Full | - | Name availability check, replications |
 | Event Grid Topics | Full | Full | Full | Full | - | Event publishing on data plane |
 | Azure Functions | Stub | Stub | Stub | Stub | - | No function execution. Served by the same `Microsoft.Web/sites` handler as App Service |
-| App Service (web apps, slots, plans) | Full | Full | Full | Full | - | `Microsoft.Web/sites`, deployment slots, `serverFarms`, site config (`web`, app settings, connection strings, auth settings, and more) and publishing-credential policies. Stored only: no app hosting, Kudu/SCM or slot swap |
+| App Service (web apps, slots, plans) | Full | Full | Full | Full | - | `Microsoft.Web/sites`, deployment slots, `serverFarms`, site config (`web`, app settings, connection strings, auth settings, and more) and publishing-credential policies. Stored only; no app hosting, Kudu/SCM or slot swap |
 | DB for PostgreSQL | Full | Full | Full | Full | - | Real DB creation via POSTGRES_URL |
 | DB for MySQL | Stub | Stub | Stub | Stub | - | ARM only, no real MySQL |
 | Azure SQL Database | Stub | Stub | Stub | Stub | - | ARM only, no real SQL Server |
@@ -37,7 +37,7 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | Managed Disks | Full | Full | Full | Full | Full (PATCH) | `beginGetAccess`/`endGetAccess` return placeholder SAS |
 | Compute Catalog (VM sizes, SKUs, images) | -- | Full | Full | -- | -- | Static catalog used by Terraform plan |
 | User-Assigned Managed Identities | Full | Full | Full | Full | Full (PATCH) | Deterministic `principalId`/`clientId`/`tenantId` |
-| RBAC (role assignments + definitions) | Full | Full | Full | Full | - | Stored only — no access is enforced |
+| RBAC (role assignments + definitions) | Full | Full | Full | Full | - | Stored only; no access is enforced |
 | Policy Definitions (`Microsoft.Authorization/policyDefinitions@2023-04-01`) | Full | Full | Full | Full | - | Custom definitions at subscription scope only, served by the [ARM engine](../architecture/arm-engine.md) as raw passthrough. No built-in definitions, not evaluated |
 | Key Vault Vaults | Full | Full | Full | Full | Full (PATCH) | `checkNameAvailability`, access policy updates, soft-deleted vault lookup/purge, and synchronous LRO headers |
 | Cosmos DB SQL Databases & Containers (ARM) | Full | Full | Full | Full | - | |
@@ -47,7 +47,7 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | Tenants | - | - | Full | - | - | Mock tenant |
 | Providers | Full | Full | Full | - | - | Registration always succeeds |
 
-## Data Plane APIs
+## Data plane APIs
 
 | Service | Operations | Status | Notes |
 |---------|-----------|--------|-------|
@@ -61,7 +61,7 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | Event Grid | Publish events | Full | No event subscriptions |
 | Container Registry | List manifests, tags | Stub | Docker v2 API stubs only |
 
-## Auth and Infrastructure
+## Auth and infrastructure
 
 | Endpoint | Status | Notes |
 |----------|--------|-------|
@@ -73,7 +73,7 @@ What's implemented, stubbed, and unsupported in miniblue compared to real Azure 
 | /health | Full | 32 services listed |
 | /metrics | Full | Uptime, request count, error rate |
 
-## Not Implemented
+## Not implemented
 
 These Azure services have no emulation:
 

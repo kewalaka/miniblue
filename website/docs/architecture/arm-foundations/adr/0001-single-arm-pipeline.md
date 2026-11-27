@@ -1,4 +1,4 @@
-# ADR-0001: The engine is the single ARM pipeline
+# ADR-0001: the engine is the single ARM pipeline
 
 Status: Proposed
 
@@ -25,7 +25,7 @@ Service packages keep:
 - data-plane routes (blob, queue, table, KV secrets, and so on);
 - provider-level non-resource operations: `checkNameAvailability`, `operationResults`, `locations/*/usages`, `deletedservices` if ever needed.
 
-One rule, applied per type: once a type is registered, its chi ARM routes are deleted in the same PR.
+Once a type is registered, delete its chi ARM routes in the same PR.
 
 ### Guards (land in Phase 1, before any new type)
 
@@ -40,7 +40,7 @@ One rule, applied per type: once a type is registered, its chi ARM routes are de
     - a pattern that is **not** in the file fails, with "register an arm.Type instead";
     - a pattern that is in the file but no longer routed passes, with a hint to delete the line.
 
-    The file only shrinks. Provider-level operations are exempt, so service packages can still add them: a pattern is skipped when the first segment after `providers/{namespace}/` is `locations`, `operations` or `checkNameAvailability`.
+    The file only shrinks. Provider-level operations are exempt, so service packages can still add them. The guard skips a pattern when the first segment after `providers/{namespace}/` is `locations`, `operations`, or `checkNameAvailability`.
 
 3. **Scope cleaners** for RG and subscription cascade (ADR-0004). This removes the hard-coded delete list.
 
@@ -67,8 +67,8 @@ Deployment handler changes:
 - **Strip template-only keys** before the body is sent: `apiVersion`, `type`, `dependsOn`, `condition`, `copy`, `comments`, `scope`.
 - **Missing `apiVersion`** gives 400 `InvalidTemplate` (verify code). Remove the `2023-01-01` default (`deployments/handler.go:188`).
 - **Nested ids** come from one helper, `arm.ChildID(parent ID, typeName, name string)`. It is used for both PUT and `outputResources` (`deployments/handler.go:87,110`).
-- **Order:** topo-sort on `dependsOn` (resourceId or name). On a cycle, return 400 `InvalidTemplate`.
-- **Principal:** the caller principal flows via `ctx`, so RBAC and policy apply to template resources.
+- **Order.** Topo-sort on `dependsOn` (resourceId or name). On a cycle, return 400 `InvalidTemplate`.
+- **Principal.** The caller principal flows via `ctx`, so RBAC and policy apply to template resources.
 
 ### End state
 
@@ -88,8 +88,8 @@ Delete each of these once its last consumer migrates (ADR-0007; `casemirror` sta
 
 ## Rejected alternatives
 
-- **Two systems by design** (bespoke handlers as first-class peers): every ARM behaviour (casing, PATCH, cascade, errors, RBAC, policy, sub-wide lists) gets implemented twice, forever.
-- **Bespoke handlers as engine plugins** (an engine that routes to `http.Handler` per type): the engine gains a second dispatch model, and handlers still own the behaviours. Hooks are the plugin model.
-- **Big-bang rewrite of all 37 packages:** 424 store call sites, high regression risk, no user-visible gain for data-plane code.
-- **Engine after chi (NotFound fallback):** the reverse is safer. New types win, and the guard stops accidental shadowing either way.
-- **Keep HTTP re-dispatch for deployments:** untestable without a server, and the principal survives only through a copied header. It is kept only as a fallback for legacy types.
+- **Two systems by design (bespoke handlers as first-class peers).** Every ARM behaviour (casing, PATCH, cascade, errors, RBAC, policy, sub-wide lists) would be implemented twice, forever.
+- **Bespoke handlers as engine plugins (an engine that routes to `http.Handler` per type).** The engine would gain a second dispatch model, and handlers would still own the behaviours. Hooks are the plugin model.
+- **Big-bang rewrite of all 37 packages.** This touches 424 store call sites with high regression risk and no user-visible gain for data-plane code.
+- **Engine after chi (NotFound fallback).** Putting the engine first is safer. New types win, and the guard stops accidental shadowing either way.
+- **Keep HTTP re-dispatch for deployments.** HTTP re-dispatch is untestable without a server, and the principal survives only through a copied header. Keep it only as a fallback for legacy types.

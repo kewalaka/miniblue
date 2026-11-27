@@ -2,9 +2,9 @@
 
 miniblue emulates Azure Virtual Machines (`Microsoft.Compute/virtualMachines`) via ARM endpoints. When Docker is available on the host, each VM is backed by a real Docker container on its own per-VM network. Without Docker the ARM lifecycle still works (create, update, power state, instance view, extensions); operations that need a running container (`runCommand`, `logs`, deploying services) return `409 DockerUnavailable`.
 
-A VM is more than a single container. You can deploy named service containers onto it, stream their logs, run commands inside it, open an interactive shell and attach managed identities for token attestation.
+You can deploy named service containers onto a VM, stream their logs, run commands inside it, open an interactive shell and attach managed identities for token attestation.
 
-The ARM surface is shaped for the `azurerm` provider's idempotency checks: the VM you `PUT` is replayed on `GET`, with the defaults Azure fills in (see [ARM fidelity](#arm-fidelity)).
+The ARM endpoints match the `azurerm` provider's idempotency checks. A `GET` returns the VM you `PUT` along with the defaults Azure fills in. See [ARM fidelity](#arm-fidelity).
 
 ## Docker detection
 
@@ -14,13 +14,13 @@ miniblue probes for the `docker` CLI at startup and runs `docker info`. The log 
 [vm] Docker is available
 ```
 
-or it falls back to stub mode when the CLI is absent or the daemon is unreachable. Set `MINIBLUE_DISABLE_DOCKER=1` to force stub mode.
+If the CLI is absent or the daemon is unreachable, miniblue falls back to stub mode. Set `MINIBLUE_DISABLE_DOCKER=1` to force stub mode.
 
 ## Image mapping
 
 VMs boot a Linux container image. miniblue resolves the image in this order:
 
-1. `properties.miniblue.image` is an explicit container image and the recommended escape hatch (for example `nginx:alpine`).
+1. `properties.miniblue.image` sets an explicit container image, such as `nginx:alpine`.
 2. `properties.storageProfile.imageReference` is mapped through an alias table.
 3. With no image reference at all, the default is `ubuntu:24.04`.
 
@@ -106,7 +106,7 @@ azlocal vm deallocate --resource-group myRG --name web01
 azlocal vm redeploy   --resource-group myRG --name web01
 ```
 
-Power actions return `200` with the updated VM (real Azure returns `202`; miniblue completes synchronously). They cascade to every service container on the VM. With Docker, `powerState` on a `GET` is refreshed live from `docker inspect`, and a `deallocated` VM stays deallocated while its container is stopped. Without Docker the recorded state is authoritative, so `GET .../instanceView` reflects the last action.
+Power actions return `200` with the updated VM because miniblue completes synchronously, whereas real Azure returns `202`. They cascade to every service container on the VM. With Docker, `powerState` on a `GET` is refreshed live from `docker inspect`, and a `deallocated` VM stays deallocated while its container is stopped. Without Docker the recorded state is authoritative, so `GET .../instanceView` reflects the last action.
 
 ## Extensions
 
@@ -165,7 +165,7 @@ azlocal vm ssh --resource-group myRG --name web01
 
 ## Managed identity attestation
 
-User-assigned managed identities live under `Microsoft.ManagedIdentity/userAssignedIdentities` and can be attached to a VM. A workload inside the VM (or its services) then obtains a token with no code changes through the standard `IDENTITY_ENDPOINT` / `IDENTITY_HEADER` protocol that Azure SDK credential chains already probe.
+User-assigned managed identities use the `Microsoft.ManagedIdentity/userAssignedIdentities` resource type and can be attached to a VM. A workload inside the VM (or its services) then obtains a token with no code changes through the standard `IDENTITY_ENDPOINT` / `IDENTITY_HEADER` protocol that Azure SDK credential chains already probe.
 
 ```bash
 azlocal identity create --resource-group myRG --name app-id

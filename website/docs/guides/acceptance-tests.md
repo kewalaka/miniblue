@@ -1,10 +1,8 @@
 # Terraform acceptance tests (azurerm)
 
-CI runs real `azurerm` (v5, pinned) against miniblue. Each fixture does:
+CI runs real `azurerm` (v5, pinned) against miniblue. Each fixture runs `init`, then `apply`, then `plan -detailed-exitcode` (which must exit 0 with no drift), then a second `apply` (which must be a no-op), and finally `destroy`.
 
-`init` → `apply` → `plan -detailed-exitcode` (must exit 0: no drift) → second `apply` (must be a no-op) → `destroy`
-
-This is the regression net for handler changes: if a handler returns something azurerm does not expect, the plan drifts or the apply fails.
+These tests catch regressions in handler changes. If a handler returns something azurerm does not expect, the plan drifts or the apply fails.
 
 | Fixture | Resources |
 |---------|-----------|
@@ -15,13 +13,13 @@ This is the regression net for handler changes: if a handler returns something a
 | `keyvault` | Key Vault (ARM only) |
 | `examples/terraform` | the user-facing quickstart, run in place by the same runner |
 
-Workflow: `.github/workflows/acceptance-azurerm.yml` (matrix over fixtures, `fail-fast: false`).
+The workflow lives in `.github/workflows/acceptance-azurerm.yml` and runs a matrix over the fixtures with `fail-fast: false`.
 
 ## Run locally
 
 Use Linux or WSL2. Go on Windows ignores `SSL_CERT_FILE`, so it cannot trust miniblue's certificate; the runner is a bash script for that reason.
 
-Prerequisites: `terraform` (version in the workflow), `curl`, Go to build miniblue.
+Prerequisites are `terraform` (at the version pinned in the workflow), `curl`, and Go to build miniblue.
 
 ```bash
 go build -o miniblue ./cmd/miniblue
@@ -29,7 +27,7 @@ tests/terraform/azurerm/run.sh network          # one fixture
 tests/terraform/azurerm/run.sh examples/terraform
 ```
 
-The runner starts its own miniblue (stub mode, `MINIBLUE_DISABLE_DOCKER=1`, always in-memory state: `PERSISTENCE` and `DATABASE_URL` are ignored), generates a throwaway certificate, builds a CA bundle (system roots + miniblue cert) for `SSL_CERT_FILE`, and sets the `ARM_*` provider environment. It stops if `PORT` or `TLS_PORT` already accepts connections, so it never tests another miniblue. Fixtures therefore only need `provider "azurerm" { features {} }`. It cleans up on exit; `ACC_KEEP=1` keeps the work dir.
+The runner starts its own miniblue process in stub mode with `MINIBLUE_DISABLE_DOCKER=1` and in-memory state, ignoring `PERSISTENCE` and `DATABASE_URL`. It generates a throwaway certificate, builds a CA bundle combining the system roots and the miniblue certificate for `SSL_CERT_FILE`, and sets the `ARM_*` provider environment variables. It stops if `PORT` or `TLS_PORT` already accepts connections, so it never tests another miniblue instance. Fixtures only need `provider "azurerm" { features {} }`. The runner cleans up on exit unless `ACC_KEEP=1` is set to keep the working directory.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
@@ -37,7 +35,7 @@ The runner starts its own miniblue (stub mode, `MINIBLUE_DISABLE_DOCKER=1`, alwa
 | `PORT` / `TLS_PORT` | `4566` / `4567` | miniblue ports (change if taken) |
 | `ACC_STEP_TIMEOUT` | `600` | seconds per terraform step |
 | `ACC_SETUP_SYSTEM` | unset | allow `sudo` for `/etc/hosts` entries and `ip_unprivileged_port_start` |
-| `ACC_KEEP` | unset | keep the work dir |
+| `ACC_KEEP` | unset | keep the working directory |
 | `TF_PLUGIN_CACHE_DIR` | unset | avoid re-downloading the provider |
 
 Explicit `provider "azurerm"` settings in a root module override the environment. The quickstart sets `metadata_host = "localhost:4567"`, so run it on the default ports.
@@ -71,12 +69,12 @@ No fixture fails. To record one, do not drop the fixture. Add a separate matrix 
 
 | Fixture | Step | Failing diff | Tracking |
 |---------|------|--------------|----------|
-| none yet (`azurerm_storage_blob`, `backend "azurerm"`) | apply / init | data-plane requests to `https://<account>.blob.core.windows.net/` are not served: miniblue has no host-style blob routing | [#3](https://github.com/kewalaka/miniblue/issues/3) |
+| none yet (`azurerm_storage_blob`, `backend "azurerm"`) | apply / init | data-plane requests to `https://<account>.blob.core.windows.net/` are not served because miniblue has no host-style blob routing | [#3](https://github.com/kewalaka/miniblue/issues/3) |
 
 ## Not covered
 
-- Blob/queue/table/file **data plane** (`azurerm_storage_blob`, `backend "azurerm"`). The provider derives data-plane URLs from `https://<account>.blob.core.windows.net/`, which needs host-style routing in miniblue. Planned follow-up: [#3](https://github.com/kewalaka/miniblue/issues/3).
-- With `MINIBLUE_STORAGE_ENDPOINT` set, `azurerm_storage_container` (and `azurerm_storage_blob` referencing a container resource) cannot work: path-style endpoints do not parse. `azurerm_storage_blob` with a literal `storage_container_id` works path-style. Leave the variable unset for Terraform; see [Configuration](../getting-started/configuration.md), including the RBAC state backend note.
+- Blob, queue, table, and file data plane (`azurerm_storage_blob`, `backend "azurerm"`). The provider derives data-plane URLs from `https://<account>.blob.core.windows.net/`, which needs host-style routing in miniblue. This is tracked in [#3](https://github.com/kewalaka/miniblue/issues/3).
+- With `MINIBLUE_STORAGE_ENDPOINT` set, `azurerm_storage_container` (and `azurerm_storage_blob` referencing a container resource) cannot work because path-style endpoints do not parse. `azurerm_storage_blob` with a literal `storage_container_id` works path-style. Leave the variable unset for Terraform; see [Configuration](../getting-started/configuration.md), including the RBAC state backend note.
 - Key Vault data plane (secrets, keys).
 - Docker-backed services (real containers); VMs run in stub mode.
 - `examples/terraform/aks` and `examples/terraform/scenarios/*` (still azurerm `~> 3.0`).

@@ -1,4 +1,4 @@
-# ADR-0003: Pipeline phases and hooks
+# ADR-0003: pipeline phases and hooks
 
 Status: Proposed
 
@@ -84,11 +84,11 @@ GET, List and DELETE run phases 1, 2, 4, 5 and 10 (DELETE only).
 
 Any `Reader` or store error in any phase gives 500 `InternalServerError`. Failures are never treated as "not found" or "no assignments".
 
-Existence checks in phase 5 are deliberately narrow, so that coexistence with legacy types works:
+Existence checks in phase 5 are narrow so coexistence with legacy types works:
 
-- **Child types** (declared via `Children`): the parent doc must exist in the engine store. Otherwise 404 `ParentResourceNotFound`. The parent is always an engine type by construction.
-- **RG and subscription scope:** `ScopeExists` is called. The server wires the RG check.
-- **Extension resources at resource scope** (e.g. a roleAssignment on a legacy vault): **not existence-checked.** The scope may be a legacy resource that the engine cannot see. This is documented as a known deviation until a cross-system resolver is justified.
+- **Child types (declared via `Children`).** The parent doc must exist in the engine store, otherwise the engine returns 404 `ParentResourceNotFound`. The parent is always an engine type by construction.
+- **RG and subscription scope.** The engine calls `ScopeExists`. The server wires the RG check.
+- **Extension resources at resource scope (for example a roleAssignment on a legacy vault).** The engine does not existence-check these, because the scope may be a legacy resource that the engine cannot see. This is a known deviation until a cross-system resolver is justified.
 
 Authn is not a phase. A small, always-on middleware puts a `Principal` on `ctx` (from `oid`, else `sub`, read from the unverified bearer). It never fails a request.
 
@@ -173,8 +173,8 @@ type IdentityLookup func(id string) (principalID, clientID string, ok bool)
 `DefaultIdentity` semantics (exact, so implementations cannot drift):
 
 - **No-op** when `doc.identity` is absent, or its `type` is `None`. The client's removal stands.
-- **`SystemAssigned` in `type`:** set `principalId` and `tenantId`. Copy them from `cur.identity` if Current also had SystemAssigned, else generate a new UUID and use the default tenant.
-- **`UserAssigned` in `type`:** for each key of `userAssignedIdentities`, set `principalId` and `clientId` from `uami(key)`. Azure echoes the identity resource's own ids, and Terraform configs often cross-reference them. If the lookup is nil or misses, copy from the same key in Current, else generate UUIDs. Whether Azure rejects a missing identity is (verify).
+- **`SystemAssigned` in `type`.** Set `principalId` and `tenantId`. Copy them from `cur.identity` if Current also had SystemAssigned; otherwise generate a new UUID and use the default tenant.
+- **`UserAssigned` in `type`.** For each key of `userAssignedIdentities`, set `principalId` and `clientId` from `uami(key)`. Azure echoes the identity resource's own ids, and Terraform configs often cross-reference them. If the lookup is nil or misses, copy from the same key in Current; otherwise generate UUIDs. Whether Azure rejects a missing identity is (verify).
 - Never adds an identity block the client did not send.
 
 The server builds one `IdentityLookup` over the identity service. It reads legacy keys today and engine docs after wave 2, so callers never change.
@@ -194,10 +194,10 @@ The server builds one `IdentityLookup` over the identity service. It reads legac
 
 ## Rejected alternatives
 
-- **Hooks outside the lock with optimistic retry:** more code and subtle bugs, for throughput nobody needs.
-- **Authorize under the write lock:** a write racing a concurrent role revocation is indistinguishable from one that arrived a moment earlier. Real Azure RBAC is eventually consistent too. Authorizing before the lock keeps reads and writes on one code path.
-- **Per-type mutexes:** cross-type validation (role definition lookup, parent existence) would need lock ordering.
-- **A middleware chain (`func(next) Handler`) per phase:** flexible but opaque ordering. That is the current problem, moved inward.
-- **`NamePattern`, `Immutable []string` or `Unique` fields on Type:** each one is a one-line hook. Declarative fields grow into a DSL.
-- **A separate `arm.Error` type:** duplicates `azerr`. Extend `azerr` instead (ADR-0006).
-- **An authn phase that rejects requests:** a non-goal. Real auth is out of scope, and a missing token resolves to the default principal.
+- **Hooks outside the lock with optimistic retry.** This adds more code and subtle bugs for throughput nobody needs.
+- **Authorize under the write lock.** A write racing a concurrent role revocation is indistinguishable from one that arrived a moment earlier, and real Azure RBAC is eventually consistent too. Authorizing before the lock keeps reads and writes on one code path.
+- **Per-type mutexes.** Cross-type validation (role definition lookup, parent existence) would require lock ordering.
+- **A middleware chain (`func(next) Handler`) per phase.** Ordering becomes opaque, which repeats the current problem inside the engine.
+- **`NamePattern`, `Immutable []string`, or `Unique` fields on Type.** Each rule is a one-line hook, and declarative fields grow into a DSL.
+- **A separate `arm.Error` type.** This duplicates `azerr`. Extend `azerr` instead (ADR-0006).
+- **An authn phase that rejects requests.** Real auth is out of scope, and a missing token resolves to the default principal.

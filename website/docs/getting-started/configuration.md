@@ -13,22 +13,22 @@ miniblue works with zero configuration out of the box. This page covers everythi
 | `LOCAL_AZURE_CERT_DIR` | `~/.miniblue` | Directory for TLS certificate and key |
 | `DATABASE_URL` | _(unset)_ | PostgreSQL connection string for persistent storage |
 | `MINIBLUE_STORAGE_ENDPOINT` | _(unset)_ | Overrides storage account data-plane endpoints to point to local server (enables SDK/data-plane testing) |
-| `MINIBLUE_DISABLE_SHAREDKEY_AUTH` | _(unset)_ | When truthy (`1`, `true`, `yes`, `on`), skips **all** blob data-plane authentication (SharedKey and Bearer); tokens are never validated. Dev-only — never enable in environments that model production. |
+| `MINIBLUE_DISABLE_SHAREDKEY_AUTH` | _(unset)_ | When truthy (`1`, `true`, `yes`, `on`), skips all blob data-plane authentication (SharedKey and Bearer); tokens are never validated. Development only. Never enable in environments that model production. |
 | `MINIBLUE_DISABLE_DOCKER` | _(unset)_ | When set, forces [Virtual Machines](../services/virtual-machines.md) into stub mode even if a Docker daemon is reachable. |
 
-When set, storage accounts return local **path-style** endpoints (e.g., `http://localhost:4566/blob/{accountName}/`) instead of real Azure endpoints (e.g., `https://{accountName}.blob.core.windows.net/`). This allows SDKs and tools to connect directly to miniblue's local blob/queue/table/file services for data-plane testing.
+When `MINIBLUE_STORAGE_ENDPOINT` is set, storage accounts return local path-style endpoints (for example, `http://localhost:4566/blob/{accountName}/`) instead of real Azure endpoints (for example, `https://{accountName}.blob.core.windows.net/`). This lets SDKs and tools connect to miniblue's local blob, queue, table, and file services for data-plane testing.
 
 !!! warning "Terraform and `MINIBLUE_STORAGE_ENDPOINT`"
-    With this variable set, `azurerm_storage_container` cannot work, and neither can `azurerm_storage_blob` when its `storage_container_id` references an `azurerm_storage_container`: the provider cannot parse path-style endpoints. `azurerm_storage_blob` with a literal `storage_container_id` (an ARM container ID string) does work path-style. To use `azurerm_storage_container`, leave the variable unset: it then works through the ARM API (use `storage_account_id`). Host-style data-plane endpoints (`https://{accountName}.blob.core.windows.net/`) served by miniblue are a planned follow-up ([#3](https://github.com/kewalaka/miniblue/issues/3)).
+    With this variable set, `azurerm_storage_container` cannot work, and neither can `azurerm_storage_blob` when its `storage_container_id` references an `azurerm_storage_container`. The provider cannot parse path-style endpoints. `azurerm_storage_blob` with a literal `storage_container_id` (an ARM container ID string) does work path-style. To use `azurerm_storage_container`, leave the variable unset. It then works through the ARM API using `storage_account_id`. Host-style data-plane endpoints (`https://{accountName}.blob.core.windows.net/`) served by miniblue are a planned follow-up ([#3](https://github.com/kewalaka/miniblue/issues/3)).
 
 !!! note "State backend with RBAC today"
-    `backend "azurerm"` works against miniblue with Entra auth when `use_azuread_auth = true`, `lookup_blob_endpoint = true` and `resource_group_name` are set (no `access_key`/`sas_token`), and miniblue runs with `MINIBLUE_STORAGE_ENDPOINT` (for example `http://localhost:4566`) and `MINIBLUE_DISABLE_SHAREDKEY_AUTH=1`. The backend then takes the path-style endpoint from the ARM response.
+    `backend "azurerm"` works against miniblue with Entra auth when `use_azuread_auth = true`, `lookup_blob_endpoint = true`, and `resource_group_name` are set (with no `access_key` or `sas_token`), and miniblue runs with `MINIBLUE_STORAGE_ENDPOINT` (for example `http://localhost:4566`) and `MINIBLUE_DISABLE_SHAREDKEY_AUTH=1`. The backend then takes the path-style endpoint from the ARM response.
 
-    `MINIBLUE_DISABLE_SHAREDKEY_AUTH` is a blunt, dev-only switch: it skips **all** blob data-plane authentication (SharedKey and Bearer), and tokens are never validated. Without it, the blob handler returns 403 `AuthenticationFailed` for Bearer requests on accounts created through ARM. The proper fix is tracked in [#3](https://github.com/kewalaka/miniblue/issues/3).
+    `MINIBLUE_DISABLE_SHAREDKEY_AUTH` is a development-only switch. It skips all blob data-plane authentication (SharedKey and Bearer), and miniblue never validates tokens. Without it, the blob handler returns 403 `AuthenticationFailed` for Bearer requests on accounts created through ARM. The proper fix is tracked in [#3](https://github.com/kewalaka/miniblue/issues/3).
 
 The metadata endpoint's `suffixes.storage` is `core.windows.net` by default, and `localhost:<PORT>` when `MINIBLUE_STORAGE_ENDPOINT` is set.
 
-Example -- run on custom ports:
+Run on custom ports:
 
 ```bash
 PORT=8080 TLS_PORT=8443 ./bin/miniblue
@@ -113,19 +113,19 @@ LOCAL_AZURE_CERT_DIR=/tmp/my-certs ./bin/miniblue
 
 ### Persistent storage
 
-By default miniblue stores everything in memory (lost on restart). For persistence, set `DATABASE_URL`:
+By default, miniblue stores data in memory and clears it on restart. For persistent storage, set `DATABASE_URL`:
 
 ```bash
 DATABASE_URL=postgres://user:pass@localhost:5432/miniblue ./bin/miniblue
 ```
 
-Or use the included Postgres docker-compose:
+Or use the included Postgres docker-compose file:
 
 ```bash
 docker-compose -f docker-compose.postgres.yml up
 ```
 
-Persisted state (file or Postgres) is stamped with a schema version. If a miniblue release changes how state is stored, startup stops with a message naming both versions. Delete `~/.miniblue/state.json` (or `TRUNCATE miniblue_store` on Postgres) and restart. State is never reset automatically.
+Persisted state in a file or Postgres includes a schema version. If a miniblue release changes how state is stored, miniblue stops on startup with a message naming both versions. Delete `~/.miniblue/state.json` (or run `TRUNCATE miniblue_store` on Postgres) and restart. miniblue never resets state automatically.
 
 ## Docker configuration
 
@@ -169,7 +169,7 @@ curl http://localhost:4566/health
 
 ## Storage
 
-miniblue uses **in-memory storage** by default. All data is lost when the process exits. This is intentional -- it keeps tests fast and repeatable.
+miniblue uses in-memory storage by default. All data is cleared when the process exits. This keeps tests fast and repeatable.
 
 !!! info "Persistent storage"
     File-backed persistent storage is on the [roadmap](https://github.com/moabukar/miniblue). Contributions welcome.

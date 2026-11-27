@@ -1,4 +1,4 @@
-# ADR-0005: Type metadata and the conformance suite
+# ADR-0005: type metadata and the conformance suite
 
 Status: Proposed
 
@@ -14,7 +14,7 @@ There are about 25 new types to add, and each one needs the same ARM behaviours 
 - the error envelope;
 - `provisioningState`.
 
-The engine registers types by hand (`registry.go`). `Register` panics on malformed metadata. `lookup` is private, and there is no `Types()`. `APIVersions` currently gates requests the wrong way round: an unknown version gives 400, while a missing version is accepted.
+The engine registers types by hand (`registry.go`). `Register` panics on malformed metadata. `lookup` is private, and there is no `Types()`. `APIVersions` currently gates requests the wrong way round. An unknown version gives 400, while a missing version is accepted.
 
 Only `tests/arm_policydefinition_test.go` exercises the engine, and that one test is bespoke.
 
@@ -44,11 +44,11 @@ func Register(reg *arm.Registry) {
 
 ### api-version is metadata, not a gate
 
-- **Missing:** 400 `MissingApiVersionParameter`.
-- **Malformed** (not `YYYY-MM-DD` with an optional `-preview` or similar suffix): 400 `InvalidApiVersionParameter`.
+- **Missing.** Returns 400 `MissingApiVersionParameter`.
+- **Malformed.** Any value that is not `YYYY-MM-DD` with an optional `-preview` or similar suffix returns 400 `InvalidApiVersionParameter`.
 - **Any well-formed version is accepted.** `APIVersions` feeds `/providers` output and armtest, and nothing else.
 
-Why: clients (azapi schema validation, the SDKs) already pin versions. Gating rots with every SDK bump, and miniblue serves one shape per type regardless of version.
+Clients (azapi schema validation and the SDKs) already pin versions. Gating rots with every SDK bump, and miniblue serves one shape per type regardless of version.
 
 ### `internal/arm/armtest` (non-test package)
 
@@ -110,9 +110,9 @@ The cost of a new type is the registration, any hooks, and one Sample of about 1
 
 ## Rejected alternatives
 
-- **Codegen from the azure-rest-api-specs repo or bicep-types:** large inputs, a build step, and the generated validation is still not behaviour. Hand-written types are about 20 lines each.
-- **Loading bicep-types at runtime:** tens of MB of data plus startup cost.
-- **api-version allow-list gating:** rots, has no behavioural payoff, and clients already validate.
-- **A strict flag for gating:** YAGNI.
-- **Per-type hand-written CRUD tests:** duplicative, and they drift from each other.
-- **An `armtest.Options` struct:** a second source of truth beside `Type`.
+- **Codegen from the azure-rest-api-specs repo or bicep-types.** This adds large inputs and a build step, and the generated validation is still not behaviour. Hand-written types are about 20 lines each.
+- **Loading bicep-types at runtime.** This adds tens of MB of data and startup cost.
+- **api-version allow-list gating.** Allow-lists rot with every SDK release, have no behavioural payoff, and clients already validate.
+- **A strict flag for gating.** No user needs it.
+- **Per-type hand-written CRUD tests.** These duplicate checks and drift from each other.
+- **An `armtest.Options` struct.** This creates a second source of truth beside `Type`.

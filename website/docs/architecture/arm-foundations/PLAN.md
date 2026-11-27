@@ -1,8 +1,8 @@
 # Phased PR plan
 
-Action small tasks in sets.  Each PR uses a conventional-commit title, and keeps `go test ./...` green. Sizes: S (under 200 lines), M (200 to 600), L (over 600). A PR may start once everything in its Depends column has merged. Rows with no dependency can run in parallel.
+Action small tasks in sets. Each PR uses a conventional-commit title and keeps `go test ./...` green. Sizes are S (under 200 lines), M (200 to 600), and L (over 600). A PR may start once everything in its Depends column has merged. Rows with no dependency can run in parallel.
 
-## Phase 0: Hygiene (no behaviour change for users)
+## Phase 0: hygiene (no behaviour change for users)
 
 | # | PR | Size | Depends | Notes |
 |---|---|---|---|---|
@@ -26,7 +26,7 @@ README findings 21 to 24 (Redis PUT body, LB `resourceGuid`, KV name validation,
 - The schema stamp is in place.
 - Zero struct type-asserts on store values remain (one grep, recorded in the PR).
 
-## Phase 1: Engine foundation
+## Phase 1: engine foundation
 
 | # | PR | Size | Depends | Notes |
 |---|---|---|---|---|
@@ -43,9 +43,9 @@ README findings 21 to 24 (Redis PUT body, LB `resourceGuid`, KV name validation,
 
 - policyDefinitions passes armtest through the full server handler.
 - The hook signatures and the `Type` fields are frozen. Any change from here on needs an ADR-0003 amendment.
-- Startup time and RSS at idle are within 5% of `main` (measure: `time` to first 200 on `/health`, and RSS after 10 s).
+- Startup time and RSS at idle are within 5% of `main`. Measure time to first 200 on `/health` and RSS after 10 s.
 
-## Phase 2: Slices
+## Phase 2: slices
 
 The two slices run in parallel. Within each, follow the Depends column.
 
@@ -71,7 +71,7 @@ The two slices run in parallel. Within each, follow the Depends column.
 - Decide on the legacy `Guard` (ADR-0008). Build it only if enforcement on unmigrated types is requested. It is not a prerequisite for any later gate.
 - **New types (the about 25 planned) may start after G2.** They are engine-only, using the recipe.
 
-## Phase 3: Platform
+## Phase 3: platform
 
 | # | PR | Size | Depends | Notes |
 |---|---|---|---|---|
@@ -88,7 +88,7 @@ The two slices run in parallel. Within each, follow the Depends column.
 - With enforcement on, RBAC and policy apply to the engine-type resources in that template, and the deny comes back as a deployment error. Legacy-type resources are not enforced unless the Guard was built (ADR-0008).
 - Decide whether roleDefinitions move onto the engine. That needs a Get fallback for built-ins. Only proceed if it is cheaper than keeping the narrowed middleware.
 
-## Phase 4: Migration waves (parallel per type, lesser agents)
+## Phase 4: migration waves (parallel per type, lesser agents)
 
 Follow the ADR-0007 recipe exactly. One PR per type family, titled `refactor(<rp>): serve <type> via arm engine`.
 
@@ -105,7 +105,7 @@ Each wave PR cites its [catalogue](catalogue/index.md) page as the acceptance li
 - No `Type` fields were added outside an ADR amendment.
 - Every PR that moved a type bumped `SchemaVersion` and added a CHANGELOG reset line.
 
-## Phase 5: Heavy types and retirement
+## Phase 5: heavy types and retirement
 
 - **Gate G5** applies per type: vm, compute, aks, sites, apps, functions. Migrate the ARM shell only on a fidelity or enforcement need (ADR-0007). Otherwise they stay bespoke.
 - **Retirement PRs**, each `refactor(server): remove <x>` when its last consumer is gone:
@@ -120,13 +120,13 @@ Each wave PR cites its [catalogue](catalogue/index.md) page as the acceptance li
 
 ## Proposed, not scheduled
 
-Rows suggested by the [scenario catalogue](catalogue/engine-lessons.md) (secret projection, seeded singleton children, soft-delete seam, `NameTaken`/`ValidateLocation`, provider registration state, deployments validate/cancel/export, `$top`/`nextLink`, extra `armtest` checks). They are proposals: each needs an owner decision, and any seam needs an ADR amendment first. New resource types listed in the catalogue (SQL, Insights, Log Analytics, Event Hubs, management groups) are engine-only registrations and may start after G2.
+Rows suggested by the [scenario catalogue](catalogue/engine-lessons.md) (secret projection, seeded singleton children, soft-delete seam, `NameTaken`/`ValidateLocation`, provider registration state, deployments validate/cancel/export, `$top`/`nextLink`, extra `armtest` checks) are proposals. Each needs an owner decision, and any seam needs an ADR amendment first. New resource types listed in the catalogue (SQL, Insights, Log Analytics, Event Hubs, management groups) are engine-only registrations and may start after G2.
 
 ## Definition of done
 
-Three loops. The first one keeps CI and review cheap, so do not skip it.
+Work moves through three loops. The first keeps CI and review cheap, so do not skip it.
 
-**1. Inner loop (local, before every push).** Seconds to a couple of minutes.
+**1. Inner loop (local, before every push).** This takes seconds to a couple of minutes.
 
 - `go build ./... && go vet ./... && go test ./internal/...`, then `go test ./tests -run <Type>` for the area touched. CI runs `go test -race ./...` always. Add `-race` locally only where CGO is available (it needs `CGO_ENABLED=1` and a C compiler).
 - New or migrated type: an armtest `Sample` and the T2 rows from its [catalogue](catalogue/index.md) page.

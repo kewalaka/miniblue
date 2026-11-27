@@ -1,6 +1,6 @@
-# Services Overview
+# Services overview
 
-miniblue emulates 32 Azure services on a single port. All services use in-memory storage (or optional file/Postgres persistence) and require no authentication.
+miniblue emulates 32 Azure services on a single port. All services use in-memory storage, with optional file or Postgres persistence, and require no authentication.
 
 ## Service status
 
@@ -40,8 +40,8 @@ miniblue emulates 32 Azure services on a single port. All services use in-memory
 
 ### What "ARM API" and "Data Plane" mean
 
-- **ARM API** -- the service responds to Azure Resource Manager style URLs (`/subscriptions/{sub}/resourceGroups/{rg}/providers/...`). This is what Terraform and the Azure CLI use.
-- **Data Plane** -- the service responds to simplified REST URLs for direct data operations (e.g. `/blob/{account}/{container}/{blob}`). This is what the azlocal CLI and curl use.
+- **ARM API.** The service responds to Azure Resource Manager URLs (`/subscriptions/{sub}/resourceGroups/{rg}/providers/...`), which Terraform and the Azure CLI use.
+- **Data Plane.** The service responds to simplified REST URLs for direct data operations, for example `/blob/{account}/{container}/{blob}`. The azlocal CLI and curl use these endpoints.
 
 ## Terraform compatibility
 
@@ -104,7 +104,7 @@ POST /cosmosdb/{account}/dbs/{db}/colls/{coll}/docs
 
 | Parameter | Notes |
 |-----------|-------|
-| `api-version` | Accepted but not enforced, except for types served by the [ARM engine](../architecture/arm-engine.md) (e.g. Policy Definitions), which reject versions they do not list with `400 InvalidApiVersionParameter`. |
+| `api-version` | Accepted but not enforced, except for types served by the [ARM engine](../architecture/arm-engine.md), such as Policy Definitions, which reject versions they do not list with `400 InvalidApiVersionParameter`. |
 
 ## Error format
 

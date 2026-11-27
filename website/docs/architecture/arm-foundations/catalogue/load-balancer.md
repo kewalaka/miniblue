@@ -1,8 +1,8 @@
 # Load Balancer
 
-> Engine fit: passthrough (all `Microsoft.Network/loadBalancers` types). miniblue today: hand-written service `internal/services/loadbalancer`, already a superset of what the engine needs (full CRUD, three child types, list by subscription). Suggested wave: wave 4 (PLAN phase 4). Until then only the small additions below are worth doing.
+> Engine fit is passthrough for all `Microsoft.Network/loadBalancers` types. miniblue today has a hand-written service `internal/services/loadbalancer` that is already a superset of what the engine needs (full CRUD, three child types, list by subscription). Suggested wave is wave 4 (PLAN phase 4). Until then only the small additions below are worth doing.
 
-miniblue is ahead of the source inventory here. The source scenarios are mostly covered by `tests/loadbalancer_test.go` (lifecycle, not found, defaults, multiple, and per-child lifecycle, defaults and not found for pools, probes and rules). This page records the remainder.
+miniblue is ahead of the source inventory here. `tests/loadbalancer_test.go` covers most of the source scenarios (lifecycle, not found, defaults, multiple load balancers, and per-child lifecycle, defaults and not found for pools, probes and rules). This page records the remainder.
 
 ## Types
 
@@ -15,35 +15,35 @@ miniblue is ahead of the source inventory here. The source scenarios are mostly 
 
 Ordered by value. Only the first group is worth doing before the wave 4 migration.
 
-- No PATCH on a load balancer (`internal/services/loadbalancer/handler.go:23-57`, route table). Real PATCH updates tags only.
+- No PATCH route exists on a load balancer (`internal/services/loadbalancer/handler.go:23-57`). Real PATCH updates tags only.
 - `resourceGuid` is regenerated on every PUT (`handler.go:156`; children at `handler.go:188`, `handler.go:219`, `handler.go:238`). It must stay stable for the life of the resource.
-- DELETE returns a bare 202 with no operation headers (`handler.go:311`). A client that polls the LRO has nothing to follow. Sync-only (ADR-0006) wants 200 when it existed and 204 when it did not. The existing `TestLoadBalancerDeleteNotFound` asserts 404 for a missing load balancer and will flip to 204.
+- DELETE returns a bare 202 with no operation headers (`handler.go:311`), so a client that polls the LRO has nothing to follow. Sync-only (ADR-0006) expects 200 when it existed and 204 when it did not. The existing `TestLoadBalancerDeleteNotFound` asserts 404 for a missing load balancer and will flip to 204.
 - Default location is `eastus` (`handler.go:131-134`) instead of requiring `location` or taking it from the resource group.
-- Default `sku` is `Standard` / `Regional` when none is sent (`handler.go:136-139`); real Azure applies `Basic` when the field is omitted on older versions `(verify)`.
-- No RG-exists check on PUT.
+- Default `sku` is `Standard` / `Regional` when none is sent (`handler.go:136-139`). Real Azure applies `Basic` when the field is omitted on older versions `(verify)`.
+- PUT does not check that the resource group exists.
 - Inline arrays on the load balancer body (`backendAddressPools`, `probes`, `loadBalancingRules`) and the child routes are not kept in sync, so a rule added through the child route is invisible in the parent `GET`.
-- No azurerm or azapi fixture for a load balancer (`tests/terraform/azurerm/network/main.tf` has none).
+- No azurerm or azapi fixture exists for a load balancer (`tests/terraform/azurerm/network/main.tf` has none).
 
 ## Scenarios
 
 | ID | Behaviour (real Azure) | Expect | Tier | Notes |
 |---|---|---|---|---|
-| G2-T106 | Create, get, delete, list by RG, list by subscription, update tags. | `PUT` => 201 on create, 200 on replace; `GET` => 200; `PATCH` `{tags}` => 200 and tags persist on the next `GET`; list by subscription includes every load balancer; `DELETE` => 200 then `GET` => 404 `ResourceNotFound`. | T2 | Extend `tests/loadbalancer_test.go`. New work is PATCH and the DELETE status. List by subscription already exists (`handler.go:57`). |
-| G2-T107 | azurerm and azapi create a basic-SKU load balancer. | Apply and destroy succeed; sku `Basic`; tags preserved across a no-op re-apply. | T3 | New fixture; none exists today. Which child reads azurerm issues after create is `(verify)`. |
-| G2-T108 | Show returns every property. | `GET` body carries `frontendIPConfigurations`, `backendAddressPools`, `loadBalancingRules`, `probes` and `inboundNatRules` as configured, with stable ids and `resourceGuid`. | T2 | Needs the inline and child sync, plus `inboundNatRules` support (worth adding is `(verify)`). |
+| G2-T106 | Create, get, delete, list by RG, list by subscription, and update tags. | `PUT` returns 201 on create and 200 on replace; `GET` returns 200; `PATCH` with `{tags}` returns 200 and persists tags on the next `GET`; list by subscription includes every load balancer; `DELETE` returns 200 and `GET` after returns 404 `ResourceNotFound`. | T2 | Extend `tests/loadbalancer_test.go`. New work is PATCH and the DELETE status. List by subscription already exists (`handler.go:57`). |
+| G2-T107 | azurerm and azapi create a basic-SKU load balancer. | Apply and destroy succeed; sku is `Basic`; tags are preserved across a no-op re-apply. | T3 | New fixture because none exists today. Which child reads azurerm issues after create is `(verify)`. |
+| G2-T108 | Show returns every property. | `GET` body carries `frontendIPConfigurations`, `backendAddressPools`, `loadBalancingRules`, `probes` and `inboundNatRules` as configured, with stable ids and `resourceGuid`. | T2 | Needs inline and child sync, plus `inboundNatRules` support (whether it is worth adding is `(verify)`). |
 
 ## Pitfalls
 
 - A real PATCH on a load balancer changes tags only. Treat any other body field as ignored or rejected `(verify)`; do not run a generic deep merge.
-- `resourceGuid` is assigned once. Regenerating on PUT breaks diff checks in azurerm.
-- A bare 202 with no `Location` or `Azure-AsyncOperation` header is a polling trap; return 200 or 204 synchronously.
+- `resourceGuid` is assigned once. Regenerating it on PUT breaks diff checks in azurerm.
+- A bare 202 with no `Location` or `Azure-AsyncOperation` header is a polling trap. Return 200 or 204 synchronously.
 - Real DELETE on a missing load balancer returns 204 in ARM, not 404.
 - PUT on an existing load balancer returns 200, not 201.
-- A child with a missing parent load balancer is 404 `ParentResourceNotFound`, not `ResourceNotFound`.
-- A missing or malformed api-version is 400; any well-formed version is accepted.
+- A child with a missing parent load balancer returns 404 `ParentResourceNotFound`, not `ResourceNotFound`.
+- A missing or malformed api-version returns 400; any well-formed version is accepted.
 
 ## Dropped
 
 | ID | Reason |
 |---|---|
-| none | Nothing dropped; every id in this group is a scenario above. |
+| none | Nothing is dropped; every id in this group is a scenario above. |

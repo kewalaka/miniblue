@@ -1,6 +1,6 @@
-# Quick Start
+# Quick start
 
-Your first 5 minutes with miniblue. By the end you will have created a resource group, stored a secret in Key Vault, and uploaded a blob -- all locally, no Azure account needed.
+This guide walks through creating a resource group, storing a secret in Key Vault, and uploading a blob locally without an Azure account.
 
 ## 1. Start miniblue
 

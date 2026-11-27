@@ -18,13 +18,12 @@ miniblue emulates Azure Network Interfaces (NICs) via ARM endpoints. NICs suppor
 - Private IPv4 addresses default to deterministic values in the `10.0.x.y`
   range when `privateIPAllocationMethod` is `Dynamic` and no explicit
   `privateIPAddress` is supplied.
-- A stable `etag` and resource `id` are assigned on first create.
-- Subnet, Public IP and Network Security Group references on each
-  `ipConfiguration` are echoed back exactly as supplied so Terraform's
-  reference tracking remains consistent.
-- When a NIC is referenced from a Virtual Machine's
-  `networkProfile.networkInterfaces`, the VM resource ID is surfaced on the
-  NIC's `properties.virtualMachine.id`.
+- miniblue assigns a stable `etag` and resource `id` on first create.
+- miniblue echoes subnet, Public IP and Network Security Group references on
+  each `ipConfiguration` as supplied so Terraform's reference tracking remains
+  consistent.
+- When a Virtual Machine references a NIC in `networkProfile.networkInterfaces`,
+  miniblue sets `properties.virtualMachine.id` on the NIC to the VM resource ID.
 
 ## Terraform
 
@@ -45,7 +44,7 @@ resource "azurerm_network_interface" "example" {
 
 ## Limitations
 
-- No accelerated networking enforcement (the flag is round-tripped only).
-- No application security group, IP tag, or auxiliary mode behaviour.
-- IPv6 configurations are accepted on PUT but not validated.
+- Accelerated networking is not enforced, and the flag is only stored and returned.
+- Application security groups, IP tags, and auxiliary mode are not implemented.
+- IPv6 configurations are accepted on `PUT` but not validated.
 

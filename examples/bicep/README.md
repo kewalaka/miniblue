@@ -51,4 +51,4 @@ Not supported yet (open follow-up issue #74):
 - Subscription-scope, management-group-scope, and tenant-scope deployments
 - `What-If` and `Validate` operations
 
-For Bicep files that use unsupported constructs, the deployment endpoint will pass them through to the handler unchanged (which usually means the resource gets a literal expression string in the field). Use literals or pre-flattened ARM JSON in the meantime.
+For Bicep files that use unsupported constructs, the deployment endpoint passes them through to the handler unchanged, which usually leaves a literal expression string in the resource field. Use literals or pre-flattened ARM JSON in the meantime.

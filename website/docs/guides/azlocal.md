@@ -1,6 +1,6 @@
 # azlocal CLI
 
-`azlocal` is a command-line client for miniblue, similar to `awslocal` for LocalStack. It wraps HTTP calls to the miniblue API -- no authentication required.
+`azlocal` is a command-line client for miniblue, similar to `awslocal` for LocalStack. It sends HTTP calls to the miniblue API without authentication.
 
 ## Installation
 
@@ -314,10 +314,10 @@ azlocal identity delete --resource-group myRG --name myid
 
 ### role (Azure RBAC)
 
-Role assignments and definitions are stored but **never enforced** — every
-other miniblue service still serves every request without authorization
-checks. The commands exist so Terraform's `azurerm_role_assignment` and
-`az role` workflows plan and apply cleanly against miniblue.
+miniblue stores role assignments and definitions, but it does not enforce them.
+Every other miniblue service serves requests without authorization checks.
+These commands exist so Terraform's `azurerm_role_assignment` and `az role`
+workflows plan and apply cleanly against miniblue.
 
 ```bash
 # Role assignments

@@ -1,6 +1,6 @@
 # Table Storage
 
-miniblue emulates Azure Table Storage via data plane endpoints. Supports table creation, entity upsert, get, query and delete with partition and row key support.
+miniblue emulates Azure Table Storage via data plane endpoints. It supports creating tables and upserting, getting, querying and deleting entities with partition and row keys.
 
 ## API endpoints
 
@@ -14,6 +14,6 @@ miniblue emulates Azure Table Storage via data plane endpoints. Supports table c
 
 ## Limitations
 
-- No OData query filtering
-- No batch operations
-- No continuation tokens for large result sets
+- OData query filtering is not supported.
+- Batch operations are not supported.
+- Continuation tokens for large result sets are not supported.

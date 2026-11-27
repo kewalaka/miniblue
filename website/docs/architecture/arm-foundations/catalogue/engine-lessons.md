@@ -55,7 +55,7 @@ One envelope everywhere: `{"error":{"code","message","target"?,"details"?}}` as 
 Rules that follow:
 
 - Missing parent is `ParentResourceNotFound`, not a per-service code (`VirtualNetworkNotFound`, `SubnetNotFound`) `(verify)`.
-- 404 messages are scope-aware: "under resource group" only at RG scope.
+- 404 messages are scope-aware, using "under resource group" only at RG scope.
 - Hooks return `*azerr.Error`; a plain `error` becomes 400 `InvalidRequestContent` (ADR-0003 phase 8).
 - Any `Reader` or store failure is 500, so an outage never looks like an empty list.
 
@@ -101,12 +101,12 @@ Rules that follow:
 | Concern | Lesson | Today |
 |---|---|---|
 | Server-owned fields | Keys, creation times, generated GUIDs and URLs must survive a replacing PUT. Copy from `Current` in `Defaults`; Defaults must be idempotent | Covered by ADR-0003 and the DefaultsIdempotent check |
-| Global name uniqueness | DNS-global names (storage, SQL server, Service Bus, Key Vault, ACR, APIM) conflict across RGs and subscriptions: 409 (storage uses `StorageAccountAlreadyTaken` `(verify)`) | No helper. A hook can scan with `Reader.Under`, but a cross-subscription check needs a store-wide lookup |
+| Global name uniqueness | DNS-global names (storage, SQL server, Service Bus, Key Vault, ACR, APIM) conflict across RGs and subscriptions with 409 (storage uses `StorageAccountAlreadyTaken` `(verify)`) | No helper. A hook can scan with `Reader.Under`, but a cross-subscription check needs a store-wide lookup |
 | Location | `location` is required on regional types (400) and must be in the type's list (400 `LocationNotAvailableForResourceType`); global types have no `location` | No helper. Each type would hand-roll it |
 | Tags | Replace on PUT, default `{}`, PATCH per `PatchMode`. Limits of 50 tags, name up to 512, value up to 256 `(verify)` | Modes covered; limits not enforced |
 | Singleton and default children | `default`, `current`, `$Default`, `RootManageSharedAccessKey` exist or are auto-created, so GET is 200 before any PUT | No seed mechanism (APIM Tier B needs one) |
 | Provider registration | A per-subscription state; PUT under an unregistered namespace is 409 `MissingSubscriptionRegistration`; `az` auto-registers and retries | Only the namespace list is derived from the registry (PLAN 3.4); no state, no gate |
-| Cross-resource side effects | NIC and private endpoint IP allocation against a subnet, availability set membership, subscription creation seeding RBAC | Out of engine scope: hooks are read-only. These stay bespoke |
+| Cross-resource side effects | NIC and private endpoint IP allocation against a subnet, availability set membership, subscription creation seeding RBAC | Out of engine scope because hooks are read-only. These stay bespoke |
 | ETag | Optional per RP; mismatched `If-Match` is 412. Never require `If-Match` where azurerm deletes without it | Engine ignores `If-Match`, sends no ETags |
 
 ## Porting recipe
@@ -115,21 +115,21 @@ ADR-0007 holds the per-type checklist and is authoritative. The table below is t
 
 | # | Step | Where | Notes |
 |---|---|---|---|
-| 1 | Classify fit: passthrough, hooks, engine-gap, bespoke. If a gap needs an engine change, land it first with an `internal/arm` unit test and an ADR amendment | `internal/arm/*` | Gate G4: no new `Type` fields outside an ADR amendment |
-| 2 | `Register(reg *arm.Registry)`: one `arm.Type` per top-level type; children via `Children` | `internal/services/<rp>/types.go` | `Name` must be `Namespace/type` with one slash; a malformed, duplicate or incomplete type panics (`internal/arm/registry.go:46-61`) |
+| 1 | Classify fit: passthrough, hooks, engine-gap, bespoke. If a gap needs an engine change, land it first with an `internal/arm` unit test and an ADR amendment | `internal/arm/*` | Per Gate G4, add no new `Type` fields outside an ADR amendment |
+| 2 | `Register(reg *arm.Registry)` with one `arm.Type` per top-level type and children via `Children` | `internal/services/<rp>/types.go` | `Name` must be `Namespace/type` with one slash; a malformed, duplicate, or incomplete type panics (`internal/arm/registry.go:46-61`) |
 | 3 | Mount before the engine, gated by the service filter | `internal/server/server.go:178-181` | `if serviceEnabled("<svc>", allowed) { <pkg>.Register(armTypes) }` precedes `arm.NewEngine` (extra) |
 | 4 | Append the service name for `/health` | `internal/server/server.go:267-268` | Extra. The `/health` list is built from the same filter |
 | 5 | Delete the chi ARM routes and their lines in `legacy_arm_routes.txt`; keep data-plane and provider-level routes | the old handler, freeze file | Freeze file lands with PLAN 1.6; it does not exist yet. Engine shadows chi, so legacy state would dangle |
 | 6 | Provider-level chi routes for `checkNameAvailability` and similar | beside `Register` | Exempt from the freeze file. Share the name rule with the hook |
 | 7 | Add an armtest `Sample` | `tests/armsamples_<rp>_test.go` | One Sample of about 15 lines; `Skip` needs a reason (ADR-0005) |
-| 8 | Port validation, defaults and actions into hooks; read through `r.Store`; copy generated values from `r.Current` | `hooks.go` | Hooks never write and never call `Do` |
+| 8 | Port validation, defaults, and actions into hooks; read through `r.Store`; copy generated values from `r.Current` | `hooks.go` | Hooks never write and never call `Do` |
 | 9 | Bespoke tests for hook logic and coexistence | `tests/arm_<name>_test.go` | See the skeleton below |
 | 10 | Remove the type's prefixes from the package's RG cleaner | the package cleaner | Delete the cleaner if it is empty |
 | 11 | Bump `store.SchemaVersion` and add a CHANGELOG line `state reset required: <type> moved to the ARM engine` | `internal/store`, `CHANGELOG.md` | ADR-0004 and ADR-0007 |
 | 12 | Add the namespace to the provider list only if clients enumerate it | `internal/services/subscriptions/handler.go` | Optional; `Microsoft.Authorization` is already absent and policy works. PLAN 3.4 derives it later (extra) |
-| 13 | Docs: services parity table and overview, a service page, `mkdocs.yml` nav, README service counts, CHANGELOG | `website/docs/services/*` | Extra. The contributing guide still documents the hand-written pattern `(verify)`; add the engine recipe in the first porting PR |
-| 14 | Terraform acceptance when the type is reachable from azurerm or azapi | azapi: `tests/terraform/azapi/<case>/{main.tf,run.sh}` plus a job in `acceptance.yml`; azurerm: `tests/terraform/azurerm/<fixture>/main.tf`, a committed `.terraform.lock.hcl` (linux_amd64, darwin_arm64, windows_amd64) and a matrix entry in `acceptance-azurerm.yml` | Extra. `run.sh` asserts apply, no drift, a no-op second apply, destroy. Linux or WSL2 only |
-| 15 | Behaviour changes in a separate `fix(<rp>)` commit; PR title `refactor(<rp>): serve <type> via arm engine` | git | ADR-0007 |
+| 13 | Update docs: services parity table and overview, a service page, `mkdocs.yml` nav, README service counts, CHANGELOG | `website/docs/services/*` | Extra. The contributing guide still documents the hand-written pattern `(verify)`; add the engine recipe in the first porting PR |
+| 14 | Terraform acceptance when the type is reachable from azurerm or azapi | azapi uses `tests/terraform/azapi/<case>/{main.tf,run.sh}` plus a job in `acceptance.yml`; azurerm uses `tests/terraform/azurerm/<fixture>/main.tf`, a committed `.terraform.lock.hcl` (linux_amd64, darwin_arm64, windows_amd64), and a matrix entry in `acceptance-azurerm.yml` | Extra. `run.sh` asserts apply, no drift, a no-op second apply, and destroy. Linux or WSL2 only |
+| 15 | Put behaviour changes in a separate `fix(<rp>)` commit and use PR title `refactor(<rp>): serve <type> via arm engine` | git | ADR-0007 |
 
 A test that PUTs without creating its RG now gets 404 `ResourceGroupNotFound`. Fix the test setup, not the engine.
 
@@ -172,7 +172,7 @@ Wave order and gates are in PLAN Phase 4 and ADR-0007. Keep these in view:
 
 ## ADR cross-check
 
-"Covered" cites the ADR or PLAN row that already decides the lesson. "Gap" is a proposal, not a decision: an ADR amendment or a PLAN row for the owners to accept.
+"Covered" cites the ADR or PLAN row that already decides the lesson. "Gap" is a proposal, not a decision, describing an ADR amendment or a PLAN row for the owners to accept.
 
 | Lesson | Already covered by | Gap (proposal) |
 |---|---|---|
@@ -180,14 +180,14 @@ Wave order and gates are in PLAN Phase 4 and ADR-0007. Keep these in view:
 | Code for an unrouted request | ADR-0002 (strict 404, code open) | pin `InvalidResourceType` or `NoRegisteredProviderFound` `(verify)` in the PLAN row that implements ADR-0002 |
 | Missing and malformed api-version | ADR-0005, ADR-0006, PLAN 1.4 | MalformedAPIVersion check is not in the ADR-0005 list; add it |
 | Name validation per type in hooks | ADR-0003 (`CheckName`), PLAN 1.4 | negative Terraform fixture for name errors (see [client suites](client-suites.md)); share one rule between the hook and the availability route |
-| Id parsing and builder | `arm.ParseID`; `ChildID` in ADR-0003 and PLAN 1.4 | extend the id tests with builder cases (tenant-level scope, unpaired segments) |
+| ID parsing and builder | `arm.ParseID`; `ChildID` in ADR-0003 and PLAN 1.4 | extend the ID tests with builder cases (tenant-level scope, unpaired segments) |
 | RG and parent existence | ADR-0003 phase 5 | subscription existence needs a "known subscription" model; no PLAN row |
 | Server-owned fields, stable defaults | ADR-0003 (`Current`, idempotent `Defaults`), ADR-0005 DefaultsIdempotent | none |
 | Sub-wide list, prefix safety | ADR-0004, PLAN 1.2 | none |
 | Paging and `nextLink` | none (SPIKE "Later") | PLAN row `feat(arm): $top and nextLink for lists`, triggered by the first type whose list needs it |
 | RG `/resources` | PLAN 3.3 | `$filter=resourceType eq` is not covered; add to 3.3 or drop |
 | RG cascade | ADR-0004, PLAN 0.6 and 1.2 | ScopeSurvivesRGDelete check |
-| Secrets never echoed | none (SPIKE "Later", `SecretPaths`) | ADR-0003 amendment: declared secret paths projected out of responses; PLAN row `feat(arm): secret path projection` before the first secret-bearing type (SQL, APIM named values) |
+| Secrets never echoed | none (SPIKE "Later", `SecretPaths`) | ADR-0003 amendment so declared secret paths are projected out of responses; PLAN row `feat(arm): secret path projection` before the first secret-bearing type (SQL, APIM named values) |
 | Soft-delete and purge | ADR-0006 and ADR-0007 keep legacy flows bespoke; APIM deletedservices is a strict 404 | ADR amendment for a write-capable delete path or deleted-collection type, before App Configuration or Key Vault migrates |
 | POST instance actions | ADR-0001, ADR-0003 (`Type.Actions` with first consumer), PLAN Phase 4 | none |
 | `checkNameAvailability` | ADR-0001 (provider-level chi route) | shared name-taken helper (next row) |
@@ -196,11 +196,11 @@ Wave order and gates are in PLAN Phase 4 and ADR-0007. Keep these in view:
 | Tags limits | none | optional; verify limits first, then a shared `Validate` helper |
 | `provisioningState` | ADR-0003 `Provisioned`, ADR-0005 ProvisioningState | none |
 | Singleton and auto-created children | none (SPIKE "Later"; APIM page notes the need) | ADR amendment for a seed mechanism; PLAN row before APIM Tier B |
-| Provider registration state and 409 gate | PLAN 3.4 (derive the list only) | PLAN row: stored per-subscription state, `unregister`, tenant `/providers`, optional 409 gate default off |
+| Provider registration state and 409 gate | PLAN 3.4 (derive the list only) | PLAN row for stored per-subscription state, `unregister`, tenant `/providers`, and an optional 409 gate default off |
 | Cross-resource side effects | ADR-0003 (hooks are read-only), ADR-0007 (wave 4 optional) | none; state explicitly that these stay bespoke |
 | Sync only, no LRO | ADR-0006 | none |
 | ETag and `If-Match` | ADR-0003 (ignored, never required) | opt-in ETag type flag only when a type needs it |
-| Deployments beyond RG-scope CRUD | ADR-0001, PLAN 3.1 and 3.2 | validate, exportTemplate, cancel, HEAD, subscription, management group and tenant scope, operations have no PLAN row (T5 in the SPIKE); what-if is out of scope |
+| Deployments beyond RG-scope CRUD | ADR-0001, PLAN 3.1 and 3.2 | validate, exportTemplate, cancel, HEAD, subscription, management group, and tenant scope, and operations have no PLAN row (T5 in the SPIKE); what-if is out of scope |
 | Conformance additions | ADR-0005 (16 checks) | WrongMethod, ResponseHeaders, UnknownRoute, ScopeSurvivesRGDelete; see [cross-cutting](cross-cutting.md) |
 
 ### Proposed PLAN rows

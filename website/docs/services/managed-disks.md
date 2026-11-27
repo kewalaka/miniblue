@@ -1,14 +1,15 @@
 # Managed Disks
 
-miniblue emulates `Microsoft.Compute/disks` so that Terraform and the Azure
-SDKs can create, attach, snapshot-grant (via `beginGetAccess`) and delete
-managed disks alongside virtual machines.
+miniblue emulates `Microsoft.Compute/disks` so Terraform and the Azure SDKs
+can create, attach, grant access to via `beginGetAccess`, and delete managed
+disks alongside virtual machines.
 
-Disks are tracked in the in-memory (or persisted) store. When a virtual machine
-is created through the [Virtual Machines](virtual-machines.md) handler without
-an existing managed disk, miniblue persists an OS disk here (`managedBy` set to
-the VM) so that `GET` on the VM returns a realistic
-`storageProfile.osDisk.managedDisk.id` reference and `GET` on the disk resolves.
+miniblue tracks disks in its in-memory or persisted store. When you create a
+virtual machine through the [Virtual Machines](virtual-machines.md) handler
+without an existing managed disk, miniblue creates an OS disk with `managedBy`
+set to the VM. A `GET` request on the VM then returns a valid
+`storageProfile.osDisk.managedDisk.id` reference, and a `GET` request on the
+disk resolves.
 
 ## ARM endpoints
 
@@ -20,12 +21,12 @@ the VM) so that `GET` on the VM returns a realistic
 | `DELETE` | `/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Compute/disks/{name}` | Delete |
 | `GET` | `/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Compute/disks` | List in resource group |
 | `GET` | `/subscriptions/{sub}/providers/Microsoft.Compute/disks` | List in subscription |
-| `POST` | `.../disks/{name}/beginGetAccess` | Issue a (stub) SAS URI for read/write access |
+| `POST` | `.../disks/{name}/beginGetAccess` | Issue a stub SAS URI for read/write access |
 | `POST` | `.../disks/{name}/endGetAccess` | Revoke the SAS |
 
-`beginGetAccess` returns a deterministic placeholder SAS pointing at
-`https://miniblue.local` — Terraform and the Azure SDK accept it but the
-URI is not actually downloadable.
+`beginGetAccess` returns a deterministic placeholder SAS URI pointing at
+`https://miniblue.local`. Terraform and the Azure SDK accept it, but the URI
+is not downloadable.
 
 ## Create a disk
 
@@ -58,8 +59,8 @@ resource "azurerm_managed_disk" "example" {
 
 ## Limitations
 
-- No real block storage is allocated — `diskSizeGB`, `tier`, `iops`/`mbps`
-  fields are echoed back but never enforced.
-- `beginGetAccess` returns a placeholder SAS that cannot actually be used to
-  upload or download disk contents.
+- miniblue does not allocate block storage. It echoes back `diskSizeGB`, `tier`,
+  `iops`, and `mbps` fields without enforcing them.
+- `beginGetAccess` returns a placeholder SAS URI that cannot upload or download
+  disk contents.
 - Snapshot and image resource types are not implemented.

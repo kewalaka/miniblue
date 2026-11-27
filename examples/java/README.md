@@ -1,8 +1,8 @@
-# miniblue Java Example
+# miniblue Java example
 
-Demonstrates four Azure services running against **[miniblue](https://github.com/moabukar/miniblue)** - a free, open-source local Azure emulator.
+This example runs four Azure services against [miniblue](https://github.com/moabukar/miniblue), a free, open-source local Azure emulator.
 
-All calls go to `http://localhost:4566` using the built-in `java.net.http.HttpClient`. No real Azure subscription or credentials required.
+All calls go to `http://localhost:4566` using the built-in `java.net.http.HttpClient`. No Azure subscription or credentials are required.
 
 ## Prerequisites
 
@@ -59,5 +59,5 @@ All calls went to miniblue!
 
 ## Notes
 
-- The Azure SDK clients for Key Vault (`azure-security-keyvault-secrets`) and Blob Storage (`azure-storage-blob`) enforce HTTPS or use incompatible path-style URL parsing for custom endpoints, so this example uses `HttpClient` directly - mirroring the approach in the .NET and Python examples.
-- miniblue does **not** validate authentication tokens or HMAC signatures.
+- The Azure SDK clients for Key Vault (`azure-security-keyvault-secrets`) and Blob Storage (`azure-storage-blob`) enforce HTTPS or use incompatible path-style URL parsing for custom endpoints. This example uses `HttpClient` directly, matching the .NET and Python examples.
+- miniblue does not validate authentication tokens or HMAC signatures.

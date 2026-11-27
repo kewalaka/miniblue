@@ -1,4 +1,4 @@
-# ADR-0006: Synchronous LRO and error taxonomy
+# ADR-0006: synchronous LRO and error taxonomy
 
 Status: Proposed
 
@@ -6,8 +6,8 @@ Status: Proposed
 
 **LRO.** Real ARM returns 201 or 202 plus `Azure-AsyncOperation` or `Location` for long-running writes. Clients handle synchronous terminal responses fine:
 
-- **azapi and azcore:** a 200 or 201 with no async headers is done.
-- **go-azure-sdk (azurerm):** a 200 or 201 with `provisioningState: Succeeded` is done. Its provisioningState poller otherwise waits about 10 s per write, unless the response carries `X-Go-Azure-Sdk-Skip-Polling-Delay: true`. A bare 202 with no `Location` is a trap. `publicip` does exactly that.
+- **azapi and azcore.** A 200 or 201 with no async headers is complete.
+- **go-azure-sdk (azurerm).** A 200 or 201 with `provisioningState: Succeeded` is complete. Its provisioningState poller otherwise waits about 10 s per write, unless the response carries `X-Go-Azure-Sdk-Skip-Polling-Delay: true`. A bare 202 with no `Location` is a trap. `publicip` does that today.
 
 **Errors.** `internal/azerr` (`errors.go`) writes `{"error":{"code","message"}}` through per-status helpers.
 
@@ -54,7 +54,7 @@ func Write(w http.ResponseWriter, err error) // *Error as-is; anything else beco
 
 - The existing helpers (`WriteError`, `NotFound`, `BadRequest` and so on) become one-line wrappers over `Write`. Legacy call sites are untouched.
 - The engine writes errors only via `Write`. Hooks return `*azerr.Error` (ADR-0003 phase 8).
-- `NotFound` messages are built from the `arm.ID`, scope-aware: "under resource group 'rg'" only at RG scope (verify exact ARM wording).
+- `NotFound` messages are built from `arm.ID` and are scope-aware. They include "under resource group 'rg'" only at RG scope (verify exact ARM wording).
 
 ### Taxonomy (engine-emitted)
 
@@ -78,8 +78,8 @@ Types add codes in their hooks. There is no central registry of codes.
 
 ## Rejected alternatives
 
-- **Simulated async (202 plus operation status):** more code and slower tests, with no client that needs it. A non-goal.
-- **Configurable latency:** a non-goal. Real LRO timing is out of scope.
-- **A separate `arm.Error`:** duplicates `azerr` and needs mapping both ways.
-- **Sentinel errors plus an engine-side mapping table:** hooks cannot attach `target` or type-specific codes.
-- **Sending the skip-polling header only on ARM writes:** needs path classification for zero benefit.
+- **Simulated async (202 plus operation status).** This adds more code and slower tests with no client that needs it.
+- **Configurable latency.** Real LRO timing is out of scope.
+- **A separate `arm.Error`.** This duplicates `azerr` and needs mapping both ways.
+- **Sentinel errors plus an engine-side mapping table.** Hooks cannot attach `target` or type-specific codes.
+- **Sending the skip-polling header only on ARM writes.** This needs path classification for zero benefit.

@@ -1,12 +1,12 @@
-# SDK Usage
+# SDK usage
 
-miniblue exposes a plain HTTP REST API. The official Azure SDKs enforce HTTPS and real credentials, so the simplest approach is to use standard HTTP libraries directly.
+miniblue exposes a plain HTTP REST API. The official Azure SDKs enforce HTTPS and real credentials, so use standard HTTP libraries instead.
 
 Working examples are in the `examples/` directory: `examples/python/`, `examples/go/`, `examples/javascript/`.
 
 ## Python
 
-Uses the `requests` library. Install with `pip install requests`.
+This example uses the `requests` library. Install it with `pip install requests`.
 
 ```python
 import requests
@@ -57,7 +57,7 @@ python example.py
 
 ## Go
 
-Uses the standard `net/http` package. No third-party dependencies.
+This example uses the standard `net/http` package with no third-party dependencies.
 
 ```go
 package main
@@ -133,7 +133,7 @@ go run main.go
 
 ## JavaScript
 
-Uses the built-in `fetch` API (Node.js 18+ or any modern browser).
+This example uses the built-in `fetch` API in Node.js 18+ or any modern browser.
 
 ```javascript
 const BASE_URL = "http://localhost:4566";
@@ -198,12 +198,12 @@ node example.js
 
 ## Why not use the official Azure SDKs?
 
-The official Azure SDKs (`azure-sdk-for-python`, `azure-sdk-for-go`, `@azure/` npm packages) enforce HTTPS and validate OAuth tokens. miniblue's HTTP endpoint is simpler to work with directly.
+The official Azure SDKs (`azure-sdk-for-python`, `azure-sdk-for-go`, `@azure/` npm packages) enforce HTTPS and validate OAuth tokens. miniblue's HTTP endpoint is simpler to call with standard HTTP clients.
 
 If your application code already uses the Azure SDK, you have two options:
 
-1. **Use Terraform or Pulumi** to provision resources (they handle the HTTPS requirement via miniblue's TLS endpoint on port 4567).
-2. **Use HTTP calls for tests** -- point your test helpers at `http://localhost:4566` and use `requests`/`fetch`/`net/http` directly.
+1. Use Terraform or Pulumi to provision resources. Both handle the HTTPS requirement via miniblue's TLS endpoint on port 4567.
+2. Use HTTP calls in tests. Point your test helpers at `http://localhost:4566` and use `requests`, `fetch`, or `net/http`.
 
 ## API cheat sheet
 

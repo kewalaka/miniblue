@@ -88,7 +88,7 @@ curl "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Mic
 curl -X DELETE "http://localhost:4566/subscriptions/sub1/resourceGroups/myRG/providers/Microsoft.Cache/redis/my-cache"
 ```
 
-Returns `200 OK`.
+The endpoint returns `200 OK`.
 
 ## List keys
 
@@ -156,7 +156,7 @@ curl -s -X DELETE "${BASE}/my-cache"
 
 ## Limitations
 
-- No actual Redis data operations through the ARM API -- use a real Redis client for data
-- Access keys are static mock values (`miniblue-redis-key`, `miniblue-redis-key-2`)
-- No firewall rules, private endpoints, or clustering configuration
-- `REDIS_URL` is only used for a TCP connectivity check on cache creation; miniblue does not proxy Redis commands
+- The ARM API does not perform Redis data operations. Use a real Redis client for data.
+- Access keys are static mock values (`miniblue-redis-key`, `miniblue-redis-key-2`).
+- Firewall rules, private endpoints, and clustering configuration are not supported.
+- `REDIS_URL` is only used for a TCP connectivity check on cache creation; miniblue does not proxy Redis commands.

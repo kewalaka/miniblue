@@ -1,6 +1,6 @@
 # Azure Functions
 
-miniblue emulates Azure Functions via ARM endpoints using the `Microsoft.Web/sites` handler (`internal/services/sites`, registered under `SERVICES=sites`), shared with App Service. Sites default to `kind: "functionapp"` when `kind` is omitted, and can be created, updated, listed and deleted along with deployment slots, site configuration and App Service plans, but no function execution is performed.
+miniblue emulates Azure Functions via ARM endpoints using the `Microsoft.Web/sites` handler (`internal/services/sites`, registered under `SERVICES=sites`), which it shares with App Service. Sites default to `kind: "functionapp"` when `kind` is omitted. You can create, update, list, and delete sites, deployment slots, site configuration, and App Service plans, but miniblue does not execute functions.
 
 ## API endpoints
 
@@ -18,5 +18,5 @@ miniblue emulates Azure Functions via ARM endpoints using the `Microsoft.Web/sit
 
 ## Limitations
 
-- Stored control-plane state only: no function execution, triggers or runtime hosting
-- No Kudu/SCM endpoint or slot swap
+- miniblue stores control-plane state only, with no function execution, triggers, or runtime hosting
+- No Kudu or SCM endpoint, and no slot swap

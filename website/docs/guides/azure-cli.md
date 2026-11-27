@@ -1,4 +1,4 @@
-# CLI Usage
+# CLI usage
 
 Use `azlocal` to interact with miniblue. It works out of the box with no authentication or setup.
 
@@ -86,7 +86,7 @@ azlocal health
 
 ## Custom endpoint
 
-By default azlocal connects to `http://localhost:4566`. Override with:
+By default, `azlocal` connects to `http://localhost:4566`. Override it with `LOCAL_AZURE_ENDPOINT`:
 
 ```bash
 LOCAL_AZURE_ENDPOINT=http://my-server:4566 azlocal health
@@ -94,7 +94,7 @@ LOCAL_AZURE_ENDPOINT=http://my-server:4566 azlocal health
 
 ## Why not the native Azure CLI?
 
-The native `az` CLI uses Microsoft's MSAL authentication library which requires real Azure AD token negotiation. This can't be reliably emulated locally. `azlocal` bypasses this entirely by talking directly to miniblue's HTTP API.
+The native `az` CLI uses Microsoft's MSAL authentication library, which requires real Azure AD token negotiation and cannot be emulated locally. `azlocal` avoids this by sending HTTP requests to miniblue's API.
 
 This is the same approach used by other emulators:
 

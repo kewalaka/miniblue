@@ -1,13 +1,12 @@
 # Cosmos DB
 
-miniblue emulates Azure Cosmos DB with a SQL API-compatible document store. Create, read, update, delete, and list JSON documents.
+miniblue emulates Azure Cosmos DB with a SQL API-compatible document store. You can create, read, update, delete, and list JSON documents.
 
 ## API endpoints
 
-### ARM (control plane)
+### ARM control plane
 
-Cosmos DB accounts, SQL databases & containers, and Table API tables are
-manageable via standard ARM endpoints:
+miniblue manages Cosmos DB accounts, SQL databases and containers, and Table API tables via standard ARM endpoints:
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -17,7 +16,7 @@ manageable via standard ARM endpoints:
 | `PUT` / `GET` / `DELETE` / `LIST` | `.../databaseAccounts/{account}/tables/{table}` | Table API table CRUD |
 | `PUT` / `GET` | `.../tables/{table}/throughputSettings/default` | Table throughput settings |
 
-### Data plane (SQL API documents)
+### Data plane SQL API documents
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -28,9 +27,8 @@ manageable via standard ARM endpoints:
 | `DELETE` | `/cosmosdb/{account}/dbs/{db}/colls/{coll}/docs/{id}` | Delete document |
 
 !!! note
-    On the data plane, accounts, databases, and collections are created
-    implicitly — you do not need to create them via ARM before inserting
-    documents.
+    The data plane creates accounts, databases, and collections implicitly. You
+    do not need to create them via ARM before inserting documents.
 
 ## Create a document
 
@@ -64,9 +62,9 @@ Response (`201 Created`):
 curl "http://localhost:4566/cosmosdb/myaccount/dbs/mydb/colls/users/docs/user-1"
 ```
 
-Returns `404` if the document does not exist.
+This request returns `404` if the document does not exist.
 
-## Replace (update) a document
+## Replace a document
 
 ```bash
 curl -X PUT "http://localhost:4566/cosmosdb/myaccount/dbs/mydb/colls/users/docs/user-1" \
@@ -78,7 +76,7 @@ curl -X PUT "http://localhost:4566/cosmosdb/myaccount/dbs/mydb/colls/users/docs/
   }'
 ```
 
-The `id` in the URL takes precedence -- the document's `id` field is set to `user-1` regardless of the request body.
+The `id` in the URL takes precedence. miniblue sets the document's `id` field to `user-1` regardless of the request body.
 
 ## List documents
 
@@ -173,8 +171,8 @@ curl -s "${BASE}" | jq '._count'
 
 ## Limitations
 
-- No SQL query language support -- the list endpoint returns all documents in the collection
+- No SQL query language support. The list endpoint returns all documents in the collection.
 - No partition key support
 - No indexing or stored procedures
-- Cosmos DB Mongo, Cassandra and Gremlin wire protocols are not implemented
-- Documents are stored in memory (or via `PERSISTENCE=1` / `DATABASE_URL`) and otherwise lost when miniblue restarts
+- Cosmos DB Mongo, Cassandra, and Gremlin wire protocols are not implemented
+- miniblue stores documents in memory by default, so they are lost on restart unless you enable `PERSISTENCE=1` or configure `DATABASE_URL`

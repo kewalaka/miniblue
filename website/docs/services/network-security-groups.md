@@ -79,6 +79,6 @@ Every NSG includes 6 default rules:
 
 ## Limitations
 
-- No subnet or NIC association tracking
-- Rules are not evaluated for traffic filtering
-- No application security groups
+- Subnet and NIC associations are not tracked.
+- Rules are not evaluated for traffic filtering.
+- Application security groups are not supported.

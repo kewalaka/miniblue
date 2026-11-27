@@ -101,7 +101,7 @@ func (p *PostgresBackend) Delete(key string) (bool, error) {
 
 func (p *PostgresBackend) Scan(prefix string) ([]KV, error) {
 	rows, err := p.db.Query(
-		`SELECT key, value FROM miniblue_store WHERE key LIKE $1 ORDER BY key`,
+		`SELECT key, value FROM miniblue_store WHERE key LIKE $1 ORDER BY key COLLATE "C"`,
 		likePrefix(prefix),
 	)
 	if err != nil {

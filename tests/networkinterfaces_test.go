@@ -69,6 +69,22 @@ func TestNetworkInterfaceLifecycleAndReferences(t *testing.T) {
 		t.Fatalf("expected subnet ipConfiguration reference, got %d", len(subnetConfigs))
 	}
 
+	for _, listURL := range []string{
+		base + "/virtualNetworks" + av,
+		ts.URL + "/subscriptions/sub1/providers/Microsoft.Network/virtualNetworks" + av,
+	} {
+		resp = doRequest(t, "GET", listURL, "")
+		expectStatus(t, resp, 200)
+		vnets := decodeJSON(t, resp)
+		resp.Body.Close()
+		vnet := vnets["value"].([]interface{})[0].(map[string]interface{})
+		subnets := vnet["properties"].(map[string]interface{})["subnets"].([]interface{})
+		listedConfigs := subnets[0].(map[string]interface{})["properties"].(map[string]interface{})["ipConfigurations"].([]interface{})
+		if len(listedConfigs) != 1 {
+			t.Fatalf("%s: expected 1 subnet ipConfiguration reference, got %d", listURL, len(listedConfigs))
+		}
+	}
+
 	resp = doRequest(t, "GET", base+"/publicIPAddresses/pip1"+av, "")
 	expectStatus(t, resp, 200)
 	pip := decodeJSON(t, resp)

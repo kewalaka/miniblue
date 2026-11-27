@@ -119,3 +119,39 @@ func TestPostgresPrefixEscaping(t *testing.T) {
 		t.Errorf("%d keys left under the root, want the 3 look-alikes", n)
 	}
 }
+
+func TestPostgresScanOrder(t *testing.T) {
+	pg := testPostgres(t)
+
+	root := fmt.Sprintf("test-order-%d/", time.Now().UnixNano())
+	// Bytewise (C collation) order differs from typical en_US.UTF-8 collation
+	// on mixed case and underscore.
+	want := []string{
+		root + "A",
+		root + "B",
+		root + "_",
+		root + "a",
+		root + "b",
+	}
+	t.Cleanup(func() {
+		_, _ = pg.DeleteByPrefix(root)
+	})
+	for i := len(want) - 1; i >= 0; i-- {
+		if err := pg.Set(want[i], []byte(`"v"`)); err != nil {
+			t.Fatalf("Set(%q): %v", want[i], err)
+		}
+	}
+
+	got, err := pg.Scan(root)
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("Scan returned %d keys, want %d", len(got), len(want))
+	}
+	for i, kv := range got {
+		if kv.Key != want[i] {
+			t.Errorf("got[%d] = %q, want %q", i, kv.Key, want[i])
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package networkinterfaces
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -290,8 +291,14 @@ func (h *Handler) CreateOrUpdate(w http.ResponseWriter, r *http.Request) {
 	k := h.key(sub, rg, name)
 	existing, exists := h.store.Get(k)
 	nic := buildResponse(sub, rg, name, input, asMap(existing))
-	h.store.Set(k, nic)
-	h.refreshReferences(sub, rg)
+	if err := h.store.Set(k, nic); err != nil {
+		azerr.Write(w, err)
+		return
+	}
+	if err := h.refreshReferences(sub, rg); err != nil {
+		azerr.Write(w, err)
+		return
+	}
 
 	if exists {
 		w.WriteHeader(http.StatusOK)
@@ -321,8 +328,14 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	existingMap := asMap(existing)
 	nic := buildResponse(sub, rg, name, mergePatch(existingMap, patch), existingMap)
-	h.store.Set(k, nic)
-	h.refreshReferences(sub, rg)
+	if err := h.store.Set(k, nic); err != nil {
+		azerr.Write(w, err)
+		return
+	}
+	if err := h.refreshReferences(sub, rg); err != nil {
+		azerr.Write(w, err)
+		return
+	}
 
 	json.NewEncoder(w).Encode(nic)
 }
@@ -349,7 +362,10 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		azerr.NotFound(w, "Microsoft.Network/networkInterfaces", name)
 		return
 	}
-	h.refreshReferences(sub, rg)
+	if err := h.refreshReferences(sub, rg); err != nil {
+		azerr.Write(w, err)
+		return
+	}
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -377,55 +393,85 @@ func idFromRef(v interface{}) string {
 }
 
 type keyedResource struct {
-	key string
-	val map[string]interface{}
+	key  string
+	orig []byte
+	val  map[string]interface{}
 }
 
-func (h *Handler) scanMaps(prefix string) []keyedResource {
+func (h *Handler) scanMaps(prefix string) ([]keyedResource, error) {
 	kvs, err := h.store.Scan(prefix)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	out := make([]keyedResource, 0, len(kvs))
 	for _, kv := range kvs {
 		var m map[string]interface{}
-		if json.Unmarshal(kv.Value, &m) == nil && m != nil {
-			out = append(out, keyedResource{key: kv.Key, val: m})
+		if err := json.Unmarshal(kv.Value, &m); err != nil {
+			return nil, err
+		}
+		if m != nil {
+			orig, err := json.Marshal(m)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, keyedResource{key: kv.Key, orig: orig, val: m})
 		}
 	}
-	return out
+	return out, nil
 }
 
-func (h *Handler) saveMaps(items []keyedResource) {
+func (h *Handler) saveMaps(items []keyedResource) error {
 	for _, item := range items {
-		_ = h.store.Set(item.key, item.val)
+		updated, err := json.Marshal(item.val)
+		if err != nil {
+			return err
+		}
+		if bytes.Equal(updated, item.orig) {
+			continue
+		}
+		if err := h.store.Set(item.key, item.val); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (h *Handler) refreshReferences(sub, rg string) {
-	subnets := h.scanMaps("subnet:" + sub + ":" + rg + ":")
+func (h *Handler) refreshReferences(sub, rg string) error {
+	subnets, err := h.scanMaps("subnet:" + sub + ":" + rg + ":")
+	if err != nil {
+		return err
+	}
+	publicIPs, err := h.scanMaps("publicip:" + sub + ":" + rg + ":")
+	if err != nil {
+		return err
+	}
+	nsgs, err := h.scanMaps("nsg:" + sub + ":" + rg + ":")
+	if err != nil {
+		return err
+	}
+	nics, err := h.scanMaps("nic:" + sub + ":" + rg + ":")
+	if err != nil {
+		return err
+	}
+
 	for _, item := range subnets {
 		if props := asMap(item.val["properties"]); props != nil {
 			props["ipConfigurations"] = []interface{}{}
 		}
 	}
-
-	publicIPs := h.scanMaps("publicip:" + sub + ":" + rg + ":")
 	for _, item := range publicIPs {
 		if props := asMap(item.val["properties"]); props != nil {
 			props["ipConfiguration"] = nil
 		}
 	}
-
-	nsgs := h.scanMaps("nsg:" + sub + ":" + rg + ":")
 	for _, item := range nsgs {
 		if props := asMap(item.val["properties"]); props != nil {
 			props["networkInterfaces"] = []interface{}{}
 		}
 	}
 
-	for _, item := range h.store.ListByPrefix("nic:" + sub + ":" + rg + ":") {
-		nic := asMap(item)
+	for _, nicItem := range nics {
+		nic := nicItem.val
 		nicID, _ := nic["id"].(string)
 		props := asMap(nic["properties"])
 		if nsgID := idFromRef(props["networkSecurityGroup"]); nsgID != "" {
@@ -444,9 +490,13 @@ func (h *Handler) refreshReferences(sub, rg string) {
 		}
 	}
 
-	h.saveMaps(subnets)
-	h.saveMaps(publicIPs)
-	h.saveMaps(nsgs)
+	if err := h.saveMaps(subnets); err != nil {
+		return err
+	}
+	if err := h.saveMaps(publicIPs); err != nil {
+		return err
+	}
+	return h.saveMaps(nsgs)
 }
 
 func appendToMatchingResource(resources []keyedResource, targetID, property string, ref map[string]interface{}) {

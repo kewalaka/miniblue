@@ -15,9 +15,8 @@ const schemaKey = "meta:schema"
 // unstampedVersion is the schema of state written before stamps existed.
 const unstampedVersion = 1
 
-// schemaReader is implemented by backends whose reads can fail (Postgres).
-// Their Get and List report a failure as a miss, which here would pass for an
-// absent stamp and let the check overwrite it.
+// schemaReader is an optional fast path for backends (Postgres) that can check
+// whether any state exists without scanning every row.
 type schemaReader interface {
 	// readSchema returns the stored stamp, whether one exists, and whether the
 	// store holds any state. A read or decode failure is an error, never a miss.
@@ -28,8 +27,21 @@ func readSchema(b Backend) (stamp interface{}, stamped, hasState bool, err error
 	if r, ok := b.(schemaReader); ok {
 		return r.readSchema()
 	}
-	stamp, stamped = b.Get(schemaKey)
-	return stamp, stamped, len(b.List()) > 0, nil
+	raw, ok, err := b.Get(schemaKey)
+	if err != nil {
+		return nil, false, false, err
+	}
+	if ok {
+		if err := json.Unmarshal(raw, &stamp); err != nil {
+			return nil, false, false, err
+		}
+		return stamp, true, true, nil
+	}
+	kvs, err := b.Scan("")
+	if err != nil {
+		return nil, false, false, err
+	}
+	return nil, false, len(kvs) > 0, nil
 }
 
 // CheckSchema verifies the schema stamp in s, writing it for an empty store.
@@ -57,7 +69,7 @@ func CheckSchema(s *Store, location string) error {
 			return resetError(location, fmt.Sprintf("is schema %d", v))
 		}
 	}
-	return s.backend.Set(schemaKey, SchemaVersion)
+	return s.Set(schemaKey, SchemaVersion)
 }
 
 func resetError(location, found string) error {

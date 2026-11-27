@@ -56,119 +56,90 @@ func NewPostgresBackend(databaseURL string) (*PostgresBackend, error) {
 	return &PostgresBackend{db: db}, nil
 }
 
-func (p *PostgresBackend) Set(key string, value interface{}) error {
-	data, err := json.Marshal(value)
-	if err != nil {
-		return err
+func (p *PostgresBackend) Get(key string) ([]byte, bool, error) {
+	var data []byte
+	err := p.db.QueryRow(`SELECT value FROM miniblue_store WHERE key = $1`, key).Scan(&data)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false, nil
 	}
-	_, err = p.db.Exec(
+	if err != nil {
+		return nil, false, err
+	}
+	return data, true, nil
+}
+
+func (p *PostgresBackend) Set(key string, v []byte) error {
+	_, err := p.db.Exec(
 		`INSERT INTO miniblue_store (key, value) VALUES ($1, $2)
 		 ON CONFLICT (key) DO UPDATE SET value = $2`,
-		key, data,
+		key, v,
 	)
 	return err
 }
 
-func (p *PostgresBackend) Get(key string) (interface{}, bool) {
-	var data []byte
-	err := p.db.QueryRow(`SELECT value FROM miniblue_store WHERE key = $1`, key).Scan(&data)
+func (p *PostgresBackend) SetNX(key string, v []byte) (bool, error) {
+	result, err := p.db.Exec(
+		`INSERT INTO miniblue_store (key, value) VALUES ($1, $2)
+		 ON CONFLICT (key) DO NOTHING`,
+		key, v,
+	)
 	if err != nil {
-		return nil, false
+		return false, err
 	}
-	var value interface{}
-	if err := json.Unmarshal(data, &value); err != nil {
-		return nil, false
-	}
-	return value, true
+	n, err := result.RowsAffected()
+	return n > 0, err
 }
 
-func (p *PostgresBackend) Delete(key string) bool {
+func (p *PostgresBackend) Delete(key string) (bool, error) {
 	result, err := p.db.Exec(`DELETE FROM miniblue_store WHERE key = $1`, key)
 	if err != nil {
-		return false
+		return false, err
 	}
-	n, _ := result.RowsAffected()
-	return n > 0
+	n, err := result.RowsAffected()
+	return n > 0, err
 }
 
-func (p *PostgresBackend) List() []string {
-	rows, err := p.db.Query(`SELECT key FROM miniblue_store`)
-	if err != nil {
-		return []string{}
-	}
-	defer rows.Close()
-
-	keys := make([]string, 0)
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err == nil {
-			keys = append(keys, k)
-		}
-	}
-	return keys
-}
-
-func (p *PostgresBackend) ListByPrefix(prefix string) []interface{} {
+func (p *PostgresBackend) Scan(prefix string) ([]KV, error) {
 	rows, err := p.db.Query(
-		`SELECT value FROM miniblue_store WHERE key LIKE $1`,
+		`SELECT key, value FROM miniblue_store WHERE key LIKE $1 ORDER BY key`,
 		likePrefix(prefix),
 	)
 	if err != nil {
-		return []interface{}{}
+		return nil, err
 	}
 	defer rows.Close()
 
-	results := make([]interface{}, 0)
+	results := make([]KV, 0)
 	for rows.Next() {
-		var data []byte
-		if err := rows.Scan(&data); err != nil {
-			continue
+		var kv KV
+		if err := rows.Scan(&kv.Key, &kv.Value); err != nil {
+			return nil, err
 		}
-		var v interface{}
-		if err := json.Unmarshal(data, &v); err == nil {
-			results = append(results, v)
-		}
+		results = append(results, kv)
 	}
-	return results
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
-func (p *PostgresBackend) CountByPrefix(prefix string) int {
-	var count int
-	err := p.db.QueryRow(
-		`SELECT COUNT(*) FROM miniblue_store WHERE key LIKE $1`,
-		likePrefix(prefix),
-	).Scan(&count)
-	if err != nil {
-		return 0
-	}
-	return count
-}
-
-func (p *PostgresBackend) Exists(key string) bool {
-	var exists bool
-	err := p.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM miniblue_store WHERE key = $1)`, key).Scan(&exists)
-	if err != nil {
-		return false
-	}
-	return exists
-}
-
-func (p *PostgresBackend) DeleteByPrefix(prefix string) int {
+func (p *PostgresBackend) DeleteByPrefix(prefix string) (int, error) {
 	result, err := p.db.Exec(
 		`DELETE FROM miniblue_store WHERE key LIKE $1`,
 		likePrefix(prefix),
 	)
 	if err != nil {
-		return 0
+		return 0, err
 	}
-	n, _ := result.RowsAffected()
-	return int(n)
+	n, err := result.RowsAffected()
+	return int(n), err
 }
 
 // Reset drops all state except the schema stamp. It is one statement, so the
 // stamp is never absent.
-func (p *PostgresBackend) Reset() {
-	_, _ = p.db.Exec(`DELETE FROM miniblue_store WHERE key <> $1`, schemaKey)
+func (p *PostgresBackend) Reset() error {
+	_, err := p.db.Exec(`DELETE FROM miniblue_store WHERE key <> $1`, schemaKey)
+	return err
 }
 
 // readSchema implements schemaReader, reporting query and decode failures

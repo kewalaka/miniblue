@@ -25,14 +25,19 @@ func Decode[T any](v any) (T, error) {
 	return out, nil
 }
 
-// GetAs reads key and decodes it into T. found is true whenever the key
-// exists, so a non-nil error with found set means the value is present but
-// cannot be decoded as T.
+// GetAs reads key and decodes it directly from stored JSON bytes into T.
+// Backend errors are returned with found=false; a non-nil error with found=true
+// means the key exists but cannot be decoded as T.
 func GetAs[T any](s *Store, key string) (t T, found bool, err error) {
-	v, ok := s.Get(key)
+	raw, ok, err := s.Lookup(key)
+	if err != nil {
+		return t, false, err
+	}
 	if !ok {
 		return t, false, nil
 	}
-	t, err = Decode[T](v)
-	return t, true, err
+	if err := json.Unmarshal(raw, &t); err != nil {
+		return t, true, fmt.Errorf("store: decode into %T: %w", t, err)
+	}
+	return t, true, nil
 }

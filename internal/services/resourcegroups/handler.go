@@ -103,7 +103,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	k := h.key(sub, name)
 	rg, ok, err := store.GetAs[ResourceGroup](h.store, k)
 	if err != nil {
-		azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
+		azerr.Write(w, err)
 		return
 	}
 	if !ok {

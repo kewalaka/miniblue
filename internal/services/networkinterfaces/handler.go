@@ -376,24 +376,50 @@ func idFromRef(v interface{}) string {
 	return id
 }
 
+type keyedResource struct {
+	key string
+	val map[string]interface{}
+}
+
+func (h *Handler) scanMaps(prefix string) []keyedResource {
+	kvs, err := h.store.Scan(prefix)
+	if err != nil {
+		return nil
+	}
+	out := make([]keyedResource, 0, len(kvs))
+	for _, kv := range kvs {
+		var m map[string]interface{}
+		if json.Unmarshal(kv.Value, &m) == nil && m != nil {
+			out = append(out, keyedResource{key: kv.Key, val: m})
+		}
+	}
+	return out
+}
+
+func (h *Handler) saveMaps(items []keyedResource) {
+	for _, item := range items {
+		_ = h.store.Set(item.key, item.val)
+	}
+}
+
 func (h *Handler) refreshReferences(sub, rg string) {
-	subnets := h.store.ListByPrefix("subnet:" + sub + ":" + rg + ":")
+	subnets := h.scanMaps("subnet:" + sub + ":" + rg + ":")
 	for _, item := range subnets {
-		if props := asMap(asMap(item)["properties"]); props != nil {
+		if props := asMap(item.val["properties"]); props != nil {
 			props["ipConfigurations"] = []interface{}{}
 		}
 	}
 
-	publicIPs := h.store.ListByPrefix("publicip:" + sub + ":" + rg + ":")
+	publicIPs := h.scanMaps("publicip:" + sub + ":" + rg + ":")
 	for _, item := range publicIPs {
-		if props := asMap(asMap(item)["properties"]); props != nil {
+		if props := asMap(item.val["properties"]); props != nil {
 			props["ipConfiguration"] = nil
 		}
 	}
 
-	nsgs := h.store.ListByPrefix("nsg:" + sub + ":" + rg + ":")
+	nsgs := h.scanMaps("nsg:" + sub + ":" + rg + ":")
 	for _, item := range nsgs {
-		if props := asMap(asMap(item)["properties"]); props != nil {
+		if props := asMap(item.val["properties"]); props != nil {
 			props["networkInterfaces"] = []interface{}{}
 		}
 	}
@@ -417,29 +443,31 @@ func (h *Handler) refreshReferences(sub, rg string) {
 			}
 		}
 	}
+
+	h.saveMaps(subnets)
+	h.saveMaps(publicIPs)
+	h.saveMaps(nsgs)
 }
 
-func appendToMatchingResource(resources []interface{}, targetID, property string, ref map[string]interface{}) {
+func appendToMatchingResource(resources []keyedResource, targetID, property string, ref map[string]interface{}) {
 	for _, item := range resources {
-		resource := asMap(item)
-		id, _ := resource["id"].(string)
+		id, _ := item.val["id"].(string)
 		if !strings.EqualFold(id, targetID) {
 			continue
 		}
-		props := asMap(resource["properties"])
+		props := asMap(item.val["properties"])
 		props[property] = append(asArray(props[property]), ref)
 		return
 	}
 }
 
-func setOnMatchingResource(resources []interface{}, targetID, property string, ref map[string]interface{}) {
+func setOnMatchingResource(resources []keyedResource, targetID, property string, ref map[string]interface{}) {
 	for _, item := range resources {
-		resource := asMap(item)
-		id, _ := resource["id"].(string)
+		id, _ := item.val["id"].(string)
 		if !strings.EqualFold(id, targetID) {
 			continue
 		}
-		props := asMap(resource["properties"])
+		props := asMap(item.val["properties"])
 		props[property] = ref
 		return
 	}

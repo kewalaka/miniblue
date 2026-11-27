@@ -12,16 +12,15 @@ import (
 	"testing"
 )
 
-// unreadableBackend behaves like Postgres when a read fails: Get and List
-// report a miss and readSchema reports the error. Writes still succeed, which
-// is what let a failed read overwrite the stamp.
+// unreadableBackend fails on Get, Scan, and readSchema while writes still
+// succeed, ensuring CheckSchema aborts without overwriting the stamp.
 type unreadableBackend struct {
 	*MemoryBackend
 	err error
 }
 
-func (unreadableBackend) Get(string) (interface{}, bool) { return nil, false }
-func (unreadableBackend) List() []string                 { return nil }
+func (u unreadableBackend) Get(string) ([]byte, bool, error) { return nil, false, u.err }
+func (u unreadableBackend) Scan(string) ([]KV, error)        { return nil, u.err }
 func (u unreadableBackend) readSchema() (interface{}, bool, bool, error) {
 	return nil, false, false, u.err
 }
@@ -44,18 +43,19 @@ func TestCheckSchema(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mb := NewMemoryBackend()
+			st := NewWithBackend(mb)
 			for k, v := range tc.seed {
-				mb.Set(k, v)
+				st.Set(k, v)
 			}
 			want := mb.Snapshot()
 
-			err := CheckSchema(NewWithBackend(mb), "test-location")
+			err := CheckSchema(st, "test-location")
 
 			if tc.wantErr == "" {
 				if err != nil {
 					t.Fatalf("CheckSchema: %v", err)
 				}
-				want[schemaKey] = SchemaVersion
+				want[schemaKey] = []byte(fmt.Sprintf("%d", SchemaVersion))
 			} else {
 				if err == nil {
 					t.Fatal("CheckSchema succeeded, want an error")
@@ -79,10 +79,11 @@ func TestCheckSchemaSurvivesFileReload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := CheckSchema(NewWithBackend(fb), path); err != nil {
+	st := NewWithBackend(fb)
+	if err := CheckSchema(st, path); err != nil {
 		t.Fatal(err)
 	}
-	fb.Set("k", "v")
+	st.Set("k", "v")
 	if err := fb.Save(); err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +132,7 @@ func TestConcurrentResetKeepsSchemaStamp(t *testing.T) {
 	}
 	backends := map[string]struct {
 		backend  Backend
-		snapshot func() map[string]interface{}
+		snapshot func() map[string][]byte
 	}{
 		"memory": {mb, mb.Snapshot},
 		"file":   {fb, fb.mem.Snapshot},
@@ -156,7 +157,7 @@ func TestConcurrentResetKeepsSchemaStamp(t *testing.T) {
 						return
 					default:
 					}
-					if _, ok := tc.backend.Get(schemaKey); !ok {
+					if _, ok, _ := tc.backend.Get(schemaKey); !ok {
 						missing = true
 					}
 					if _, ok := tc.snapshot()[schemaKey]; !ok {
@@ -183,7 +184,7 @@ func TestConcurrentResetKeepsSchemaStamp(t *testing.T) {
 			if missing {
 				t.Error("schema stamp was absent during a concurrent Reset")
 			}
-			if _, ok := tc.backend.Get(schemaKey); !ok {
+			if _, ok, _ := tc.backend.Get(schemaKey); !ok {
 				t.Error("schema stamp missing after concurrent Resets")
 			}
 		})
@@ -193,8 +194,9 @@ func TestConcurrentResetKeepsSchemaStamp(t *testing.T) {
 func TestCheckSchemaAbortsOnFailedRead(t *testing.T) {
 	readErr := errors.New("connection refused")
 	mb := NewMemoryBackend()
-	mb.Set(schemaKey, SchemaVersion+1)
-	mb.Set("k", "v")
+	st := NewWithBackend(mb)
+	st.Set(schemaKey, SchemaVersion+1)
+	st.Set("k", "v")
 	want := mb.Snapshot()
 
 	err := CheckSchema(NewWithBackend(unreadableBackend{mb, readErr}), "test-location")

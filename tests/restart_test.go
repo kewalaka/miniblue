@@ -20,9 +20,7 @@ import (
 // live Go structs, so only a save and reload through the file backend shows
 // handlers that type-assert structs, or fields that never reach the snapshot.
 //
-// Each read is captured before the restart and compared after it. A read with
-// blocked set fails today and names the PLAN row that fixes it; delete the
-// field when that row lands.
+// Each read is captured before the restart and compared after it.
 
 const (
 	restartSub = "sub1"
@@ -32,11 +30,10 @@ const (
 )
 
 type restartRead struct {
-	name    string
-	method  string // GET when empty
-	path    string
-	body    string
-	blocked string
+	name   string
+	method string // GET when empty
+	path   string
+	body   string
 }
 
 type restartCase struct {
@@ -71,6 +68,9 @@ func restartRequest(t *testing.T, base string, r restartRead) restartResponse {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Each httptest.Server binds an ephemeral port, so normalize the server
+	// address in responses (e.g. Blob ServiceEndpoint) before comparing.
+	body = bytes.ReplaceAll(body, []byte(base), []byte("http://miniblue.test"))
 	return restartResponse{status: resp.StatusCode, etag: resp.Header.Get("ETag"), body: body}
 }
 
@@ -133,10 +133,10 @@ var restartCases = []restartCase{
 			restartPut(t, base+restartBlobCommit+"?comp=blocklist", `<BlockList><Latest>YQ==</Latest></BlockList>`, 201, nil)
 		},
 		reads: []restartRead{
-			{name: "upload", path: restartBlobUpload, blocked: "0.3"},
-			{name: "copy", path: restartBlobCopy, blocked: "0.3"},
-			{name: "block commit", path: restartBlobCommit, blocked: "0.3"},
-			{name: "list", path: restartBlobBase + "?restype=container&comp=list", blocked: "0.3"},
+			{name: "upload", path: restartBlobUpload},
+			{name: "copy", path: restartBlobCopy},
+			{name: "block commit", path: restartBlobCommit},
+			{name: "list", path: restartBlobBase + "?restype=container&comp=list"},
 		},
 	},
 	{
@@ -159,7 +159,7 @@ var restartCases = []restartCase{
 		},
 		reads: []restartRead{
 			{name: "get", path: "/keyvault/restartkv/secrets/db-pass"},
-			{name: "list", path: "/keyvault/restartkv/secrets", blocked: "0.3"},
+			{name: "list", path: "/keyvault/restartkv/secrets"},
 		},
 	},
 	{
@@ -191,7 +191,7 @@ var restartCases = []restartCase{
 		reads: []restartRead{
 			{name: "store", path: restartARM + "Microsoft.AppConfiguration/configurationStores/restartconfig" + restartAV},
 			{name: "store list", path: restartARM + "Microsoft.AppConfiguration/configurationStores" + restartAV},
-			{name: "key value", path: "/appconfig/restartconfig/kv/db-host", blocked: "0.3"},
+			{name: "key value", path: "/appconfig/restartconfig/kv/db-host"},
 			{name: "key value list", path: "/appconfig/restartconfig/kv"},
 		},
 	},
@@ -233,9 +233,6 @@ func TestRestartRoundTrip(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			for _, r := range c.reads {
 				t.Run(r.name, func(t *testing.T) {
-					if r.blocked != "" {
-						t.Skip("blocked by PLAN row " + r.blocked)
-					}
 					want := before[c.name+"/"+r.name]
 					got := restartRequest(t, ts.URL, r)
 					if got.status != want.status || got.etag != want.etag || !sameBody(got.body, want.body) {
@@ -247,8 +244,8 @@ func TestRestartRoundTrip(t *testing.T) {
 		})
 	}
 
-	// The handlers cannot read blobs back until row 0.3, so check the
-	// reloaded values directly: every payload must have reached the snapshot.
+	// Also verify the reloaded snapshot directly: every blob payload must have
+	// reached disk and decoded back with non-empty content.
 	t.Run("blob content", func(t *testing.T) {
 		want := map[string]bool{}
 		for _, name := range []string{"upload", "copy", "block commit"} {

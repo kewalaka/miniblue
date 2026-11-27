@@ -78,10 +78,11 @@ Order matters:
 
 ### 2. Postgres
 
-- `key TEXT PRIMARY KEY, value JSONB` is unchanged. Bytes go in and out as JSONB text, with no `interface{}` round trip.
+- `miniblue_store` (`key TEXT PRIMARY KEY, value JSONB`) is unchanged. Bytes go in and out as JSONB text, with no `interface{}` round trip.
 - One `likePrefix(s string) string` escape helper, used by `Scan`, `DeleteByPrefix` and `Count`.
-- `CREATE INDEX IF NOT EXISTS kv_key_prefix ON kv (key text_pattern_ops)`. The PK btree cannot serve `LIKE 'x%'` under non-C collations.
+- `CREATE INDEX IF NOT EXISTS miniblue_store_key_prefix ON miniblue_store (key text_pattern_ops)`. The PK btree cannot serve `LIKE 'x%'` under non-C collations.
 - `Scan` uses `ORDER BY key`.
+- `Reset` runs `DELETE FROM miniblue_store WHERE key <> $1` (preserving the `meta:schema` stamp in a single statement rather than `TRUNCATE`).
 - **Single writer.** One miniblue process per database. A shared database across processes is unsupported and documented. The engine mutex is in-process.
 
 ### 3. Engine store
@@ -131,7 +132,7 @@ func CheckSchema(s *Store, location string) error // called once at startup, bef
 - **Empty store:** write `meta:schema` = `SchemaVersion`.
 - **Stamp matches:** continue.
 - **No stamp on a non-empty store:** treat it as version 1. That is state written by current main, which has the same shape. Stamp it and continue.
-- **Stamp differs:** fail startup, leaving the store untouched. The message names both versions and how to reset, for example: `state in ./data/state.json is schema 2; this miniblue needs 3. Delete the file (or TRUNCATE kv on Postgres) and restart.` There is no auto-wipe flag.
+- **Stamp differs:** fail startup, leaving the store untouched. The message names both versions and how to reset, for example: `state in ./data/state.json is schema 2; this miniblue needs 3: delete the file (or TRUNCATE miniblue_store on Postgres) and restart`. There is no auto-wipe flag.
 
 Bump rules:
 

@@ -6,7 +6,7 @@ Action small tasks in sets.  Each PR uses a conventional-commit title, and keeps
 
 | # | PR | Size | Depends | Notes |
 |---|---|---|---|---|
-| 0.1 | `ci: run go test ./... with -race on internal packages` | S | | `ci.yml:47` runs `./tests/...` only. |
+| 0.1 | `ci: run go test ./... with -race on internal packages` | S | | Done: `.github/workflows/ci.yml` builds `bin/azlocal` and runs `go test -race -v ./...`. |
 | 0.2 | `fix(blob): persist blob content across restarts` | S | | `Blob.Content` tag becomes `json:"content"`. Adds the restart round-trip test (create RG, blob with upload, copy and block commit, KV, ACR, appconfig and pg server; Save; reload; GET and list). A snapshot that fails to load fails startup. This replaces a backend CI matrix. |
 | 0.3 | `fix(store): add Decode and GetAs; fix struct-asserting call sites` | M | | Fix every site from README findings 1 and 2, and grep for `.(` on `store.Get` results. |
 | 0.4 | `fix(store): byte-KV backends with uniform JSON values` | M | 0.2, 0.3 | ADR-0004 §1: `Scan`, `Lookup`, `SetNX`, `Set` returns error, `ListKeysByPrefix` fixed. The restart test must pass unchanged. Value shapes do not change, so there is no schema bump. Fix any sites the suite surfaces in this PR. |
@@ -148,7 +148,7 @@ Three loops. The first one keeps CI and review cheap, so do not skip it.
     - no `Type` fields, hook parameters or engine options were added without an ADR amendment;
     - every store error is checked;
     - `SchemaVersion` is bumped with a CHANGELOG line if the key or value shape changed;
-    - the legacy route freeze file or cleaner count did not grow;
+    - the legacy route freeze file did not grow, and in Phase 4 the cleaner count did not grow (0.6 legitimately added the legacy `CleanupRG` cleaners);
     - a `Sample` exists for each type touched.
 - At most two review rounds. If it is still open after that, escalate to Stu rather than iterating.
 - Stu reviews and signs off the gates (G0 to G5), not each PR.

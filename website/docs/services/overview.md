@@ -13,7 +13,7 @@ miniblue emulates 32 Azure services on a single port. All services use in-memory
 | [Key Vault](key-vault.md) | `Microsoft.KeyVault` | Done | Yes | Yes |
 | [Cosmos DB](cosmos-db.md) | `Microsoft.DocumentDB` | Done | -- | Yes |
 | [Service Bus](service-bus.md) | `Microsoft.ServiceBus` | Done | -- | Yes |
-| Azure Functions | `Microsoft.Web` | Done | Yes | -- |
+| [App Service / Azure Functions](functions.md) | `Microsoft.Web` (`sites`) | Done | Yes | -- |
 | [Virtual Networks](virtual-networks.md) | `Microsoft.Network` | Done | Yes | -- |
 | [DNS Zones](dns-zones.md) | `Microsoft.Network` | Done | Yes | -- |
 | [Container Registry](container-registry.md) | `Microsoft.ContainerRegistry` | Done | Yes | Yes |

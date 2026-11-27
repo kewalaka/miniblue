@@ -73,7 +73,7 @@ Current workflows, checked in the worktree:
 
 | Workflow | Jobs and triggers | Notes |
 |---|---|---|
-| `ci.yml` | vet, lint, test, build, docker; push to main and PRs to main | The test job runs `go test -v ./tests/...` (`ci.yml:47`). `internal/...` is not run and there is no race detector (PLAN 0.1) |
+| `ci.yml` | vet, lint, test, build, docker; push to main and PRs to main | The test job builds `bin/azlocal` and runs `go test -race -v ./...` (PLAN 0.1, done) |
 | `acceptance.yml` | one job, the azapi policy definition fixture; 15 minute cap; cancels superseded runs | The only azapi job. Uploads the log on failure |
 | `acceptance-azurerm.yml` | matrix `azurerm / <fixture>` over `network`, `storage`, `identity-rbac`, `keyvault`, `compute`, `examples/terraform`; `fail-fast: false`; 15 minutes each | Builds the binary from source, then `ACC_SETUP_SYSTEM=1 ./tests/terraform/azurerm/run.sh <fixture>` |
 | `e2e.yml` | builds the Docker image; curl and Python smoke plus the `azlocal` CLI; push, PR and manual | The only job that tests the shipped image |
@@ -88,7 +88,7 @@ Current workflows, checked in the worktree:
 | Manual runs | `workflow_dispatch` on expensive suites | `e2e.yml` and `aks-e2e.yml` have it; the acceptance workflows do not | Add to every new suite that misses the PR budget |
 | Provider cache | cache the plugin directory | none | `TF_PLUGIN_CACHE_DIR` and `actions/cache`; serialise `init` if a cache is shared between parallel fixtures |
 | Reporting | publish test results and coverage | raw logs; `acceptance.yml` uploads the log on failure | Low priority: `gotestsum --junitfile` plus a coverage upload |
-| Unit tests | the same pipeline runs unit and integration tests | `internal/...` not run | PLAN 0.1 |
+| Unit tests | the same pipeline runs unit and integration tests | `ci.yml` runs `go test -race -v ./...` | Done (PLAN 0.1) |
 
 ## Cost rule
 
@@ -109,7 +109,7 @@ Ordered. Effort: XS under half a day, S about a day, M two to four days, L engin
 
 | # | Item | Effort | Depends on | Why |
 |---|---|---|---|---|
-| A1 | `go test ./...` with `-race` in `ci.yml` | XS | none (PLAN 0.1) | engine, store, id and deployments tests are unguarded in CI |
+| A1 | `go test ./...` with `-race` in `ci.yml` | XS | none (PLAN 0.1, done) | guards engine, store, id and deployments tests in CI |
 | A2 | Go SDK smoke in `tests/sdk/go`: own module, no `replace`, custom transport or `SSL_CERT_FILE`, fake credential | M | A1 | exercises the LRO poller and id casing in Go; Terraform's Go provider shares the same SDK base |
 | A3 | Python SDK smoke: `azure-mgmt-resource`, `azure-mgmt-authorization`, `base_url`, fake credential | M | A2 | cheap once A2 exists; `begin_*().result()` covers polling |
 | A4 | `az` scripted scenario plus `cloud.json` and a three-version matrix; feasibility spike first, then update `azure-cli.md` | M | A1 | the most common local-dev client; catches discovery and metadata drift |

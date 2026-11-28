@@ -62,7 +62,18 @@ func TestPolicyDefinitionRequestValidation(t *testing.T) {
 	ts := setupServer()
 	defer ts.Close()
 
-	expectStatus(t, doRequest(t, "PUT", ts.URL+pdBase+"/x?api-version=2019-01-01", pdBody), http.StatusBadRequest)
+	resp := doRequest(t, "PUT", ts.URL+pdBase+"/x", pdBody)
+	expectStatus(t, resp, http.StatusBadRequest)
+	if code := decodeError(t, resp).Error.Code; code != "MissingApiVersionParameter" {
+		t.Fatalf("missing api-version code = %q, want MissingApiVersionParameter", code)
+	}
+	resp = doRequest(t, "PUT", ts.URL+pdBase+"/x?api-version=invalid", pdBody)
+	expectStatus(t, resp, http.StatusBadRequest)
+	if code := decodeError(t, resp).Error.Code; code != "InvalidApiVersionParameter" {
+		t.Fatalf("malformed api-version code = %q, want InvalidApiVersionParameter", code)
+	}
+	// Any well-formed api-version is accepted (APIVersions is metadata, not a gate).
+	expectStatus(t, doRequest(t, "PUT", ts.URL+pdBase+"/x?api-version=2019-01-01", pdBody), http.StatusCreated)
 	expectStatus(t, doRequest(t, "PUT", ts.URL+pdBase+"/x"+pdAPI, `{"name":"y"}`), http.StatusBadRequest)
 	expectStatus(t, doRequest(t, "POST", ts.URL+pdBase+"/x"+pdAPI, pdBody), http.StatusMethodNotAllowed)
 	expectStatus(t, doRequest(t, "PATCH", ts.URL+pdBase+"/x"+pdAPI, pdBody), http.StatusMethodNotAllowed)

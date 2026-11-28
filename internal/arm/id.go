@@ -7,6 +7,7 @@ package arm
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -236,3 +237,81 @@ func (id ID) String() string {
 
 // Key is the case-insensitive identity of an ID.
 func (id ID) Key() string { return strings.ToLower(id.String()) }
+
+// ChildID builds a resource ID under parent.
+//
+// When typeName is a single segment (no "/"), it appends a child segment and
+// name to parent's own resource hierarchy. When typeName is a full resource
+// type ("Namespace/type[/child...]"), it scopes the new ID under parent (or
+// tenant scope when parent.IsTenant()) and pairs the type segments 1-to-1 with
+// the "/"-separated segments of name. Passing an empty name produces a
+// collection ID. Invalid inputs (empty segments, mismatched segment counts, or
+// a collection parent) return the zero ID.
+func ChildID(parent ID, typeName, name string) ID {
+	if parent.IsCollection() {
+		return ID{}
+	}
+	typeName = strings.Trim(typeName, "/")
+	if typeName == "" {
+		return ID{}
+	}
+	tParts := strings.Split(typeName, "/")
+	for _, s := range tParts {
+		if s == "" {
+			return ID{}
+		}
+	}
+	var nParts []string
+	if name != "" {
+		name = strings.Trim(name, "/")
+		if name == "" {
+			return ID{}
+		}
+		nParts = strings.Split(name, "/")
+		for _, s := range nParts {
+			if s == "" {
+				return ID{}
+			}
+		}
+	}
+
+	if len(tParts) == 1 {
+		if parent.IsTenant() {
+			return ID{}
+		}
+		if len(nParts) > 1 {
+			return ID{}
+		}
+		types := append(slices.Clone(parent.Types), tParts[0])
+		names := slices.Clone(parent.Names)
+		if len(nParts) == 1 {
+			names = append(names, nParts[0])
+		}
+		return ID{
+			Scope:     parent.Scope,
+			Namespace: parent.Namespace,
+			Types:     types,
+			Names:     names,
+		}
+	}
+
+	ns, types := tParts[0], tParts[1:]
+	if len(nParts) == 0 {
+		if len(types) != 1 {
+			return ID{}
+		}
+	} else if len(nParts) != len(types) {
+		return ID{}
+	}
+	var scope *ID
+	if !parent.IsTenant() {
+		p := parent
+		scope = &p
+	}
+	return ID{
+		Scope:     scope,
+		Namespace: ns,
+		Types:     types,
+		Names:     nParts,
+	}
+}

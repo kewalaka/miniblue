@@ -24,8 +24,9 @@ type Type struct {
 	// Name is "Namespace/type" for a top-level type; for a child in Children
 	// it is just the child segment (e.g. "subnets").
 	Name string
-	// APIVersions lists the accepted api-version query values. A request
-	// without api-version is accepted, like the rest of miniblue.
+	// APIVersions lists the resource type's API versions (latest first) as
+	// metadata for /providers and conformance tests. Any well-formed
+	// api-version query value is accepted by the engine.
 	APIVersions []string
 	// Scopes is the bitmask of scopes the type may be created in. Requests at
 	// other scopes are not claimed and fall through to the next handler.
@@ -35,7 +36,10 @@ type Type struct {
 	Children []Type
 	// Patch controls PATCH handling (default PatchMerge).
 	Patch PatchMode
-	Hooks Hooks
+	// Provisioned stamps properties.provisioningState="Succeeded" before
+	// Hooks.Defaults runs on PUT and PATCH.
+	Provisioned bool
+	Hooks       Hooks
 }
 
 // Hooks are optional per-type behaviour. The engine is pure passthrough
@@ -102,13 +106,4 @@ func (r *Registry) add(t Type) {
 func (r *Registry) Lookup(id ID) (*Type, bool) {
 	t, ok := r.types[strings.ToLower(id.TypeName())]
 	return t, ok
-}
-
-func (t *Type) supports(apiVersion string) bool {
-	for _, v := range t.APIVersions {
-		if strings.EqualFold(v, apiVersion) {
-			return true
-		}
-	}
-	return false
 }

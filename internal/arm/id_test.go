@@ -216,3 +216,135 @@ func TestIDWithTypeName(t *testing.T) {
 		t.Errorf("mismatched shape must be a no-op, got %q", got)
 	}
 }
+
+func TestChildID(t *testing.T) {
+	sub, err := ParseID("/subscriptions/s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rg, err := ParseID("/subscriptions/s1/resourceGroups/rg1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	vnet := ChildID(rg, "Microsoft.Network/virtualNetworks", "vnet1")
+
+	tests := []struct {
+		name     string
+		got      ID
+		wantStr  string
+		wantZero bool
+	}{
+		{
+			name:    "top-level under rg",
+			got:     vnet,
+			wantStr: "/subscriptions/s1/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks/vnet1",
+		},
+		{
+			name:    "single child segment",
+			got:     ChildID(vnet, "subnets", "sn1"),
+			wantStr: "/subscriptions/s1/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks/vnet1/subnets/sn1",
+		},
+		{
+			name:    "multi-level full type",
+			got:     ChildID(rg, "Microsoft.ServiceBus/namespaces/topics/subscriptions/rules", "ns/topic/sub/rule"),
+			wantStr: "/subscriptions/s1/resourceGroups/rg1/providers/Microsoft.ServiceBus/namespaces/ns/topics/topic/subscriptions/sub/rules/rule",
+		},
+		{
+			name: "chained single segments match multi-level",
+			got: ChildID(
+				ChildID(
+					ChildID(
+						ChildID(rg, "Microsoft.ServiceBus/namespaces", "ns"),
+						"topics", "topic",
+					),
+					"subscriptions", "sub",
+				),
+				"rules", "rule",
+			),
+			wantStr: "/subscriptions/s1/resourceGroups/rg1/providers/Microsoft.ServiceBus/namespaces/ns/topics/topic/subscriptions/sub/rules/rule",
+		},
+		{
+			name:    "tenant scope",
+			got:     ChildID(ID{}, "Microsoft.Authorization/policyDefinitions", "pd1"),
+			wantStr: "/providers/Microsoft.Authorization/policyDefinitions/pd1",
+		},
+		{
+			name:    "extension resource on resource",
+			got:     ChildID(vnet, "Microsoft.Authorization/roleAssignments", "ra1"),
+			wantStr: "/subscriptions/s1/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks/vnet1/providers/Microsoft.Authorization/roleAssignments/ra1",
+		},
+		{
+			name:    "builtin resource group",
+			got:     ChildID(sub, "Microsoft.Resources/resourceGroups", "rg2"),
+			wantStr: "/subscriptions/s1/resourceGroups/rg2",
+		},
+		{
+			name:    "collection under parent",
+			got:     ChildID(vnet, "subnets", ""),
+			wantStr: "/subscriptions/s1/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks/vnet1/subnets",
+		},
+		{
+			name:    "top-level collection",
+			got:     ChildID(rg, "Microsoft.Network/virtualNetworks", ""),
+			wantStr: "/subscriptions/s1/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks",
+		},
+		{
+			name:     "mismatched multi-level segments rejected",
+			got:      ChildID(rg, "Microsoft.ServiceBus/namespaces/topics", "ns"),
+			wantZero: true,
+		},
+		{
+			name:     "too many name segments for single child rejected",
+			got:      ChildID(vnet, "subnets", "sn1/extra"),
+			wantZero: true,
+		},
+		{
+			name:     "single segment under tenant rejected",
+			got:      ChildID(ID{}, "subnets", "sn1"),
+			wantZero: true,
+		},
+		{
+			name:     "empty type rejected",
+			got:      ChildID(rg, "", "x"),
+			wantZero: true,
+		},
+		{
+			name:     "empty inner segment rejected",
+			got:      ChildID(rg, "Microsoft.ServiceBus/namespaces/topics", "ns//topic"),
+			wantZero: true,
+		},
+		{
+			name:     "collection parent rejected",
+			got:      ChildID(ChildID(vnet, "subnets", ""), "sub", "x"),
+			wantZero: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.wantZero {
+				if !tc.got.IsTenant() {
+					t.Fatalf("got %q, want zero ID", tc.got.String())
+				}
+				return
+			}
+			if got := tc.got.String(); got != tc.wantStr {
+				t.Fatalf("String() = %q, want %q", got, tc.wantStr)
+			}
+			parsed, err := ParseID(tc.got.String())
+			if err != nil {
+				t.Fatalf("ParseID(%q): %v", tc.got.String(), err)
+			}
+			if parsed.String() != tc.wantStr {
+				t.Fatalf("round-trip = %q, want %q", parsed.String(), tc.wantStr)
+			}
+		})
+	}
+
+	// Ensure ChildID does not mutate parent slices.
+	_ = ChildID(vnet, "subnets", "a")
+	_ = ChildID(vnet, "subnets", "b")
+	if len(vnet.Types) != 1 || len(vnet.Names) != 1 {
+		t.Fatalf("parent mutated: %+v", vnet)
+	}
+}

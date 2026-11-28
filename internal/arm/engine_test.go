@@ -275,23 +275,134 @@ func TestEngineRequestErrors(t *testing.T) {
 	cases := []struct {
 		name, method, path, body string
 		status                   int
+		code                     string
 	}{
-		{"bad api-version", http.MethodGet, path + "?api-version=1999-01-01", "", http.StatusBadRequest},
-		{"missing api-version is accepted", http.MethodGet, path, "", http.StatusNotFound},
-		{"empty body", http.MethodPut, path + apiV, "", http.StatusBadRequest},
-		{"non-object body", http.MethodPut, path + apiV, `[1]`, http.StatusBadRequest},
-		{"null body", http.MethodPut, path + apiV, `null`, http.StatusBadRequest},
-		{"name mismatch", http.MethodPut, path + apiV, `{"name":"other"}`, http.StatusBadRequest},
-		{"id mismatch", http.MethodPut, path + apiV, `{"id":"/subscriptions/x"}`, http.StatusBadRequest},
-		{"post item", http.MethodPost, path + apiV, `{}`, http.StatusMethodNotAllowed},
-		{"post collection", http.MethodPost, subScope + "/providers/Microsoft.Test/widgets" + apiV, `{}`, http.StatusMethodNotAllowed},
-		{"delete collection", http.MethodDelete, subScope + "/providers/Microsoft.Test/widgets" + apiV, "", http.StatusMethodNotAllowed},
-		{"patch with PatchNone", http.MethodPatch, subScope + "/providers/Microsoft.Test/gadgets/g" + apiV, `{"tags":{}}`, http.StatusMethodNotAllowed},
+		{"missing api-version", http.MethodGet, path, "", http.StatusBadRequest, "MissingApiVersionParameter"},
+		{"empty api-version", http.MethodGet, path + "?api-version=", "", http.StatusBadRequest, "MissingApiVersionParameter"},
+		{"malformed api-version", http.MethodGet, path + "?api-version=not-a-date", "", http.StatusBadRequest, "InvalidApiVersionParameter"},
+		{"invalid calendar date api-version", http.MethodGet, path + "?api-version=2024-13-45", "", http.StatusBadRequest, "InvalidApiVersionParameter"},
+		{"unknown well-formed api-version accepted", http.MethodGet, path + "?api-version=2099-01-01-preview", "", http.StatusNotFound, "ResourceNotFound"},
+		{"empty body", http.MethodPut, path + apiV, "", http.StatusBadRequest, "InvalidRequestContent"},
+		{"non-object body", http.MethodPut, path + apiV, `[1]`, http.StatusBadRequest, "InvalidRequestContent"},
+		{"null body", http.MethodPut, path + apiV, `null`, http.StatusBadRequest, "InvalidRequestContent"},
+		{"name mismatch", http.MethodPut, path + apiV, `{"name":"other"}`, http.StatusBadRequest, "InvalidRequestContent"},
+		{"id mismatch", http.MethodPut, path + apiV, `{"id":"/subscriptions/x"}`, http.StatusBadRequest, "InvalidRequestContent"},
+		{"post item", http.MethodPost, path + apiV, `{}`, http.StatusMethodNotAllowed, "MethodNotAllowed"},
+		{"post collection", http.MethodPost, subScope + "/providers/Microsoft.Test/widgets" + apiV, `{}`, http.StatusMethodNotAllowed, "MethodNotAllowed"},
+		{"delete collection", http.MethodDelete, subScope + "/providers/Microsoft.Test/widgets" + apiV, "", http.StatusMethodNotAllowed, "MethodNotAllowed"},
+		{"patch with PatchNone", http.MethodPatch, subScope + "/providers/Microsoft.Test/gadgets/g" + apiV, `{"tags":{}}`, http.StatusMethodNotAllowed, "MethodNotAllowed"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			want(t, do(h, c.method, c.path, c.body), c.status)
+			w := do(h, c.method, c.path, c.body)
+			want(t, w, c.status)
+			if c.code != "" {
+				if got := decode(t, w)["error"].(map[string]any)["code"]; got != c.code {
+					t.Fatalf("error code = %v, want %s", got, c.code)
+				}
+			}
 		})
+	}
+}
+
+func TestEngineAPIVersionMetadata(t *testing.T) {
+	h := newHandler(t)
+	path := subScope + "/providers/Microsoft.Test/widgets/w1"
+	coll := subScope + "/providers/Microsoft.Test/widgets"
+
+	// Missing api-version fails on all methods including list and delete.
+	for _, tc := range []struct {
+		method, url, body string
+	}{
+		{http.MethodPut, path, `{}`},
+		{http.MethodGet, path, ""},
+		{http.MethodGet, coll, ""},
+		{http.MethodPatch, path, `{"tags":{}}`},
+		{http.MethodDelete, path, ""},
+	} {
+		w := do(h, tc.method, tc.url, tc.body)
+		want(t, w, http.StatusBadRequest)
+		if got := decode(t, w)["error"].(map[string]any)["code"]; got != "MissingApiVersionParameter" {
+			t.Fatalf("%s %s: code = %v, want MissingApiVersionParameter", tc.method, tc.url, got)
+		}
+	}
+
+	// Malformed api-version values are rejected.
+	for _, bad := range []string{"1", "2024-1-1", "2024-01-01-", "2024/01/01", "2024-01-01 preview", "2024-02-30"} {
+		w := do(h, http.MethodGet, path+"?api-version="+url.QueryEscape(bad), "")
+		want(t, w, http.StatusBadRequest)
+		if got := decode(t, w)["error"].(map[string]any)["code"]; got != "InvalidApiVersionParameter" {
+			t.Fatalf("api-version=%q: code = %v, want InvalidApiVersionParameter", bad, got)
+		}
+	}
+
+	// Any well-formed version is accepted even if not in Type.APIVersions.
+	for _, good := range []string{"2019-01-01", "2025-06-01-preview", "2026-01-01-privatepreview", "2024-05-01-beta.1"} {
+		w := do(h, http.MethodPut, path+"?api-version="+good, `{}`)
+		if w.Code != http.StatusCreated && w.Code != http.StatusOK {
+			t.Fatalf("api-version=%q: status = %d, body = %s", good, w.Code, w.Body.String())
+		}
+	}
+}
+
+func TestEngineProvisioned(t *testing.T) {
+	reg := NewRegistry()
+	var defaultsSawState any
+	reg.Register(Type{
+		Name:        "Microsoft.Test/services",
+		APIVersions: []string{"2024-01-01"},
+		Scopes:      ScopeSubscription,
+		Patch:       PatchTags,
+		Provisioned: true,
+		Hooks: Hooks{
+			Defaults: func(_ context.Context, r *Request) error {
+				props, _ := r.Doc["properties"].(map[string]any)
+				defaultsSawState = props["provisioningState"]
+				return nil
+			},
+		},
+	})
+	reg.Register(Type{
+		Name:        "Microsoft.Test/plain",
+		APIVersions: []string{"2024-01-01"},
+		Scopes:      ScopeSubscription,
+	})
+	e := NewEngine(reg, NewStore(store.New()))
+
+	// Provisioned type without properties gets properties.provisioningState="Succeeded".
+	svcPath := subScope + "/providers/Microsoft.Test/services/s1"
+	w := do(e, http.MethodPut, svcPath+apiV, `{}`)
+	want(t, w, http.StatusCreated)
+	if defaultsSawState != "Succeeded" {
+		t.Fatalf("Defaults saw provisioningState = %v, want Succeeded", defaultsSawState)
+	}
+	props := decode(t, w)["properties"].(map[string]any)
+	if props["provisioningState"] != "Succeeded" {
+		t.Fatalf("provisioningState = %v, want Succeeded", props["provisioningState"])
+	}
+
+	// Client-supplied provisioningState is overwritten and existing properties preserved.
+	w = do(e, http.MethodPut, svcPath+apiV, `{"properties":{"tier":"Basic","provisioningState":"Updating"}}`)
+	want(t, w, http.StatusOK)
+	props = decode(t, w)["properties"].(map[string]any)
+	if props["provisioningState"] != "Succeeded" || props["tier"] != "Basic" {
+		t.Fatalf("properties = %v", props)
+	}
+
+	// PATCH preserves provisioningState="Succeeded".
+	w = do(e, http.MethodPatch, svcPath+apiV, `{"tags":{"env":"dev"}}`)
+	want(t, w, http.StatusOK)
+	props = decode(t, w)["properties"].(map[string]any)
+	if props["provisioningState"] != "Succeeded" {
+		t.Fatalf("after PATCH provisioningState = %v, want Succeeded", props["provisioningState"])
+	}
+
+	// Non-provisioned type does not stamp provisioningState.
+	plainPath := subScope + "/providers/Microsoft.Test/plain/p1"
+	w = do(e, http.MethodPut, plainPath+apiV, `{}`)
+	want(t, w, http.StatusCreated)
+	if _, ok := decode(t, w)["properties"]; ok {
+		t.Fatalf("non-provisioned type should not add properties: %s", w.Body.String())
 	}
 }
 

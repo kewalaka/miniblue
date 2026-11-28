@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/moabukar/miniblue/internal/store"
+	"github.com/moabukar/miniblue/internal/token"
 )
 
 type Handler struct {
@@ -48,39 +48,32 @@ func baseFromRequest(r *http.Request) string {
 	return scheme + "://" + r.Host
 }
 
-func mockJWT(tenantId, clientId string) string {
-	header := `{"typ":"JWT","alg":"none"}`
-	now := time.Now()
-	claims := map[string]interface{}{
-		"aud": "https://management.azure.com/",
-		"iss": fmt.Sprintf("https://sts.windows.net/%s/", tenantId),
-		"iat": now.Unix(),
-		"nbf": now.Unix(),
-		"exp": now.Add(24 * time.Hour).Unix(),
-		"oid": "00000000-0000-0000-0000-000000000002",
-		"sub": "00000000-0000-0000-0000-000000000002",
-		"tid": tenantId,
-		"appid": clientId,
-	}
-	claimsJSON, _ := json.Marshal(claims)
-	h := base64.RawURLEncoding.EncodeToString([]byte(header))
-	p := base64.RawURLEncoding.EncodeToString(claimsJSON)
-	return h + "." + p + ".mock-signature"
-}
-
 func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 	tenantId := chi.URLParam(r, "tenantId")
 	clientId := r.FormValue("client_id")
 	if clientId == "" {
-		clientId = "miniblue"
+		clientId = token.DefaultClientID
 	}
-	accessToken := mockJWT(tenantId, clientId)
-	token := map[string]interface{}{
+	now := time.Now()
+	exp := now.Add(24 * time.Hour)
+	oid := token.ClientOID(tenantId, clientId)
+	accessToken := token.Issue(token.Claims{
+		Aud:   "https://management.azure.com/",
+		Iss:   fmt.Sprintf("https://sts.windows.net/%s/", tenantId),
+		IAT:   now.Unix(),
+		NBF:   now.Unix(),
+		Exp:   exp.Unix(),
+		OID:   oid,
+		Sub:   oid,
+		TID:   tenantId,
+		AppID: clientId,
+	})
+	resp := map[string]interface{}{
 		"access_token":   accessToken,
 		"token_type":     "Bearer",
 		"expires_in":     86400,
-		"expires_on":     time.Now().Add(24 * time.Hour).Unix(),
-		"not_before":     time.Now().Unix(),
+		"expires_on":     exp.Unix(),
+		"not_before":     now.Unix(),
 		"resource":       r.FormValue("resource"),
 		"refresh_token":  "miniblue-mock-refresh-token",
 		"scope":          r.FormValue("scope"),
@@ -91,7 +84,7 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 		"tenant_id":      tenantId,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(token)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (h *Handler) OpenIDConfig(w http.ResponseWriter, r *http.Request) {

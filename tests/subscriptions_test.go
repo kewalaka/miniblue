@@ -2,6 +2,8 @@ package tests
 
 import (
 	"testing"
+
+	"github.com/moabukar/miniblue/internal/token"
 )
 
 func TestSubscriptionsAndTenants(t *testing.T) {
@@ -92,8 +94,19 @@ func TestManagedIdentityToken(t *testing.T) {
 	if m["token_type"] != "Bearer" {
 		t.Fatalf("expected token_type=Bearer, got %v", m["token_type"])
 	}
-	if m["access_token"] == nil || m["access_token"] == "" {
+	accessToken, _ := m["access_token"].(string)
+	if accessToken == "" {
 		t.Fatal("expected non-empty access_token")
+	}
+	claims, ok := token.Parse(accessToken)
+	if !ok {
+		t.Fatalf("expected parseable JWT access_token, got %q", accessToken)
+	}
+	if claims.OID != token.DefaultClientOID {
+		t.Fatalf("expected oid=%s, got %q", token.DefaultClientOID, claims.OID)
+	}
+	if claims.Aud != "https://management.azure.com/" {
+		t.Fatalf("expected aud=https://management.azure.com/, got %q", claims.Aud)
 	}
 }
 

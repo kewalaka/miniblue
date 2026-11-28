@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -50,7 +51,7 @@ func TestDeleteRunsEngineDeleteScopeAheadOfCleaners(t *testing.T) {
 
 	putWidget := func(rg, name string) arm.ID {
 		path := "/subscriptions/sub1/resourceGroups/" + rg + "/providers/Microsoft.Test/widgets/" + name
-		req, ok, err := eng.Resolve(http.MethodPut, path, nil)
+		req, ok, err := eng.Resolve(http.MethodPut, path, url.Values{"api-version": {"2024-01-01"}})
 		if !ok || err != nil {
 			t.Fatalf("Resolve(%s): ok=%v err=%v", path, ok, err)
 		}

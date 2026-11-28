@@ -6,10 +6,22 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/moabukar/miniblue/internal/azerr"
 )
+
+var apiVersionRE = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$`)
+
+func validAPIVersion(v string) bool {
+	if !apiVersionRE.MatchString(v) {
+		return false
+	}
+	_, err := time.Parse("2006-01-02", v[:10])
+	return err == nil
+}
 
 // Op identifies the ARM operation performed by Engine.Do.
 type Op uint8
@@ -108,10 +120,13 @@ func (e *Engine) Resolve(method, path string, q url.Values) (*Request, bool, err
 		return nil, false, nil
 	}
 	apiVersion := q.Get("api-version")
-	if apiVersion != "" && !t.supports(apiVersion) {
+	if apiVersion == "" {
+		return nil, true, azerr.New(http.StatusBadRequest, "MissingApiVersionParameter",
+			"The api-version query parameter (?api-version=) is required for all requests.")
+	}
+	if !validAPIVersion(apiVersion) {
 		return nil, true, azerr.New(http.StatusBadRequest, "InvalidApiVersionParameter",
-			"The api-version '%s' is invalid. The supported versions are '%s'.",
-			apiVersion, strings.Join(t.APIVersions, ","))
+			"The api-version '%s' is invalid.", apiVersion)
 	}
 	req := &Request{
 		ID:         id,
@@ -358,6 +373,9 @@ func (e *Engine) doPut(ctx context.Context, r *Request) (int, any, error) {
 				return nil, normalizeValidateErr(err)
 			}
 		}
+		if r.Type.Provisioned {
+			stampProvisioningState(r.Doc)
+		}
 		if r.Type.Hooks.Defaults != nil {
 			if err := r.Type.Hooks.Defaults(ctx, r); err != nil {
 				return nil, err
@@ -448,6 +466,9 @@ func (e *Engine) doPatch(ctx context.Context, r *Request) (int, any, error) {
 				return nil, normalizeValidateErr(err)
 			}
 		}
+		if r.Type.Provisioned {
+			stampProvisioningState(r.Doc)
+		}
 		if r.Type.Hooks.Defaults != nil {
 			if err := r.Type.Hooks.Defaults(ctx, r); err != nil {
 				return nil, err
@@ -496,6 +517,18 @@ func mergePatch(target, patch map[string]any) map[string]any {
 		target[k] = cloneValue(v)
 	}
 	return target
+}
+
+func stampProvisioningState(doc map[string]any) {
+	props, ok := doc["properties"].(map[string]any)
+	if !ok {
+		if doc["properties"] != nil {
+			return
+		}
+		props = map[string]any{}
+		doc["properties"] = props
+	}
+	props["provisioningState"] = "Succeeded"
 }
 
 func normalizeValidateErr(err error) error {

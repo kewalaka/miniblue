@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/moabukar/miniblue/internal/arm"
 	"github.com/moabukar/miniblue/internal/azerr"
 	"github.com/moabukar/miniblue/internal/store"
 )
@@ -28,12 +29,14 @@ type Cleaner func(sub, rg string)
 
 type Handler struct {
 	store    *store.Store
+	engine   *arm.Engine
 	cleaners []Cleaner
 }
 
-// NewHandler returns a handler whose delete runs the cleaners in order.
-func NewHandler(s *store.Store, cleaners ...Cleaner) *Handler {
-	return &Handler{store: s, cleaners: cleaners}
+// NewHandler returns a handler whose delete runs engine scope cleanup (when
+// eng is non-nil) followed by the legacy cleaners in order.
+func NewHandler(s *store.Store, eng *arm.Engine, cleaners ...Cleaner) *Handler {
+	return &Handler{store: s, engine: eng, cleaners: cleaners}
 }
 
 func (h *Handler) Register(r chi.Router) {
@@ -154,6 +157,18 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	if !h.store.Delete(k) {
 		azerr.NotFound(w, "Microsoft.Resources/resourceGroups", name)
 		return
+	}
+
+	if h.engine != nil {
+		rgID, err := arm.ParseID("/subscriptions/" + sub + "/resourceGroups/" + name)
+		if err != nil {
+			azerr.Write(w, err)
+			return
+		}
+		if err := h.engine.DeleteScope(rgID); err != nil {
+			azerr.Write(w, err)
+			return
+		}
 	}
 
 	// Also clean up resources in this resource group

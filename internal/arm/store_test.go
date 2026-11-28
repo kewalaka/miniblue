@@ -210,38 +210,42 @@ func TestStoreReaderUnder(t *testing.T) {
 	}
 }
 
-func TestStoreListSkipsStaleIndexEntries(t *testing.T) {
+func TestStoreIgnoresLeftoverIndexKeys(t *testing.T) {
 	backend := store.New()
 	s := NewStore(backend)
 	a := mustID(t, "/subscriptions/a1/providers/Microsoft.Authorization/policyDefinitions/a")
-	b := mustID(t, "/subscriptions/a1/providers/Microsoft.Authorization/policyDefinitions/b")
 	s.Put(a, doc(a))
-	s.Put(b, doc(b))
-	backend.Delete(resKey(a))
+	// Simulate a leftover arm:i: key from an earlier version.
+	_ = backend.Set("arm:i:/subscriptions/a1|microsoft.authorization/policydefinitions", []string{"arm:r:/subscriptions/a1/providers/microsoft.authorization/policydefinitions/ghost"})
+
+	// Store writes no arm:i: keys of its own, and List only reads arm:r:.
 	list, err := s.List(mustID(t, "/subscriptions/a1/providers/Microsoft.Authorization/policyDefinitions"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := ids(list), []string{b.String()}; !reflect.DeepEqual(got, want) {
+	if got, want := ids(list), []string{a.String()}; !reflect.DeepEqual(got, want) {
 		t.Errorf("List = %v, want %v", got, want)
+	}
+	if keys := backend.ListKeysByPrefix("arm:r:"); len(keys) != 1 {
+		t.Errorf("arm:r: keys = %v, want 1", keys)
 	}
 }
 
-func TestStoreDelete(t *testing.T) {
+func TestStoreDeleteTreeSingleResource(t *testing.T) {
 	backend := store.New()
 	s := NewStore(backend)
 	id := mustID(t, "/subscriptions/a1/providers/Microsoft.Authorization/policyDefinitions/p")
 	s.Put(id, doc(id))
-	existed, err := s.Delete(mustID(t, "/SUBSCRIPTIONS/A1/providers/microsoft.authorization/policydefinitions/P"))
+	existed, err := s.DeleteTree(mustID(t, "/SUBSCRIPTIONS/A1/providers/microsoft.authorization/policydefinitions/P"))
 	if err != nil || !existed {
-		t.Fatalf("Delete should report existed: existed=%v err=%v", existed, err)
+		t.Fatalf("DeleteTree should report existed: existed=%v err=%v", existed, err)
 	}
-	existed, err = s.Delete(id)
+	existed, err = s.DeleteTree(id)
 	if err != nil || existed {
-		t.Errorf("second Delete should report absent: existed=%v err=%v", existed, err)
+		t.Errorf("second DeleteTree should report absent: existed=%v err=%v", existed, err)
 	}
 	if keys := backend.List(); len(keys) != 0 {
-		t.Errorf("index/resource keys left behind: %v", keys)
+		t.Errorf("keys left behind: %v", keys)
 	}
 }
 
@@ -286,9 +290,9 @@ func TestStoreDeleteTree(t *testing.T) {
 			if got := ids(list); !reflect.DeepEqual(got, []string{keep.String()}) {
 				t.Errorf("List(virtualNetworks) = %v", got)
 			}
-			// Only vnet2, its child, and the two index records remain.
-			if n := len(backend.List()); n != 4 {
-				t.Errorf("backend keys = %v, want 4", backend.List())
+			// Only vnet2 and its child remain (no index keys).
+			if n := len(backend.List()); n != 2 {
+				t.Errorf("backend keys = %v, want 2", backend.List())
 			}
 		})
 	}
@@ -368,7 +372,7 @@ func TestStoreUpdateExcludesDelete(t *testing.T) {
 
 	deleted := make(chan bool, 1)
 	go func() {
-		ok, _ := s.Delete(id)
+		ok, _ := s.DeleteTree(id)
 		deleted <- ok
 	}()
 	select {
@@ -442,6 +446,35 @@ func (f *failingBackend) DeleteByPrefix(prefix string) (int, error) {
 	return f.MemoryBackend.DeleteByPrefix(prefix)
 }
 
+func TestStoreDeleteScope(t *testing.T) {
+	backend := store.New()
+	s := NewStore(backend)
+	put := func(p string) ID {
+		id := mustID(t, p)
+		s.Put(id, doc(id))
+		return id
+	}
+	rg1 := mustID(t, "/subscriptions/a1/resourceGroups/rg1")
+	put("/subscriptions/a1/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks/v1")
+	put("/subscriptions/a1/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks/v1/subnets/s1")
+	put("/subscriptions/a1/resourceGroups/rg1/providers/Microsoft.Authorization/locks/l1")
+	keepRG10 := put("/subscriptions/a1/resourceGroups/rg10/providers/Microsoft.Network/virtualNetworks/v1")
+	keepSub := put("/subscriptions/a1/providers/Microsoft.Authorization/policyDefinitions/p1")
+
+	if err := s.DeleteScope(rg1); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Under(rg1, "Microsoft.Network/virtualNetworks"); err != nil || len(got) != 0 {
+		t.Errorf("rg1 vnets survived: %v err=%v", ids(got), err)
+	}
+	if _, ok, err := s.Get(keepRG10); err != nil || !ok {
+		t.Errorf("rg10 resource deleted: ok=%v err=%v", ok, err)
+	}
+	if _, ok, err := s.Get(keepSub); err != nil || !ok {
+		t.Errorf("subscription resource deleted: ok=%v err=%v", ok, err)
+	}
+}
+
 func TestStorePropagatesBackendErrors(t *testing.T) {
 	boom := errors.New("backend unavailable")
 	id := mustID(t, "/subscriptions/a1/providers/Microsoft.Test/widgets/w1")
@@ -452,15 +485,15 @@ func TestStorePropagatesBackendErrors(t *testing.T) {
 	if _, _, err := s.Get(id); !errors.Is(err, boom) {
 		t.Errorf("Get err = %v, want %v", err, boom)
 	}
-	if _, err := s.Children(sub, "Microsoft.Test/widgets"); !errors.Is(err, boom) {
-		t.Errorf("Children err = %v, want %v", err, boom)
-	}
 	if _, _, err := s.Update(id, func(cur map[string]any) (map[string]any, error) { return doc(id), nil }); !errors.Is(err, boom) {
 		t.Errorf("Update(read) err = %v, want %v", err, boom)
 	}
 
 	fb = &failingBackend{MemoryBackend: store.NewMemoryBackend(), scanErr: boom}
 	s = NewStore(store.NewWithBackend(fb))
+	if _, err := s.Children(sub, "Microsoft.Test/widgets"); !errors.Is(err, boom) {
+		t.Errorf("Children err = %v, want %v", err, boom)
+	}
 	if _, err := s.Under(sub, "Microsoft.Test/widgets"); !errors.Is(err, boom) {
 		t.Errorf("Under err = %v, want %v", err, boom)
 	}
@@ -473,10 +506,13 @@ func TestStorePropagatesBackendErrors(t *testing.T) {
 
 	fb = &failingBackend{MemoryBackend: store.NewMemoryBackend(), deleteErr: boom}
 	s = NewStore(store.NewWithBackend(fb))
-	if _, err := s.Delete(id); !errors.Is(err, boom) {
-		t.Errorf("Delete err = %v, want %v", err, boom)
-	}
 	if _, err := s.DeleteTree(id); !errors.Is(err, boom) {
 		t.Errorf("DeleteTree err = %v, want %v", err, boom)
+	}
+
+	fb = &failingBackend{MemoryBackend: store.NewMemoryBackend(), deletePrefixErr: boom}
+	s = NewStore(store.NewWithBackend(fb))
+	if err := s.DeleteScope(sub); !errors.Is(err, boom) {
+		t.Errorf("DeleteScope err = %v, want %v", err, boom)
 	}
 }

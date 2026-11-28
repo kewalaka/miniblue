@@ -56,6 +56,7 @@ type Server struct {
 	router     *chi.Mux
 	store      *store.Store
 	armTypes   *arm.Registry
+	armEngine  *arm.Engine
 	services   []string
 	aksHandler *aks.Handler
 	routeTrie  *routeTrie
@@ -187,7 +188,8 @@ func (s *Server) setupRoutes() {
 	if serviceEnabled("policy", allowed) {
 		policy.Register(s.armTypes)
 	}
-	s.router.Use(arm.NewEngine(s.armTypes, arm.NewStore(s.store)).Middleware)
+	s.armEngine = arm.NewEngine(s.armTypes, arm.NewStore(s.store), arm.WithScopeExists(s.scopeExists))
+	s.router.Use(s.armEngine.Middleware)
 
 	var authorizationHandler *authorization.Handler
 	if serviceEnabled("authorization", allowed) {
@@ -212,7 +214,7 @@ func (s *Server) setupRoutes() {
 		register func()
 	}
 	services := []namedService{
-		{"resourcegroups", func() { resourcegroups.NewHandler(s.store, s.rgCleaners()...).Register(s.router) }},
+		{"resourcegroups", func() { resourcegroups.NewHandler(s.store, s.armEngine, s.rgCleaners()...).Register(s.router) }},
 		{"blob", func() { blob.NewHandler(s.store).Register(s.router) }},
 		{"table", func() { table.NewHandler(s.store).Register(s.router) }},
 		{"queue", func() { queue.NewHandler(s.store).Register(s.router) }},
@@ -276,6 +278,30 @@ func (s *Server) setupRoutes() {
 	if serviceEnabled("policy", allowed) {
 		s.services = append(s.services, "policy")
 	}
+}
+
+// scopeExists checks whether an ARM scope exists before the engine creates or
+// updates a resource in it. Only resource groups are checked here until they
+// migrate onto the engine.
+func (s *Server) scopeExists(_ context.Context, scope arm.ID) (bool, error) {
+	if !strings.EqualFold(scope.TypeName(), "Microsoft.Resources/resourceGroups") {
+		return true, nil
+	}
+	sub, rg := scope.Parent().Name(), scope.Name()
+	want := "rg:" + sub + ":" + rg
+	if _, ok, err := s.store.Lookup(want); err != nil || ok {
+		return ok, err
+	}
+	kvs, err := s.store.Scan("rg:")
+	if err != nil {
+		return false, err
+	}
+	for _, kv := range kvs {
+		if strings.EqualFold(kv.Key, want) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // rgCleaners lists the legacy per-service cleaners that run on resource group

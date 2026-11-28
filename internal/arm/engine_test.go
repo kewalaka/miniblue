@@ -756,7 +756,6 @@ func TestEngineStoreErrorsReturn500(t *testing.T) {
 		name, method, url, body string
 	}{
 		{"get", http.MethodGet, path + apiV, ""},
-		{"list", http.MethodGet, subScope + "/providers/Microsoft.Test/widgets" + apiV, ""},
 		{"put", http.MethodPut, path + apiV, `{}`},
 		{"patch", http.MethodPatch, path + apiV, `{"tags":{}}`},
 	} {
@@ -769,9 +768,115 @@ func TestEngineStoreErrorsReturn500(t *testing.T) {
 		})
 	}
 
+	fb = &failingBackend{MemoryBackend: store.NewMemoryBackend(), scanErr: boom}
+	e = newTestEngine(t, store.NewWithBackend(fb))
+	want(t, do(e, http.MethodGet, subScope+"/providers/Microsoft.Test/widgets"+apiV, ""), http.StatusInternalServerError)
+
 	fb = &failingBackend{MemoryBackend: store.NewMemoryBackend(), deleteErr: boom}
 	e = newTestEngine(t, store.NewWithBackend(fb))
 	want(t, do(e, http.MethodDelete, path+apiV, ""), http.StatusInternalServerError)
+}
+
+func TestEngineSubscriptionWideList(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(Type{
+		Name:        "Microsoft.Test/rgwidgets",
+		APIVersions: []string{"2024-01-01"},
+		Scopes:      ScopeResourceGroup,
+		Children:    []Type{{Name: "parts"}},
+	})
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
+	h := NewEngine(reg, NewStore(store.New())).Middleware(next)
+
+	const otherSub = "/subscriptions/00000000-0000-4000-8000-000000000002"
+	for _, p := range []string{
+		subScope + "/resourceGroups/rg1/providers/Microsoft.Test/rgwidgets/w1",
+		subScope + "/resourceGroups/rg2/providers/Microsoft.Test/rgwidgets/w2",
+		subScope + "/resourceGroups/rg1/providers/Microsoft.Test/rgwidgets/w1/parts/p1",
+		otherSub + "/resourceGroups/rg1/providers/Microsoft.Test/rgwidgets/w3",
+	} {
+		want(t, do(h, http.MethodPut, p+apiV, `{}`), http.StatusCreated)
+	}
+
+	// Subscription-wide list returns RG resources in subScope, excluding otherSub and children.
+	w := do(h, http.MethodGet, subScope+"/providers/Microsoft.Test/rgwidgets"+apiV, "")
+	want(t, w, http.StatusOK)
+	var names []string
+	for _, v := range decode(t, w)["value"].([]any) {
+		names = append(names, v.(map[string]any)["name"].(string))
+	}
+	if got := strings.Join(names, ","); got != "w1,w2" {
+		t.Fatalf("sub-wide list = %q, want w1,w2", got)
+	}
+
+	// Non-GET on the subscription-wide collection returns 405.
+	want(t, do(h, http.MethodPost, subScope+"/providers/Microsoft.Test/rgwidgets"+apiV, `{}`), http.StatusMethodNotAllowed)
+
+	// Item PUT at subscription scope is not allowed for an RG-only type (falls through).
+	want(t, do(h, http.MethodPut, subScope+"/providers/Microsoft.Test/rgwidgets/w1"+apiV, `{}`), http.StatusTeapot)
+}
+
+func TestEngineDeleteAlwaysRemovesExtensions(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(Type{
+		Name:        "Microsoft.Test/leaves",
+		APIVersions: []string{"2024-01-01"},
+		Scopes:      ScopeResourceGroup,
+	})
+	reg.Register(Type{
+		Name:        "Microsoft.Test/locks",
+		APIVersions: []string{"2024-01-01"},
+		Scopes:      ScopeResource,
+	})
+	e := NewEngine(reg, NewStore(store.New()))
+	leaf := subScope + "/resourceGroups/rg1/providers/Microsoft.Test/leaves/l1"
+	lock := leaf + "/providers/Microsoft.Test/locks/k1"
+
+	want(t, do(e, http.MethodPut, leaf+apiV, `{}`), http.StatusCreated)
+	want(t, do(e, http.MethodPut, lock+apiV, `{}`), http.StatusCreated)
+	want(t, do(e, http.MethodDelete, leaf+apiV, ""), http.StatusOK)
+	want(t, do(e, http.MethodGet, lock+apiV, ""), http.StatusNotFound)
+}
+
+func TestEngineWithScopeExists(t *testing.T) {
+	boom := errors.New("rg lookup failed")
+	reg := NewRegistry()
+	reg.Register(Type{
+		Name:        "Microsoft.Test/rgitems",
+		APIVersions: []string{"2024-01-01"},
+		Scopes:      ScopeResourceGroup | ScopeResource,
+	})
+	existingRGs := map[string]bool{"rg-ok": true}
+	var checked []string
+	e := NewEngine(reg, NewStore(store.New()), WithScopeExists(func(_ context.Context, scope ID) (bool, error) {
+		checked = append(checked, scope.String())
+		if scope.Name() == "rg-err" {
+			return false, boom
+		}
+		return existingRGs[strings.ToLower(scope.Name())], nil
+	}))
+
+	// Missing RG -> 404 ResourceGroupNotFound.
+	w := do(e, http.MethodPut, subScope+"/resourceGroups/rg-missing/providers/Microsoft.Test/rgitems/i1"+apiV, `{}`)
+	want(t, w, http.StatusNotFound)
+	if code := decode(t, w)["error"].(map[string]any)["code"]; code != "ResourceGroupNotFound" {
+		t.Fatalf("code = %v, want ResourceGroupNotFound", code)
+	}
+
+	// Existing RG -> 201 Created.
+	want(t, do(e, http.MethodPut, subScope+"/resourceGroups/rg-ok/providers/Microsoft.Test/rgitems/i1"+apiV, `{}`), http.StatusCreated)
+
+	// Store error from scopeExists -> 500 InternalServerError.
+	w = do(e, http.MethodPut, subScope+"/resourceGroups/rg-err/providers/Microsoft.Test/rgitems/i1"+apiV, `{}`)
+	want(t, w, http.StatusInternalServerError)
+
+	// Extension resource at resource scope does not call scopeExists.
+	before := len(checked)
+	extPath := subScope + "/resourceGroups/rg-missing/providers/Microsoft.Other/things/t1/providers/Microsoft.Test/rgitems/ext1"
+	want(t, do(e, http.MethodPut, extPath+apiV, `{}`), http.StatusCreated)
+	if len(checked) != before {
+		t.Errorf("scopeExists should not be called for resource-scoped extension, got %v", checked[before:])
+	}
 }
 
 func TestEngineScopeAwareNotFound(t *testing.T) {

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -221,5 +223,62 @@ func diffLegacyARMRoutes(current, frozen []string) (unexpected, stale []string) 
 		}
 	}
 	return unexpected, stale
+}
+
+func TestServerScopeExistsAndRGDeleteCascade(t *testing.T) {
+	s := New()
+	s.armTypes.Register(arm.Type{
+		Name:        "Microsoft.Test/widgets",
+		APIVersions: []string{"2024-01-01"},
+		Scopes:      arm.ScopeResourceGroup,
+	})
+	h := s.Handler()
+	do := func(method, path, body string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(method, path, strings.NewReader(body)))
+		return w
+	}
+
+	const (
+		rgPath     = "/subscriptions/sub1/resourcegroups/MyRG?api-version=2023-07-01"
+		widgetPath = "/subscriptions/sub1/resourceGroups/myrg/providers/Microsoft.Test/widgets/w1?api-version=2024-01-01"
+		subList    = "/subscriptions/sub1/providers/Microsoft.Test/widgets?api-version=2024-01-01"
+	)
+
+	// PUT to a missing RG returns 404 ResourceGroupNotFound.
+	w := do(http.MethodPut, widgetPath, `{}`)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("PUT missing RG: status = %d, want 404 (%s)", w.Code, w.Body.String())
+	}
+	var errResp struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil || errResp.Error.Code != "ResourceGroupNotFound" {
+		t.Fatalf("PUT missing RG error = %s, want ResourceGroupNotFound", w.Body.String())
+	}
+
+	// Creating the RG enables the RG-scoped PUT (case-insensitively).
+	if w := do(http.MethodPut, rgPath, `{"location":"eastus"}`); w.Code != http.StatusCreated {
+		t.Fatalf("PUT RG: status = %d (%s)", w.Code, w.Body.String())
+	}
+	if w := do(http.MethodPut, widgetPath, `{}`); w.Code != http.StatusCreated {
+		t.Fatalf("PUT widget: status = %d (%s)", w.Code, w.Body.String())
+	}
+
+	// Subscription-wide list finds the RG-scoped widget.
+	w = do(http.MethodGet, subList, "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"w1"`) {
+		t.Fatalf("sub-wide list: status = %d body = %s", w.Code, w.Body.String())
+	}
+
+	// Deleting the RG cascades to engine resources via DeleteScope.
+	if w := do(http.MethodDelete, rgPath, ""); w.Code != http.StatusAccepted {
+		t.Fatalf("DELETE RG: status = %d (%s)", w.Code, w.Body.String())
+	}
+	if w := do(http.MethodGet, widgetPath, ""); w.Code != http.StatusNotFound {
+		t.Fatalf("GET widget after RG delete: status = %d, want 404", w.Code)
+	}
 }
 

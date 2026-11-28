@@ -15,7 +15,7 @@ import (
 
 func do(s *store.Store, method, path, body string) *httptest.ResponseRecorder {
 	r := chi.NewRouter()
-	NewHandler(s).Register(r)
+	NewHandler(s, nil).Register(r)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(method, path, strings.NewReader(body)))
 	return w

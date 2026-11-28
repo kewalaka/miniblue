@@ -39,18 +39,42 @@ type Request struct {
 	ifNoneMatch bool
 }
 
+// Option configures an Engine.
+type Option func(*Engine)
+
+// WithScopeExists sets the callback used to verify that a resource's scope
+// (such as a resource group) exists before writing a resource in it. When nil,
+// every scope is assumed to exist.
+func WithScopeExists(f func(ctx context.Context, scope ID) (bool, error)) Option {
+	return func(e *Engine) { e.scopeExists = f }
+}
+
 // Engine serves registered resource types with generic ARM CRUD: PUT (201 on
 // create, 200 on update), GET, DELETE (200 if it existed, 204 if not), list
 // at the collection path and, for types that enable it, PATCH of tags.
 // The stored body is whatever the client sent plus the server-owned id, name
 // and type.
 type Engine struct {
-	reg   *Registry
-	store *Store
+	reg         *Registry
+	store       *Store
+	scopeExists func(ctx context.Context, scope ID) (bool, error)
 }
 
 // NewEngine returns an Engine serving the types in reg from s.
-func NewEngine(reg *Registry, s *Store) *Engine { return &Engine{reg: reg, store: s} }
+func NewEngine(reg *Registry, s *Store, opts ...Option) *Engine {
+	e := &Engine{reg: reg, store: s}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(e)
+		}
+	}
+	return e
+}
+
+// DeleteScope removes every engine resource stored beneath scope.
+func (e *Engine) DeleteScope(scope ID) error {
+	return e.store.DeleteScope(scope)
+}
 
 // Resolve routes an ARM request and validates api-version.
 // ok=false means the path is not owned by any registered type at its scope.
@@ -60,7 +84,11 @@ func (e *Engine) Resolve(method, path string, q url.Values) (*Request, bool, err
 		return nil, false, nil
 	}
 	t, ok := e.reg.Lookup(id)
-	if !ok || !t.Scopes.Has(id.ScopeKind()) {
+	if !ok {
+		return nil, false, nil
+	}
+	subWideList := id.IsCollection() && id.ScopeKind() == ScopeSubscription && len(id.Types) == 1 && t.Scopes.Has(ScopeResourceGroup)
+	if !t.Scopes.Has(id.ScopeKind()) && !subWideList {
 		return nil, false, nil
 	}
 	apiVersion := q.Get("api-version")
@@ -203,7 +231,15 @@ func (e *Engine) doGet(r *Request) (int, any, error) {
 }
 
 func (e *Engine) doList(r *Request) (int, any, error) {
-	items, err := e.store.Children(r.ID, r.Type.Name)
+	var (
+		items []map[string]any
+		err   error
+	)
+	if r.ID.is(nsResources, typeSubscriptions) && !r.Type.Scopes.Has(ScopeSubscription) && r.Type.Scopes.Has(ScopeResourceGroup) {
+		items, err = e.store.Under(r.ID, r.Type.Name)
+	} else {
+		items, err = e.store.Children(r.ID, r.Type.Name)
+	}
 	if err != nil {
 		return 0, nil, err
 	}
@@ -234,6 +270,23 @@ func (e *Engine) doPut(ctx context.Context, r *Request) (int, any, error) {
 		if r.ifNoneMatch && cur != nil {
 			return nil, azerr.New(http.StatusPreconditionFailed, "PreconditionFailed",
 				"The resource '%s' already exists.", r.ID.String())
+		}
+		if e.scopeExists != nil && r.ID.Scope != nil {
+			switch kind := r.ID.ScopeKind(); kind {
+			case ScopeResourceGroup, ScopeSubscription:
+				exists, err := e.scopeExists(ctx, *r.ID.Scope)
+				if err != nil {
+					return nil, wrapStoreErr(err)
+				}
+				if !exists {
+					if kind == ScopeResourceGroup {
+						return nil, azerr.New(http.StatusNotFound, "ResourceGroupNotFound",
+							"Resource group '%s' could not be found.", r.ID.Scope.Name())
+					}
+					return nil, azerr.New(http.StatusNotFound, "SubscriptionNotFound",
+						"The subscription '%s' could not be found.", r.ID.Scope.Name())
+				}
+			}
 		}
 		if len(r.ID.Types) > 1 {
 			_, parentOK, err := r.Store.Get(r.ID.Parent())
@@ -279,15 +332,7 @@ func (e *Engine) doPut(ctx context.Context, r *Request) (int, any, error) {
 }
 
 func (e *Engine) doDelete(r *Request) (int, any, error) {
-	var (
-		existed bool
-		err     error
-	)
-	if len(r.Type.Children) > 0 {
-		existed, err = e.store.DeleteTree(r.ID)
-	} else {
-		existed, err = e.store.Delete(r.ID)
-	}
+	existed, err := e.store.DeleteTree(r.ID)
 	if err != nil {
 		return 0, nil, err
 	}

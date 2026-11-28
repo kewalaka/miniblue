@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 	"sync"
 
@@ -44,8 +43,7 @@ func wrapStoreErr(err error) error {
 //
 // Layout:
 //
-//	arm:r:<lower id>                   -> resource document (JSON text)
-//	arm:i:<lower parent>|<lower type>  -> sorted list of child resource keys
+//	arm:r:<lower id> -> resource document (JSON text)
 //
 // Documents are stored as JSON text, not as maps: the file and Postgres
 // backends decode stored values into interface{}, which turns every number
@@ -53,11 +51,10 @@ func wrapStoreErr(err error) error {
 // every backend unchanged, and is decoded here with json.Number for the same
 // reason. It also means callers never share state with the backend.
 //
-// The child index makes listing O(children) instead of a ListByPrefix scan of
-// the whole backend (O(n), see upstream issue #95). Only DeleteTree scans by
-// prefix, and only for types that declare children.
+// Lists are served via prefix Scan over arm:r: with a depth filter. Leftover
+// arm:i: keys from earlier versions are ignored.
 type Store struct {
-	mu sync.Mutex // serialises all writes, including each index read-modify-write
+	mu sync.Mutex // serialises all writes
 	s  *store.Store
 }
 
@@ -66,8 +63,26 @@ func NewStore(s *store.Store) *Store { return &Store{s: s} }
 
 func resKey(id ID) string { return "arm:r:" + id.Key() }
 
-func idxKey(id ID) string {
-	return "arm:i:" + strings.ToLower(id.Parent().String()) + "|" + strings.ToLower(id.TypeName())
+func collectionPrefix(parent ID, typeName string) string {
+	lowerType := strings.ToLower(typeName)
+	if parent.IsTenant() {
+		if lowerType == strings.ToLower(nsResources+"/"+typeSubscriptions) {
+			return "arm:r:/" + strings.ToLower(typeSubscriptions) + "/"
+		}
+		return "arm:r:/providers/" + lowerType + "/"
+	}
+	base := "arm:r:" + parent.Key()
+	if parent.is(nsResources, typeSubscriptions) && lowerType == strings.ToLower(nsResources+"/"+typeResourceGroups) {
+		return base + "/" + strings.ToLower(typeResourceGroups) + "/"
+	}
+	if !strings.Contains(lowerType, "/") {
+		return base + "/" + lowerType + "/"
+	}
+	parentType := strings.ToLower(parent.TypeName()) + "/"
+	if childSeg, ok := strings.CutPrefix(lowerType, parentType); ok && !strings.Contains(childSeg, "/") {
+		return base + "/" + childSeg + "/"
+	}
+	return base + "/providers/" + lowerType + "/"
 }
 
 // Get returns the document stored for id. Numbers are json.Number.
@@ -90,24 +105,18 @@ func (s *Store) Get(id ID) (map[string]any, bool, error) {
 // Children returns the direct child resources of typeName under parent,
 // ordered by ID.
 func (s *Store) Children(parent ID, typeName string) ([]map[string]any, error) {
-	if !strings.Contains(typeName, "/") && !parent.IsTenant() {
-		typeName = parent.TypeName() + "/" + typeName
-	}
-	idx := "arm:i:" + strings.ToLower(parent.String()) + "|" + strings.ToLower(typeName)
-	keys, err := s.index(idx)
+	prefix := collectionPrefix(parent, typeName)
+	kvs, err := s.s.Scan(prefix)
 	if err != nil {
 		return nil, wrapStoreErr(err)
 	}
 	out := []map[string]any{}
-	for _, key := range keys {
-		raw, ok, err := s.s.Lookup(key)
-		if err != nil {
-			return nil, wrapStoreErr(err)
-		}
-		if !ok {
+	for _, kv := range kvs {
+		rest := strings.TrimPrefix(kv.Key, prefix)
+		if rest == "" || strings.Contains(rest, "/") {
 			continue
 		}
-		doc, err := decodeStoredDoc(raw)
+		doc, err := decodeStoredDoc(kv.Value)
 		if err != nil {
 			return nil, wrapStoreErr(err)
 		}
@@ -146,7 +155,7 @@ func (s *Store) Under(scope ID, typeName string) ([]map[string]any, error) {
 // document, or nil if there is none, and returns the document to store; nil
 // stores nothing. It runs under the store write lock, so it may perform
 // lock-free reads via Reader methods, but must not call write methods on Store.
-// Update, Delete and DeleteTree are mutually exclusive, which makes
+// Update, DeleteTree and DeleteScope are mutually exclusive, which makes
 // create-if-absent, update-if-present and delete race-free within this
 // process. Update returns the stored document and whether it was created.
 func (s *Store) Update(id ID, fn func(cur map[string]any) (map[string]any, error)) (doc map[string]any, created bool, err error) {
@@ -171,35 +180,11 @@ func (s *Store) Update(id ID, fn func(cur map[string]any) (map[string]any, error
 	if err := s.s.Set(key, string(raw)); err != nil {
 		return nil, false, wrapStoreErr(err)
 	}
-	if !exists {
-		if err := s.indexAdd(idxKey(id), key); err != nil {
-			return nil, false, wrapStoreErr(err)
-		}
-	}
 	return next, !exists, nil
 }
 
-// Delete removes the resource and reports whether it existed.
-func (s *Store) Delete(id ID) (bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	key := resKey(id)
-	existed, err := s.s.Remove(key)
-	if err != nil {
-		return false, wrapStoreErr(err)
-	}
-	if !existed {
-		return false, nil
-	}
-	if err := s.indexRemove(idxKey(id), key); err != nil {
-		return true, wrapStoreErr(err)
-	}
-	return true, nil
-}
-
 // DeleteTree removes the resource (if present) and everything beneath it:
-// child resources and extension resources, with their indexes. It scans the
-// backend by prefix, so use it only for deletes that can have descendants.
+// child resources and extension resources.
 func (s *Store) DeleteTree(id ID) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -208,76 +193,28 @@ func (s *Store) DeleteTree(id ID) (bool, error) {
 	if err != nil {
 		return false, wrapStoreErr(err)
 	}
-	if existed {
-		if err := s.indexRemove(idxKey(id), "arm:r:"+k); err != nil {
-			return true, wrapStoreErr(err)
-		}
-	}
 	if _, err := s.s.RemoveByPrefix("arm:r:" + k + "/"); err != nil {
-		return existed, wrapStoreErr(err)
-	}
-	if _, err := s.s.RemoveByPrefix("arm:i:" + k + "/"); err != nil {
-		return existed, wrapStoreErr(err)
-	}
-	if _, err := s.s.RemoveByPrefix("arm:i:" + k + "|"); err != nil {
 		return existed, wrapStoreErr(err)
 	}
 	return existed, nil
 }
 
+// DeleteScope removes every engine resource stored beneath scope (for example,
+// all resources in a resource group). The scope itself is not removed.
+func (s *Store) DeleteScope(scope ID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	prefix := "arm:r:/"
+	if !scope.IsTenant() {
+		prefix = "arm:r:" + scope.Key() + "/"
+	}
+	_, err := s.s.RemoveByPrefix(prefix)
+	return wrapStoreErr(err)
+}
+
 // List returns the resources in a collection, ordered by ID.
 func (s *Store) List(collection ID) ([]map[string]any, error) {
 	return s.Children(collection.Parent(), collection.TypeName())
-}
-
-func (s *Store) index(key string) ([]string, error) {
-	raw, ok, err := s.s.Lookup(key)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, nil
-	}
-	var keys []string
-	if err := json.Unmarshal(raw, &keys); err != nil {
-		return nil, fmt.Errorf("arm: decode index %q: %w", key, err)
-	}
-	return keys, nil
-}
-
-func (s *Store) writeIndex(key string, keys []string) error {
-	if len(keys) == 0 {
-		_, err := s.s.Remove(key)
-		return err
-	}
-	return s.s.Set(key, keys)
-}
-
-func (s *Store) indexAdd(idx, key string) error {
-	keys, err := s.index(idx)
-	if err != nil {
-		return err
-	}
-	i := sort.SearchStrings(keys, key)
-	if i < len(keys) && keys[i] == key {
-		return nil
-	}
-	keys = append(keys, "")
-	copy(keys[i+1:], keys[i:])
-	keys[i] = key
-	return s.writeIndex(idx, keys)
-}
-
-func (s *Store) indexRemove(idx, key string) error {
-	keys, err := s.index(idx)
-	if err != nil {
-		return err
-	}
-	i := sort.SearchStrings(keys, key)
-	if i == len(keys) || keys[i] != key {
-		return nil
-	}
-	return s.writeIndex(idx, append(keys[:i], keys[i+1:]...))
 }
 
 // decodeObject decodes a JSON object keeping numbers as json.Number, so

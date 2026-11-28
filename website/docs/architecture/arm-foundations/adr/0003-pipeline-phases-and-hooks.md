@@ -174,7 +174,7 @@ type IdentityLookup func(id string) (principalID, clientID string, ok bool)
 
 - **No-op** when `doc.identity` is absent, or its `type` is `None`. The client's removal stands.
 - **`SystemAssigned` in `type`.** Set `principalId` and `tenantId`. Copy them from `cur.identity` if Current also had SystemAssigned; otherwise generate a new UUID and use the default tenant.
-- **`UserAssigned` in `type`.** For each key of `userAssignedIdentities`, set `principalId` and `clientId` from `uami(key)`. Azure echoes the identity resource's own ids, and Terraform configs often cross-reference them. If the lookup is nil or misses, copy from the same key in Current; otherwise generate UUIDs. Whether Azure rejects a missing identity is (verify).
+- **`UserAssigned` in `type`.** For each key of `userAssignedIdentities`, set `principalId` and `clientId` from `uami(key)`. Azure echoes the identity resource's own ids, and Terraform configs often cross-reference them. If the lookup is nil or misses, copy from the same key in Current; otherwise generate UUIDs. Real Azure rejects a missing identity with 400 `FailedIdentityOperation` (inner `BadRequest`); miniblue falls back so tests need not pre-create every UAMI.
 - Never adds an identity block the client did not send.
 
 The server builds one `IdentityLookup` over the identity service. It reads legacy keys today and engine docs after wave 2, so callers never change.

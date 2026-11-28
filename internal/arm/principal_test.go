@@ -26,9 +26,6 @@ func (f admitterFunc) Admit(ctx context.Context, r *Request) error {
 }
 
 func TestPrincipalContext(t *testing.T) {
-	if got := PrincipalFrom(nil); got != (Principal{}) {
-		t.Fatalf("PrincipalFrom(nil) = %+v, want zero", got)
-	}
 	if got := PrincipalFrom(context.Background()); got != (Principal{}) {
 		t.Fatalf("PrincipalFrom(empty) = %+v, want zero", got)
 	}

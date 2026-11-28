@@ -79,6 +79,7 @@ func TestPostgresResetKeepsSchemaStamp(t *testing.T) {
 
 func TestPostgresPrefixEscaping(t *testing.T) {
 	pg := testPostgres(t)
+	s := NewWithBackend(pg)
 
 	// A unique root keeps the test clear of other data in a shared database.
 	root := fmt.Sprintf("test-like-%d/", time.Now().UnixNano())
@@ -93,28 +94,64 @@ func TestPostgresPrefixEscaping(t *testing.T) {
 		}
 	})
 	for _, k := range keys {
-		if err := pg.Set(k, map[string]string{"key": k}); err != nil {
+		if err := s.Set(k, map[string]string{"key": k}); err != nil {
 			t.Fatalf("Set(%q): %v", k, err)
 		}
 	}
 
 	for _, name := range []string{"a_b", "100%", `c\d`} {
 		prefix := root + name
-		if n := pg.CountByPrefix(prefix); n != 1 {
+		if n := s.CountByPrefix(prefix); n != 1 {
 			t.Errorf("CountByPrefix(%q) = %d, want 1", prefix, n)
 		}
-		if got := pg.ListByPrefix(prefix); len(got) != 1 {
+		if got := s.ListByPrefix(prefix); len(got) != 1 {
 			t.Errorf("ListByPrefix(%q) returned %d values, want 1", prefix, len(got))
 		}
 	}
 
 	for _, name := range []string{"a_b", "100%", `c\d`} {
 		prefix := root + name
-		if n := pg.DeleteByPrefix(prefix); n != 1 {
-			t.Errorf("DeleteByPrefix(%q) = %d, want 1", prefix, n)
+		if n, err := pg.DeleteByPrefix(prefix); err != nil || n != 1 {
+			t.Errorf("DeleteByPrefix(%q) = %d, %v, want 1, nil", prefix, n, err)
 		}
 	}
-	if n := pg.CountByPrefix(root); n != 3 {
+	if n := s.CountByPrefix(root); n != 3 {
 		t.Errorf("%d keys left under the root, want the 3 look-alikes", n)
+	}
+}
+
+func TestPostgresScanOrder(t *testing.T) {
+	pg := testPostgres(t)
+
+	root := fmt.Sprintf("test-order-%d/", time.Now().UnixNano())
+	// Bytewise (C collation) order differs from typical en_US.UTF-8 collation
+	// on mixed case and underscore.
+	want := []string{
+		root + "A",
+		root + "B",
+		root + "_",
+		root + "a",
+		root + "b",
+	}
+	t.Cleanup(func() {
+		_, _ = pg.DeleteByPrefix(root)
+	})
+	for i := len(want) - 1; i >= 0; i-- {
+		if err := pg.Set(want[i], []byte(`"v"`)); err != nil {
+			t.Fatalf("Set(%q): %v", want[i], err)
+		}
+	}
+
+	got, err := pg.Scan(root)
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("Scan returned %d keys, want %d", len(got), len(want))
+	}
+	for i, kv := range got {
+		if kv.Key != want[i] {
+			t.Errorf("got[%d] = %q, want %q", i, kv.Key, want[i])
+		}
 	}
 }

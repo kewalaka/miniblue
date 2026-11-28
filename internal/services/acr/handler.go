@@ -223,7 +223,7 @@ func (h *Handler) CheckNameAvailability(w http.ResponseWriter, r *http.Request) 
 	for _, item := range items {
 		reg, err := store.Decode[Registry](item)
 		if err != nil {
-			azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
+			azerr.Write(w, err)
 			return
 		}
 		if reg.Name == input.Name {

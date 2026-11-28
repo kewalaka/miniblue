@@ -45,11 +45,9 @@ func (f *FileBackend) load() error {
 		return fmt.Errorf("parse state %s: %w", f.path, err)
 	}
 	for k, v := range state {
-		var val interface{}
-		if err := json.Unmarshal(v, &val); err != nil {
-			return fmt.Errorf("parse state %s key %q: %w", f.path, k, err)
+		if err := f.mem.Set(k, []byte(v)); err != nil {
+			return fmt.Errorf("load state %s key %q: %w", f.path, k, err)
 		}
-		f.mem.Set(k, val)
 	}
 	log.Printf("loaded %d items from %s", len(state), f.path)
 	return nil
@@ -61,7 +59,11 @@ func (f *FileBackend) Save() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	state := f.mem.Snapshot()
+	snap := f.mem.Snapshot()
+	state := make(map[string]json.RawMessage, len(snap))
+	for k, v := range snap {
+		state[k] = json.RawMessage(v)
+	}
 	data, err := json.Marshal(state)
 	if err != nil {
 		return err
@@ -102,15 +104,11 @@ func (f *FileBackend) StartAutoSave(interval time.Duration) func() {
 	return func() { once.Do(func() { close(done) }) }
 }
 
-// Delegate all Backend methods to the in-memory backend
-func (f *FileBackend) Set(key string, value interface{}) error { return f.mem.Set(key, value) }
-func (f *FileBackend) Get(key string) (interface{}, bool)      { return f.mem.Get(key) }
-func (f *FileBackend) Delete(key string) bool                  { return f.mem.Delete(key) }
-func (f *FileBackend) List() []string                          { return f.mem.List() }
-func (f *FileBackend) ListByPrefix(prefix string) []interface{} {
-	return f.mem.ListByPrefix(prefix)
-}
-func (f *FileBackend) CountByPrefix(prefix string) int  { return f.mem.CountByPrefix(prefix) }
-func (f *FileBackend) Exists(key string) bool           { return f.mem.Exists(key) }
-func (f *FileBackend) DeleteByPrefix(prefix string) int { return f.mem.DeleteByPrefix(prefix) }
-func (f *FileBackend) Reset()                           { f.mem.Reset() }
+// Delegate all Backend methods to the in-memory backend.
+func (f *FileBackend) Get(key string) ([]byte, bool, error)      { return f.mem.Get(key) }
+func (f *FileBackend) Set(key string, v []byte) error            { return f.mem.Set(key, v) }
+func (f *FileBackend) SetNX(key string, v []byte) (bool, error)  { return f.mem.SetNX(key, v) }
+func (f *FileBackend) Delete(key string) (bool, error)           { return f.mem.Delete(key) }
+func (f *FileBackend) Scan(prefix string) ([]KV, error)          { return f.mem.Scan(prefix) }
+func (f *FileBackend) DeleteByPrefix(prefix string) (int, error) { return f.mem.DeleteByPrefix(prefix) }
+func (f *FileBackend) Reset() error                              { return f.mem.Reset() }

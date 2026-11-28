@@ -113,7 +113,7 @@ func (h *Handler) GetKeyValue(w http.ResponseWriter, r *http.Request) {
 
 	kv, ok, err := store.GetAs[KeyValue](h.store, h.kvKey(storeName, key, label))
 	if err != nil {
-		azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
+		azerr.Write(w, err)
 		return
 	}
 	if !ok {

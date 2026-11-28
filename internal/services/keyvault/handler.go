@@ -651,7 +651,7 @@ func (h *Handler) DeleteSecret(w http.ResponseWriter, r *http.Request) {
 	var deleted map[string]interface{}
 	secret, found, err := store.GetAs[Secret](h.store, h.key(vault, name))
 	if err != nil {
-		azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
+		azerr.Write(w, err)
 		return
 	}
 	if found {
@@ -673,7 +673,7 @@ func (h *Handler) ListSecrets(w http.ResponseWriter, r *http.Request) {
 	for _, item := range items {
 		s, err := store.Decode[Secret](item)
 		if err != nil {
-			azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
+			azerr.Write(w, err)
 			return
 		}
 		redacted = append(redacted, map[string]interface{}{

@@ -11,21 +11,9 @@ import (
 	"github.com/moabukar/miniblue/internal/store"
 )
 
-// jsonBackend mimics the Postgres backend: values are JSON round-tripped, so
-// structured values come back as map[string]interface{} with float64 numbers.
-type jsonBackend struct{ *store.MemoryBackend }
-
-func (b jsonBackend) Set(key string, value interface{}) error {
-	raw, _ := json.Marshal(value)
-	var v interface{}
-	_ = json.Unmarshal(raw, &v)
-	return b.MemoryBackend.Set(key, v)
-}
-
 func backends() map[string]func() *store.Store {
 	return map[string]func() *store.Store{
 		"memory": store.New,
-		"json":   func() *store.Store { return store.NewWithBackend(jsonBackend{store.NewMemoryBackend()}) },
 	}
 }
 

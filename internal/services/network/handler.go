@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -134,8 +135,42 @@ func (h *Handler) Register(r chi.Router) {
 
 func (h *Handler) ListVNetsInSubscription(w http.ResponseWriter, r *http.Request) {
 	sub := chi.URLParam(r, "subscriptionId")
-	items := h.store.ListByPrefix("vnet:" + sub + ":")
+	items := h.listVNetsByPrefix("vnet:" + sub + ":")
 	json.NewEncoder(w).Encode(map[string]interface{}{"value": items})
+}
+
+func (h *Handler) listVNetsByPrefix(prefix string) []interface{} {
+	kvs, err := h.store.Scan(prefix)
+	if err != nil {
+		return []interface{}{}
+	}
+	items := make([]interface{}, 0, len(kvs))
+	for _, kv := range kvs {
+		var v interface{}
+		if json.Unmarshal(kv.Value, &v) != nil {
+			continue
+		}
+		if vnet, ok := v.(map[string]interface{}); ok {
+			if suffix, ok := strings.CutPrefix(kv.Key, "vnet:"); ok {
+				h.populateVNetSubnets(vnet, "subnet:"+suffix+":")
+			}
+		}
+		items = append(items, v)
+	}
+	return items
+}
+
+func (h *Handler) populateVNetSubnets(vnet map[string]interface{}, subnetPrefix string) {
+	props, ok := vnet["properties"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	subnetItems := h.store.ListByPrefix(subnetPrefix)
+	if len(subnetItems) > 0 {
+		props["subnets"] = subnetItems
+	} else {
+		props["subnets"] = []interface{}{}
+	}
 }
 
 func (h *Handler) vnetKey(sub, rg, name string) string {
@@ -287,14 +322,7 @@ func (h *Handler) GetVNet(w http.ResponseWriter, r *http.Request) {
 
 	// Re-populate subnets from the store
 	if vnet, ok := v.(map[string]interface{}); ok {
-		subnetItems := h.store.ListByPrefix(h.subnetKey(sub, rg, name, ""))
-		if props, ok := vnet["properties"].(map[string]interface{}); ok {
-			if len(subnetItems) > 0 {
-				props["subnets"] = subnetItems
-			} else {
-				props["subnets"] = []interface{}{}
-			}
-		}
+		h.populateVNetSubnets(vnet, h.subnetKey(sub, rg, name, ""))
 		json.NewEncoder(w).Encode(vnet)
 		return
 	}
@@ -317,7 +345,7 @@ func (h *Handler) DeleteVNet(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListVNets(w http.ResponseWriter, r *http.Request) {
 	sub := chi.URLParam(r, "subscriptionId")
 	rg := chi.URLParam(r, "resourceGroupName")
-	items := h.store.ListByPrefix("vnet:" + sub + ":" + rg + ":")
+	items := h.listVNetsByPrefix("vnet:" + sub + ":" + rg + ":")
 	json.NewEncoder(w).Encode(map[string]interface{}{"value": items})
 }
 

@@ -2,7 +2,6 @@ package identity
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -15,10 +14,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/moabukar/miniblue/internal/azerr"
 	"github.com/moabukar/miniblue/internal/store"
+	"github.com/moabukar/miniblue/internal/token"
 )
 
 // tenantID is the constant emulator tenant.
-const tenantID = "00000000-0000-0000-0000-000000000001"
+const tenantID = token.DefaultTenantID
 
 type TokenResponse struct {
 	AccessToken string `json:"access_token"`
@@ -207,16 +207,29 @@ func (h *Handler) GetToken(w http.ResponseWriter, r *http.Request) {
 
 	secret := r.Header.Get("X-IDENTITY-HEADER")
 	if secret == "" {
-		// Legacy host-level flow: static token, no VM attestation.
-		token := TokenResponse{
-			AccessToken: "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6ImxvY2FsLWF6dXJlIn0.miniblue-mock-token",
+		// Legacy host-level flow: default-client token, no VM attestation.
+		now := time.Now()
+		exp := now.Add(24 * time.Hour)
+		accessToken := token.Issue(token.Claims{
+			OID:   token.DefaultClientOID,
+			Sub:   token.DefaultClientOID,
+			TID:   tenantID,
+			AppID: token.DefaultClientID,
+			Aud:   resource,
+			Iss:   "https://sts.windows.net/" + tenantID + "/",
+			IAT:   now.Unix(),
+			NBF:   now.Unix(),
+			Exp:   exp.Unix(),
+		})
+		resp := TokenResponse{
+			AccessToken: accessToken,
 			TokenType:   "Bearer",
 			ExpiresIn:   86400,
-			ExpiresOn:   time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339),
+			ExpiresOn:   exp.UTC().Format(time.RFC3339),
 			Resource:    resource,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(token)
+		json.NewEncoder(w).Encode(resp)
 		return
 	}
 
@@ -296,20 +309,21 @@ func (h *Handler) GetToken(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	exp := now.Add(24 * time.Hour)
 
-	claims := map[string]interface{}{
-		"sub":         principalID,
-		"appid":       clientID,
-		"xms_mirid":   armID,
-		"miniblue_vm": vmID,
-		"aud":         resource,
-		"iss":         "https://sts.windows.net/" + tenantID + "/",
-		"tid":         tenantID,
-		"iat":         now.Unix(),
-		"exp":         exp.Unix(),
-	}
-	token := buildMockJWT(claims)
+	accessToken := token.Issue(token.Claims{
+		OID:        principalID,
+		Sub:        principalID,
+		AppID:      clientID,
+		XmsMirid:   armID,
+		MiniblueVM: vmID,
+		Aud:        resource,
+		Iss:        "https://sts.windows.net/" + tenantID + "/",
+		TID:        tenantID,
+		IAT:        now.Unix(),
+		NBF:        now.Unix(),
+		Exp:        exp.Unix(),
+	})
 
-	h.store.Set("msi:token:"+tokenHash(token), map[string]interface{}{
+	h.store.Set("msi:token:"+tokenHash(accessToken), map[string]interface{}{
 		"identityId": armID,
 		"vmId":       vmID,
 		"clientId":   clientID,
@@ -318,7 +332,7 @@ func (h *Handler) GetToken(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(TokenResponse{
-		AccessToken: token,
+		AccessToken: accessToken,
 		TokenType:   "Bearer",
 		ExpiresIn:   86400,
 		ExpiresOn:   exp.UTC().Format(time.RFC3339),
@@ -335,17 +349,6 @@ func identityKeyFromARMID(armID string) (string, error) {
 		return "", fmt.Errorf("'%s' is not a valid userAssignedIdentities resource id", armID)
 	}
 	return "msi:identity:" + parts[1] + ":" + parts[3] + ":" + parts[7], nil
-}
-
-// buildMockJWT assembles an unsigned but introspectable JWT-shaped token:
-// real cryptographic signing is intentionally out of scope for the emulator.
-func buildMockJWT(claims map[string]interface{}) string {
-	enc := func(v interface{}) string {
-		b, _ := json.Marshal(v)
-		return base64.RawURLEncoding.EncodeToString(b)
-	}
-	header := map[string]string{"typ": "JWT", "alg": "none", "kid": "miniblue-local"}
-	return enc(header) + "." + enc(claims) + ".miniblue-mock-signature"
 }
 
 func tokenHash(token string) string {

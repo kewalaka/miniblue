@@ -247,6 +247,9 @@ func TestTokenSingleIdentity(t *testing.T) {
 	if claims["sub"] != "principal-1" {
 		t.Fatalf("expected sub=principal-1, got %v", claims["sub"])
 	}
+	if claims["oid"] != "principal-1" {
+		t.Fatalf("expected oid=principal-1, got %v", claims["oid"])
+	}
 	if claims["aud"] != "https://vault.local/" {
 		t.Fatalf("expected aud echo, got %v", claims["aud"])
 	}

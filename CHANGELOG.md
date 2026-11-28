@@ -4,6 +4,12 @@ All notable changes to miniblue are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Notes
+
+* Non-default OAuth2 `client_id` values now receive distinct, stable `oid` claims derived from `(tenant_id, client_id)` instead of sharing `00000000-0000-0000-0000-000000000002` (the default `miniblue` client keeps `...0002`). Managed-identity tokens now also carry `oid` equal to `principalId`.
+
 ## [0.9.0](https://github.com/kewalaka/miniblue/compare/v0.8.0...v0.9.0) (2026-11-28)
 
 

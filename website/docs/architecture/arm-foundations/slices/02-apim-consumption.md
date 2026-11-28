@@ -43,14 +43,14 @@ func Register(reg *arm.Registry) {
 
 | Type | Validate | Defaults |
 |---|---|---|
-| service | `CheckName(^[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]$, 1, 50)`; `location`; `sku.name` in the known set; `sku.capacity` (Consumption 0); `publisherEmail` and `publisherName` required, max 100 (verify) | `customProperties` `{}` when absent (azurerm dereferences it without a nil check); `virtualNetworkType=None`; `publicNetworkAccess=Enabled`; `disableGateway=false`; `platformVersion=stv2`; `notificationSenderEmail`; URLs derived from the name (`gatewayUrl`, `gatewayRegionalUrl`, `managementApiUrl`, `scmUrl`, `portalUrl`, `developerPortalUrl`); `DefaultIdentity(doc, cur, uami)` |
+| service | `CheckName(^[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]$, 1, 50)`; `location`; `sku.name` in the known set; `sku.capacity` (Consumption 0); `publisherEmail` and `publisherName` required, max 100 | `customProperties` `{}` when absent (azurerm dereferences it without a nil check); `virtualNetworkType=None`; `publicNetworkAccess=Enabled`; `disableGateway=false`; `platformVersion=stv2`; `notificationSenderEmail`; URLs derived from the name (`gatewayUrl`, `gatewayRegionalUrl`, `managementApiUrl`, `scmUrl`, `portalUrl`, `developerPortalUrl`); `DefaultIdentity(doc, cur, uami)` |
 | apis | `path` required, max 400; `displayName` required, max 300; name part before `;rev=` 1 to 256, `^[^*#&+:<>?]+$` | `authenticationSettings` `{oAuth2AuthenticationSettings:[], openidAuthenticationSettings:[]}`; `subscriptionKeyParameterNames {header:"Ocp-Apim-Subscription-Key", query:"subscription-key"}`; `type=http`; `protocols=["https"]` when absent; `subscriptionRequired=true`; `apiRevision` from `;rev=N` (default `"1"`); `isCurrent=true`; `isOnline=true` |
 | operations | `displayName`, `method` and `urlTemplate` required; name 1 to 80 | echo |
 | products | `displayName` required, max 300; `approvalRequired` only with `subscriptionRequired` | `state=notPublished`; `subscriptionRequired=true` |
 | namedValues | `displayName` 1 to 256, `^[A-Za-z0-9-._]+$`; exactly one of `value` and `keyVault` | `secret=false`; `tags=[]` |
 | backends | `url` required; `protocol` in {http, soap} | echo `credentials`, `proxy`, `tls`, `circuitBreaker` |
 
-Validation errors are 400 `ValidationError` with `target` set to the property path (verify the code against real APIM).
+Validation errors return 400 with real APIM codes (`InvalidParameters` for missing required properties, `PublisherNameLengthOutOfBound` over 100 chars, `MissingSkuTypeCapacity` for non-zero Consumption capacity, `InvalidCharactersInServiceName` for bad service names; `ValidationError` with `target` where applicable).
 
 Rules:
 

@@ -47,10 +47,10 @@ A resource-scope assignment is **not** existence-checked against its scope (ADR-
 
 | Rule | Error |
 |---|---|
-| name is a GUID | 400 `InvalidRoleAssignmentId` (verify) |
-| `properties.roleDefinitionId` present and resolvable (built-in by trailing GUID, or custom at scope or an ancestor) | 400 `RoleDefinitionDoesNotExist` (verify) |
-| `properties.principalId` present and a GUID | 400 `InvalidPrincipalId` (verify). There is no directory, so nothing beyond GUID shape. |
-| `Current != nil` and principalId, roleDefinitionId or scope changed | 400 `RoleAssignmentUpdateNotPermitted` (verify) |
+| name is a GUID | 400 `InvalidRoleAssignmentId` |
+| `properties.roleDefinitionId` present and resolvable (built-in by trailing GUID, or custom at scope or an ancestor) | 400 `RoleDefinitionDoesNotExist` |
+| `properties.principalId` present and a GUID | 400 `InvalidPrincipalId`. Real ARM also checks Entra directory (`PrincipalNotFound`), which miniblue intentionally skips because there is no directory. |
+| `Current != nil` and immutable fields (`principalId`, `roleDefinitionId`, or `scope`) changed | 400 `RoleAssignmentUpdateNotPermitted` (note: real ARM `2022-04-01` permits updating `roleDefinitionId` when `principalId` and `scope` match) |
 | Another assignment at the same scope with the same principalId and role GUID, under a different name | 409 `RoleAssignmentExists` |
 
 Shared resolver, used by Validate and injected into the Enforcer as its `RoleResolver` (ADR-0008):
@@ -76,11 +76,11 @@ Collection GET at `{scope}/providers/Microsoft.Authorization/roleAssignments`:
 
 | `$filter` | Result |
 |---|---|
-| none | at, above and below scope (verify against a real subscription before PR 1) |
+| none | at, above and below scope (verified against real ARM) |
 | `atScope()` | at and above |
 | `principalId eq '{id}'` | at, above and below, for that principal |
 
-- Combine clauses by splitting on ` and ` (case-insensitive). An unknown clause gives 400 `InvalidFilter` (verify).
+- Combine clauses by splitting on ` and ` (case-insensitive). An unknown clause gives 400 `UnsupportedQuery` (verified against real ARM).
 - `assignedTo('{id}')` is not documented for 2022-04-01, so it is not implemented. Add it only if a client is seen sending it.
 - "Above" walks `scope.Parent()` with `Reader.Children`. "Below" uses `Reader.Under(scope, type)`.
 

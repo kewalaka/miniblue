@@ -54,7 +54,7 @@ func Write(w http.ResponseWriter, err error) // *Error as-is; anything else beco
 
 - The existing helpers (`WriteError`, `NotFound`, `BadRequest` and so on) become one-line wrappers over `Write`. Legacy call sites are untouched.
 - The engine writes errors only via `Write`. Hooks return `*azerr.Error` (ADR-0003 phase 8).
-- `NotFound` messages are built from `arm.ID` and are scope-aware. They include "under resource group 'rg'" only at RG scope (verify exact ARM wording).
+- `NotFound` messages are built from `arm.ID` and are scope-aware. They include "under resource group 'rg'" only at RG scope (verified: `The Resource '<ns>/<type>/<name>' under resource group '<rg>' was not found.`, and `Resource group '<rg>' could not be found.` for missing RGs).
 
 ### Taxonomy (engine-emitted)
 
@@ -62,7 +62,7 @@ func Write(w http.ResponseWriter, err error) // *Error as-is; anything else beco
 |---|---|
 | 400 | `InvalidRequestContent`, `MissingApiVersionParameter`, `InvalidApiVersionParameter`, `InvalidResourceName`, `InvalidParameter` (with `target`), plus type-specific codes from hooks |
 | 403 | `AuthorizationFailed`, `RequestDisallowedByPolicy` |
-| 404 | `ResourceNotFound`, `ResourceGroupNotFound`, `SubscriptionNotFound`, `ParentResourceNotFound`, `InvalidResourceType` (verify) |
+| 404 | `ResourceNotFound`, `ResourceGroupNotFound`, `SubscriptionNotFound`, `ParentResourceNotFound`, `InvalidResourceType`, `InvalidResourceNamespace` |
 | 405 | `MethodNotAllowed` |
 | 409 | `Conflict`, plus type-specific codes (e.g. `RoleAssignmentExists`) |
 | 412 | `PreconditionFailed` |

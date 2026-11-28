@@ -4,6 +4,15 @@ All notable changes to miniblue are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.10.0](https://github.com/kewalaka/miniblue/compare/v0.9.0...v0.10.0) (2026-11-28)
+
+
+### Features
+
+* **arm:** PatchMode with RFC 7386 merge default ([#30](https://github.com/kewalaka/miniblue/issues/30)) ([86044a1](https://github.com/kewalaka/miniblue/commit/86044a1ddcf730817b767420a0b43a919885725d))
+* **arm:** principal context and Authorizer/Admitter seams ([#31](https://github.com/kewalaka/miniblue/issues/31)) ([0307bd1](https://github.com/kewalaka/miniblue/commit/0307bd1e386c05cdf8c97046835fe4d096320b1b))
+* **arm:** require api-version; versions as metadata; Provisioned ([#32](https://github.com/kewalaka/miniblue/issues/32)) ([428db5a](https://github.com/kewalaka/miniblue/commit/428db5a66014798116b328e7c5c5a86ecf372b35))
+
 ## [Unreleased]
 
 ### Notes

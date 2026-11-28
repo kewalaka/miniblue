@@ -29,7 +29,7 @@ func (e *Engine) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, err := ParseID(r.URL.Path)
 		if err == nil {
-			if t, ok := e.reg.lookup(id); ok && t.Scopes.Has(id.ScopeKind()) {
+			if t, ok := e.reg.Lookup(id); ok && t.Scopes.Has(id.ScopeKind()) {
 				e.serve(w, r, t, id)
 				return
 			}

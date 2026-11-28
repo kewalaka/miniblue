@@ -65,6 +65,7 @@ func TestPolicyDefinitionRequestValidation(t *testing.T) {
 	expectStatus(t, doRequest(t, "PUT", ts.URL+pdBase+"/x?api-version=2019-01-01", pdBody), http.StatusBadRequest)
 	expectStatus(t, doRequest(t, "PUT", ts.URL+pdBase+"/x"+pdAPI, `{"name":"y"}`), http.StatusBadRequest)
 	expectStatus(t, doRequest(t, "POST", ts.URL+pdBase+"/x"+pdAPI, pdBody), http.StatusMethodNotAllowed)
+	expectStatus(t, doRequest(t, "PATCH", ts.URL+pdBase+"/x"+pdAPI, pdBody), http.StatusMethodNotAllowed)
 }
 
 // Only subscription scope is registered; other scopes fall through to the

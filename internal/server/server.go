@@ -122,6 +122,7 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(middleware.RequestID)
 	s.router.Use(AzureHeaders)
 	s.router.Use(APIVersionCheck)
+	s.router.Use(ExtractPrincipal)
 }
 
 // safeRecover catches panics and returns a 500 error instead of crashing the server.

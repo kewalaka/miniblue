@@ -31,6 +31,7 @@ type Request struct {
 	APIVersion string
 	Action     string // OpAction only
 	Query      url.Values
+	Principal  Principal
 	Body       map[string]any // decoded request (UseNumber)
 	Current    map[string]any // stored doc; nil on create
 	Doc        map[string]any // proposed doc; hooks mutate this
@@ -49,6 +50,18 @@ func WithScopeExists(f func(ctx context.Context, scope ID) (bool, error)) Option
 	return func(e *Engine) { e.scopeExists = f }
 }
 
+// WithAuthorizer sets the Authorizer checked before every Engine.Do operation.
+// A nil Authorizer allows all requests.
+func WithAuthorizer(a Authorizer) Option {
+	return func(e *Engine) { e.authorizer = a }
+}
+
+// WithAdmitter sets the Admitter checked on PUT and PATCH proposed documents.
+// A nil Admitter allows all requests.
+func WithAdmitter(a Admitter) Option {
+	return func(e *Engine) { e.admitter = a }
+}
+
 // Engine serves registered resource types with generic ARM CRUD: PUT (201 on
 // create, 200 on update), GET, DELETE (200 if it existed, 204 if not), list
 // at the collection path and PATCH according to Type.Patch (default RFC 7386
@@ -59,6 +72,8 @@ type Engine struct {
 	reg         *Registry
 	store       *Store
 	scopeExists func(ctx context.Context, scope ID) (bool, error)
+	authorizer  Authorizer
+	admitter    Admitter
 }
 
 // NewEngine returns an Engine serving the types in reg from s.
@@ -149,6 +164,19 @@ func (e *Engine) Do(ctx context.Context, r *Request) (int, any, error) {
 		}
 		r.Type = t
 	}
+	if r.Principal == (Principal{}) {
+		r.Principal = PrincipalFrom(ctx)
+	}
+	action, ok := actionFor(r)
+	if !ok {
+		return 0, nil, azerr.New(http.StatusMethodNotAllowed, "MethodNotAllowed",
+			"The requested operation is not allowed.")
+	}
+	if e.authorizer != nil {
+		if err := e.authorizer.Authorize(ctx, r.Principal, action, r.ID); err != nil {
+			return 0, nil, err
+		}
+	}
 	switch r.Op {
 	case OpGet:
 		return e.doGet(r)
@@ -163,6 +191,24 @@ func (e *Engine) Do(ctx context.Context, r *Request) (int, any, error) {
 	default:
 		return 0, nil, azerr.New(http.StatusMethodNotAllowed, "MethodNotAllowed",
 			"The requested operation is not allowed.")
+	}
+}
+
+func actionFor(r *Request) (string, bool) {
+	switch r.Op {
+	case OpGet, OpList:
+		return r.Type.Name + "/read", true
+	case OpPut, OpPatch:
+		return r.Type.Name + "/write", true
+	case OpDelete:
+		return r.Type.Name + "/delete", true
+	case OpAction:
+		if r.Action == "" {
+			return "", false
+		}
+		return r.Type.Name + "/" + r.Action + "/action", true
+	default:
+		return "", false
 	}
 }
 
@@ -302,6 +348,11 @@ func (e *Engine) doPut(ctx context.Context, r *Request) (int, any, error) {
 		}
 		r.Doc["type"] = r.Type.Name
 
+		if e.admitter != nil {
+			if err := e.admitter.Admit(ctx, r); err != nil {
+				return nil, err
+			}
+		}
 		if r.Type.Hooks.Validate != nil {
 			if err := r.Type.Hooks.Validate(ctx, r); err != nil {
 				return nil, normalizeValidateErr(err)
@@ -385,6 +436,11 @@ func (e *Engine) doPatch(ctx context.Context, r *Request) (int, any, error) {
 				delete(r.Doc, "tags")
 			} else {
 				r.Doc["tags"] = cloneValue(tags)
+			}
+		}
+		if e.admitter != nil {
+			if err := e.admitter.Admit(ctx, r); err != nil {
+				return nil, err
 			}
 		}
 		if r.Type.Hooks.Validate != nil {

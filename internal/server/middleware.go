@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/moabukar/miniblue/internal/arm"
+	"github.com/moabukar/miniblue/internal/token"
 )
 
 // CORS adds permissive CORS headers for local development.
@@ -51,4 +53,45 @@ func APIVersionCheck(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// ExtractPrincipal reads an unverified bearer token from the Authorization
+// header and attaches an arm.Principal to the request context. Missing or
+// malformed tokens resolve to the default principal; it never fails a request.
+func ExtractPrincipal(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := principalFromHeader(r.Header.Get("Authorization"))
+		next.ServeHTTP(w, r.WithContext(arm.WithPrincipal(r.Context(), p)))
+	})
+}
+
+func principalFromHeader(header string) arm.Principal {
+	claims, ok := token.Parse(header)
+	if !ok {
+		return defaultPrincipal()
+	}
+	oid := claims.OID
+	if oid == "" {
+		oid = claims.Sub
+	}
+	if oid == "" {
+		return defaultPrincipal()
+	}
+	tid := claims.TID
+	if tid == "" {
+		tid = token.DefaultTenantID
+	}
+	return arm.Principal{
+		ObjectID: oid,
+		TenantID: tid,
+		AppID:    claims.AppID,
+	}
+}
+
+func defaultPrincipal() arm.Principal {
+	return arm.Principal{
+		ObjectID: token.DefaultClientOID,
+		TenantID: token.DefaultTenantID,
+		AppID:    token.DefaultClientID,
+	}
 }

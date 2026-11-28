@@ -1,6 +1,7 @@
 package arm
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -27,12 +28,23 @@ type Type struct {
 // Hooks are optional per-type behaviour. The engine is pure passthrough
 // without them: the body is stored as sent plus id, name and type. Numbers in
 // the body are json.Number, not float64, so large integers are not altered.
+//
+// Validate and Defaults run under the engine write lock and see r.Current.
+// They read via r.Store (or a read-only resolver owned by the same package);
+// they must never write or call Engine.Do, and must not do slow I/O.
+// Defaults must be idempotent: generated values are copied from r.Current
+// when it is present.
+// After runs post-commit, outside the lock.
 type Hooks struct {
-	// Validate rejects a PUT body; the error text becomes a 400 response.
-	Validate func(id ID, body map[string]interface{}) error
-	// Defaults fills server-side defaults into a PUT body, after Validate.
-	// Types whose clients drift on missing defaults (e.g. azurerm) use it.
-	Defaults func(id ID, body map[string]interface{})
+	// Validate rejects a write; an *azerr.Error is returned as-is, and any
+	// other error becomes 400 InvalidRequestContent (except store errors,
+	// which remain 500 InternalServerError).
+	Validate func(ctx context.Context, r *Request) error
+	// Defaults fills server-side defaults into r.Doc, after Validate.
+	// Return an error only for read failures.
+	Defaults func(ctx context.Context, r *Request) error
+	// After runs post-commit, outside the write lock.
+	After func(ctx context.Context, r *Request)
 }
 
 // Registry holds the registered types, keyed by lowercased full type name.

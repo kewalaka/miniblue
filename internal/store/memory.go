@@ -136,6 +136,17 @@ func (s *Store) Scan(prefix string) ([]KV, error) {
 	return s.backend.Scan(prefix)
 }
 
+// Remove deletes key and reports whether it existed, propagating backend errors.
+func (s *Store) Remove(key string) (bool, error) {
+	return s.backend.Delete(key)
+}
+
+// RemoveByPrefix deletes all keys with prefix and returns the count,
+// propagating backend errors.
+func (s *Store) RemoveByPrefix(prefix string) (int, error) {
+	return s.backend.DeleteByPrefix(prefix)
+}
+
 // Set marshals value to JSON and stores it under key. Existing callers that
 // ignore the return value still compile; new and migrated code should check it.
 func (s *Store) Set(key string, value interface{}) error {

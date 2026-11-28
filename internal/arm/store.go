@@ -2,6 +2,8 @@ package arm
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"sort"
 	"strings"
@@ -9,6 +11,32 @@ import (
 
 	"github.com/moabukar/miniblue/internal/store"
 )
+
+// Reader provides lock-free reads against the ARM store. Backend errors are
+// returned, never swallowed.
+type Reader interface {
+	Get(id ID) (map[string]any, bool, error)
+	Children(parent ID, typeName string) ([]map[string]any, error)
+	Under(scope ID, typeName string) ([]map[string]any, error)
+}
+
+// storeError marks backend and decode errors from Store so Engine.Do never
+// downgrades a store failure returned from a Validate hook to a 400.
+type storeError struct{ err error }
+
+func (e *storeError) Error() string { return e.err.Error() }
+func (e *storeError) Unwrap() error { return e.err }
+
+func wrapStoreErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	var se *storeError
+	if errors.As(err, &se) {
+		return err
+	}
+	return &storeError{err: err}
+}
 
 // Store keeps ARM resources in a store.Backend under keys derived from the
 // lowercased canonical ID, so lookups are case-insensitive while the stored
@@ -43,134 +71,219 @@ func idxKey(id ID) string {
 }
 
 // Get returns the document stored for id. Numbers are json.Number.
-func (s *Store) Get(id ID) (map[string]interface{}, bool) {
-	v, ok := s.s.Get(resKey(id))
-	if !ok {
-		return nil, false
+// Backend and decode errors are returned, never reported as not found.
+func (s *Store) Get(id ID) (map[string]any, bool, error) {
+	raw, ok, err := s.s.Lookup(resKey(id))
+	if err != nil {
+		return nil, false, wrapStoreErr(err)
 	}
-	return decodeDoc(v)
+	if !ok {
+		return nil, false, nil
+	}
+	doc, err := decodeStoredDoc(raw)
+	if err != nil {
+		return nil, false, wrapStoreErr(err)
+	}
+	return doc, true, nil
+}
+
+// Children returns the direct child resources of typeName under parent,
+// ordered by ID.
+func (s *Store) Children(parent ID, typeName string) ([]map[string]any, error) {
+	if !strings.Contains(typeName, "/") && !parent.IsTenant() {
+		typeName = parent.TypeName() + "/" + typeName
+	}
+	idx := "arm:i:" + strings.ToLower(parent.String()) + "|" + strings.ToLower(typeName)
+	keys, err := s.index(idx)
+	if err != nil {
+		return nil, wrapStoreErr(err)
+	}
+	out := []map[string]any{}
+	for _, key := range keys {
+		raw, ok, err := s.s.Lookup(key)
+		if err != nil {
+			return nil, wrapStoreErr(err)
+		}
+		if !ok {
+			continue
+		}
+		doc, err := decodeStoredDoc(raw)
+		if err != nil {
+			return nil, wrapStoreErr(err)
+		}
+		out = append(out, doc)
+	}
+	return out, nil
+}
+
+// Under returns all resources of typeName anywhere under scope (e.g.
+// subscription- or resource-group-wide), ordered by ID.
+func (s *Store) Under(scope ID, typeName string) ([]map[string]any, error) {
+	prefix := "arm:r:/"
+	if !scope.IsTenant() {
+		prefix = "arm:r:" + scope.Key() + "/"
+	}
+	kvs, err := s.s.Scan(prefix)
+	if err != nil {
+		return nil, wrapStoreErr(err)
+	}
+	out := []map[string]any{}
+	for _, kv := range kvs {
+		id, err := ParseID(strings.TrimPrefix(kv.Key, "arm:r:"))
+		if err != nil || !strings.EqualFold(id.TypeName(), typeName) {
+			continue
+		}
+		doc, err := decodeStoredDoc(kv.Value)
+		if err != nil {
+			return nil, wrapStoreErr(err)
+		}
+		out = append(out, doc)
+	}
+	return out, nil
 }
 
 // Update atomically replaces the document for id. fn receives the current
 // document, or nil if there is none, and returns the document to store; nil
-// stores nothing. It runs under the store lock, so it must not call the Store.
+// stores nothing. It runs under the store write lock, so it may perform
+// lock-free reads via Reader methods, but must not call write methods on Store.
 // Update, Delete and DeleteTree are mutually exclusive, which makes
 // create-if-absent, update-if-present and delete race-free within this
 // process. Update returns the stored document and whether it was created.
-func (s *Store) Update(id ID, fn func(cur map[string]interface{}) map[string]interface{}) (doc map[string]interface{}, created bool, err error) {
+func (s *Store) Update(id ID, fn func(cur map[string]any) (map[string]any, error)) (doc map[string]any, created bool, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := resKey(id)
-	cur, exists := s.Get(id)
-	next := fn(cur)
+	cur, exists, err := s.Get(id)
+	if err != nil {
+		return nil, false, err
+	}
+	next, err := fn(cur)
+	if err != nil {
+		return nil, false, err
+	}
 	if next == nil {
 		return nil, false, nil
 	}
 	raw, err := json.Marshal(next)
 	if err != nil {
-		return nil, false, err
+		return nil, false, wrapStoreErr(err)
 	}
-	s.s.Set(key, string(raw))
+	if err := s.s.Set(key, string(raw)); err != nil {
+		return nil, false, wrapStoreErr(err)
+	}
 	if !exists {
-		s.indexAdd(idxKey(id), key)
+		if err := s.indexAdd(idxKey(id), key); err != nil {
+			return nil, false, wrapStoreErr(err)
+		}
 	}
 	return next, !exists, nil
 }
 
 // Delete removes the resource and reports whether it existed.
-func (s *Store) Delete(id ID) bool {
+func (s *Store) Delete(id ID) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := resKey(id)
-	if !s.s.Delete(key) {
-		return false
+	existed, err := s.s.Remove(key)
+	if err != nil {
+		return false, wrapStoreErr(err)
 	}
-	s.indexRemove(idxKey(id), key)
-	return true
+	if !existed {
+		return false, nil
+	}
+	if err := s.indexRemove(idxKey(id), key); err != nil {
+		return true, wrapStoreErr(err)
+	}
+	return true, nil
 }
 
 // DeleteTree removes the resource (if present) and everything beneath it:
 // child resources and extension resources, with their indexes. It scans the
 // backend by prefix, so use it only for deletes that can have descendants.
-func (s *Store) DeleteTree(id ID) bool {
+func (s *Store) DeleteTree(id ID) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	k := id.Key()
-	existed := s.s.Delete("arm:r:" + k)
-	if existed {
-		s.indexRemove(idxKey(id), "arm:r:"+k)
+	existed, err := s.s.Remove("arm:r:" + k)
+	if err != nil {
+		return false, wrapStoreErr(err)
 	}
-	s.s.DeleteByPrefix("arm:r:" + k + "/")
-	s.s.DeleteByPrefix("arm:i:" + k + "/")
-	s.s.DeleteByPrefix("arm:i:" + k + "|")
-	return existed
+	if existed {
+		if err := s.indexRemove(idxKey(id), "arm:r:"+k); err != nil {
+			return true, wrapStoreErr(err)
+		}
+	}
+	if _, err := s.s.RemoveByPrefix("arm:r:" + k + "/"); err != nil {
+		return existed, wrapStoreErr(err)
+	}
+	if _, err := s.s.RemoveByPrefix("arm:i:" + k + "/"); err != nil {
+		return existed, wrapStoreErr(err)
+	}
+	if _, err := s.s.RemoveByPrefix("arm:i:" + k + "|"); err != nil {
+		return existed, wrapStoreErr(err)
+	}
+	return existed, nil
 }
 
 // List returns the resources in a collection, ordered by ID.
-func (s *Store) List(collection ID) []map[string]interface{} {
-	out := []map[string]interface{}{}
-	for _, key := range s.index(idxKey(collection)) {
-		if v, ok := s.s.Get(key); ok {
-			if doc, ok := decodeDoc(v); ok {
-				out = append(out, doc)
-			}
-		}
-	}
-	return out
+func (s *Store) List(collection ID) ([]map[string]any, error) {
+	return s.Children(collection.Parent(), collection.TypeName())
 }
 
-func (s *Store) index(key string) []string {
-	v, ok := s.s.Get(key)
+func (s *Store) index(key string) ([]string, error) {
+	raw, ok, err := s.s.Lookup(key)
+	if err != nil {
+		return nil, err
+	}
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	items, _ := v.([]interface{})
-	keys := make([]string, 0, len(items))
-	for _, it := range items {
-		if k, ok := it.(string); ok {
-			keys = append(keys, k)
-		}
+	var keys []string
+	if err := json.Unmarshal(raw, &keys); err != nil {
+		return nil, fmt.Errorf("arm: decode index %q: %w", key, err)
 	}
-	return keys
+	return keys, nil
 }
 
-func (s *Store) writeIndex(key string, keys []string) {
+func (s *Store) writeIndex(key string, keys []string) error {
 	if len(keys) == 0 {
-		s.s.Delete(key)
-		return
+		_, err := s.s.Remove(key)
+		return err
 	}
-	items := make([]interface{}, len(keys))
-	for i, k := range keys {
-		items[i] = k
-	}
-	s.s.Set(key, items)
+	return s.s.Set(key, keys)
 }
 
-func (s *Store) indexAdd(idx, key string) {
-	keys := s.index(idx)
+func (s *Store) indexAdd(idx, key string) error {
+	keys, err := s.index(idx)
+	if err != nil {
+		return err
+	}
 	i := sort.SearchStrings(keys, key)
 	if i < len(keys) && keys[i] == key {
-		return
+		return nil
 	}
 	keys = append(keys, "")
 	copy(keys[i+1:], keys[i:])
 	keys[i] = key
-	s.writeIndex(idx, keys)
+	return s.writeIndex(idx, keys)
 }
 
-func (s *Store) indexRemove(idx, key string) {
-	keys := s.index(idx)
+func (s *Store) indexRemove(idx, key string) error {
+	keys, err := s.index(idx)
+	if err != nil {
+		return err
+	}
 	i := sort.SearchStrings(keys, key)
 	if i == len(keys) || keys[i] != key {
-		return
+		return nil
 	}
-	s.writeIndex(idx, append(keys[:i], keys[i+1:]...))
+	return s.writeIndex(idx, append(keys[:i], keys[i+1:]...))
 }
 
 // decodeObject decodes a JSON object keeping numbers as json.Number, so
 // integers beyond float64 precision round-trip unchanged.
-func decodeObject(r io.Reader) (map[string]interface{}, error) {
-	var m map[string]interface{}
+func decodeObject(r io.Reader) (map[string]any, error) {
+	var m map[string]any
 	dec := json.NewDecoder(r)
 	dec.UseNumber()
 	if err := dec.Decode(&m); err != nil {
@@ -179,11 +292,17 @@ func decodeObject(r io.Reader) (map[string]interface{}, error) {
 	return m, nil
 }
 
-func decodeDoc(v interface{}) (map[string]interface{}, bool) {
-	raw, ok := v.(string)
-	if !ok {
-		return nil, false
+func decodeStoredDoc(raw []byte) (map[string]any, error) {
+	var docJSON string
+	if err := json.Unmarshal(raw, &docJSON); err != nil {
+		return nil, fmt.Errorf("arm: decode stored envelope: %w", err)
 	}
-	doc, err := decodeObject(strings.NewReader(raw))
-	return doc, err == nil && doc != nil
+	doc, err := decodeObject(strings.NewReader(docJSON))
+	if err != nil {
+		return nil, fmt.Errorf("arm: decode stored doc: %w", err)
+	}
+	if doc == nil {
+		return nil, errors.New("arm: stored doc is null")
+	}
+	return doc, nil
 }

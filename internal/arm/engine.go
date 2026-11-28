@@ -1,13 +1,43 @@
 package arm
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/moabukar/miniblue/internal/azerr"
 )
+
+// Op identifies the ARM operation performed by Engine.Do.
+type Op uint8
+
+const (
+	OpGet Op = iota
+	OpList
+	OpPut
+	OpPatch
+	OpDelete
+	OpAction
+)
+
+// Request is the transport-independent input and working state for Engine.Do.
+type Request struct {
+	Op         Op
+	ID         ID // instance id; for OpList the parent scope
+	Type       *Type
+	APIVersion string
+	Action     string // OpAction only
+	Query      url.Values
+	Body       map[string]any // decoded request (UseNumber)
+	Current    map[string]any // stored doc; nil on create
+	Doc        map[string]any // proposed doc; hooks mutate this
+	Store      Reader
+
+	ifNoneMatch bool
+}
 
 // Engine serves registered resource types with generic ARM CRUD: PUT (201 on
 // create, 200 on update), GET, DELETE (200 if it existed, 204 if not), list
@@ -22,170 +52,350 @@ type Engine struct {
 // NewEngine returns an Engine serving the types in reg from s.
 func NewEngine(reg *Registry, s *Store) *Engine { return &Engine{reg: reg, store: s} }
 
+// Resolve routes an ARM request and validates api-version.
+// ok=false means the path is not owned by any registered type at its scope.
+func (e *Engine) Resolve(method, path string, q url.Values) (*Request, bool, error) {
+	id, err := ParseID(path)
+	if err != nil {
+		return nil, false, nil
+	}
+	t, ok := e.reg.Lookup(id)
+	if !ok || !t.Scopes.Has(id.ScopeKind()) {
+		return nil, false, nil
+	}
+	apiVersion := q.Get("api-version")
+	if apiVersion != "" && !t.supports(apiVersion) {
+		return nil, true, azerr.New(http.StatusBadRequest, "InvalidApiVersionParameter",
+			"The api-version '%s' is invalid. The supported versions are '%s'.",
+			apiVersion, strings.Join(t.APIVersions, ","))
+	}
+	req := &Request{
+		ID:         id,
+		Type:       t,
+		APIVersion: apiVersion,
+		Query:      q,
+		Store:      e.store,
+	}
+	if id.IsCollection() {
+		if method != http.MethodGet {
+			return nil, true, azerr.New(http.StatusMethodNotAllowed, "MethodNotAllowed",
+				"The request method '%s' is not allowed.", method)
+		}
+		req.Op = OpList
+		req.ID = id.Parent()
+		return req, true, nil
+	}
+	switch method {
+	case http.MethodGet:
+		req.Op = OpGet
+	case http.MethodPut:
+		req.Op = OpPut
+	case http.MethodPatch:
+		if !t.PatchTags {
+			return nil, true, azerr.New(http.StatusMethodNotAllowed, "MethodNotAllowed",
+				"The request method '%s' is not allowed.", method)
+		}
+		req.Op = OpPatch
+	case http.MethodDelete:
+		req.Op = OpDelete
+	default:
+		return nil, true, azerr.New(http.StatusMethodNotAllowed, "MethodNotAllowed",
+			"The request method '%s' is not allowed.", method)
+	}
+	return req, true, nil
+}
+
+// Do executes a resolved ARM request and returns the HTTP status, response
+// payload (if any), and error. Errors from the engine or hooks are *azerr.Error;
+// store errors are returned unwrapped so HTTP adapters render 500.
+func (e *Engine) Do(ctx context.Context, r *Request) (int, any, error) {
+	if r.Store == nil {
+		r.Store = e.store
+	}
+	if r.Type == nil {
+		t, ok := e.reg.Lookup(r.ID)
+		if !ok {
+			return 0, nil, azerr.New(http.StatusNotFound, "InvalidResourceType",
+				"The resource type '%s' could not be found.", r.ID.TypeName())
+		}
+		r.Type = t
+	}
+	switch r.Op {
+	case OpGet:
+		return e.doGet(r)
+	case OpList:
+		return e.doList(r)
+	case OpPut:
+		return e.doPut(ctx, r)
+	case OpPatch:
+		return e.doPatch(ctx, r)
+	case OpDelete:
+		return e.doDelete(r)
+	default:
+		return 0, nil, azerr.New(http.StatusMethodNotAllowed, "MethodNotAllowed",
+			"The requested operation is not allowed.")
+	}
+}
+
+// ServeHTTP adapts HTTP requests to Resolve and Do.
+func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	req, ok, err := e.Resolve(r.Method, r.URL.Path, r.URL.Query())
+	if !ok {
+		azerr.Write(w, azerr.New(http.StatusNotFound, "ResourceNotFound",
+			"The resource '%s' could not be found.", r.URL.Path))
+		return
+	}
+	e.serveResolved(w, r, req, err)
+}
+
 // Middleware serves requests whose path is a registered type at an allowed
 // scope and passes everything else to next, so it coexists with handlers
 // that have not migrated to the engine yet. Register it before them.
 func (e *Engine) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, err := ParseID(r.URL.Path)
-		if err == nil {
-			if t, ok := e.reg.Lookup(id); ok && t.Scopes.Has(id.ScopeKind()) {
-				e.serve(w, r, t, id)
-				return
-			}
+		req, ok, err := e.Resolve(r.Method, r.URL.Path, r.URL.Query())
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
 		}
-		next.ServeHTTP(w, r)
+		e.serveResolved(w, r, req, err)
 	})
 }
 
-func (e *Engine) serve(w http.ResponseWriter, r *http.Request, t *Type, id ID) {
-	if v := r.URL.Query().Get("api-version"); v != "" && !t.supports(v) {
-		azerr.WriteError(w, http.StatusBadRequest, "InvalidApiVersionParameter",
-			fmt.Sprintf("The api-version '%s' is invalid. The supported versions are '%s'.", v, strings.Join(t.APIVersions, ",")))
+func (e *Engine) serveResolved(w http.ResponseWriter, r *http.Request, req *Request, err error) {
+	if err != nil {
+		azerr.Write(w, err)
 		return
 	}
-	switch {
-	case id.IsCollection() && r.Method == http.MethodGet:
-		writeJSON(w, http.StatusOK, map[string]interface{}{"value": e.store.List(id)})
-	case id.IsCollection():
-		azerr.MethodNotAllowed(w, r.Method)
-	case r.Method == http.MethodGet:
-		e.get(w, id)
-	case r.Method == http.MethodPut:
-		e.put(w, r, t, id)
-	case r.Method == http.MethodDelete:
-		e.delete(w, t, id)
-	case r.Method == http.MethodPatch && t.PatchTags:
-		e.patchTags(w, r, id)
-	default:
-		azerr.MethodNotAllowed(w, r.Method)
-	}
-}
-
-func (e *Engine) get(w http.ResponseWriter, id ID) {
-	doc, ok := e.store.Get(id)
-	if !ok {
-		notFound(w, id)
-		return
-	}
-	writeJSON(w, http.StatusOK, doc)
-}
-
-func (e *Engine) put(w http.ResponseWriter, r *http.Request, t *Type, id ID) {
-	body, ok := readObject(w, r)
-	if !ok {
-		return
-	}
-	if n, _ := body["name"].(string); n != "" && !strings.EqualFold(n, id.Name()) {
-		azerr.BadRequest(w, fmt.Sprintf("The resource name '%s' in the body does not match '%s' in the URL.", n, id.Name()))
-		return
-	}
-	if s, _ := body["id"].(string); s != "" && !strings.EqualFold(s, id.String()) {
-		azerr.BadRequest(w, fmt.Sprintf("The resource id '%s' in the body does not match the URL.", s))
-		return
-	}
-	if t.Hooks.Validate != nil {
-		if err := t.Hooks.Validate(id, body); err != nil {
-			azerr.BadRequest(w, err.Error())
+	if req.Op == OpPut || req.Op == OpPatch {
+		body, err := decodeObject(r.Body)
+		if err != nil || body == nil {
+			azerr.Write(w, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
+				"The request content is not a valid JSON object."))
 			return
 		}
+		req.Body = body
 	}
-	if t.Hooks.Defaults != nil {
-		t.Hooks.Defaults(id, body)
+	if strings.TrimSpace(r.Header.Get("If-None-Match")) == "*" {
+		req.ifNoneMatch = true
+	}
+	status, body, err := e.Do(r.Context(), req)
+	if err != nil {
+		azerr.Write(w, err)
+		return
+	}
+	if body == nil {
+		w.WriteHeader(status)
+		return
+	}
+	writeJSON(w, status, body)
+}
+
+func (e *Engine) doGet(r *Request) (int, any, error) {
+	doc, ok, err := e.store.Get(r.ID)
+	if err != nil {
+		return 0, nil, err
+	}
+	if !ok {
+		return 0, nil, notFoundErr(r.ID)
+	}
+	return http.StatusOK, doc, nil
+}
+
+func (e *Engine) doList(r *Request) (int, any, error) {
+	items, err := e.store.Children(r.ID, r.Type.Name)
+	if err != nil {
+		return 0, nil, err
+	}
+	return http.StatusOK, map[string]any{"value": items}, nil
+}
+
+func (e *Engine) doPut(ctx context.Context, r *Request) (int, any, error) {
+	if r.Body == nil {
+		return 0, nil, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
+			"The request content is not a valid JSON object.")
+	}
+	if n, _ := r.Body["name"].(string); n != "" && !strings.EqualFold(n, r.ID.Name()) {
+		return 0, nil, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
+			"The resource name '%s' in the body does not match '%s' in the URL.", n, r.ID.Name())
+	}
+	if s, _ := r.Body["id"].(string); s != "" && !strings.EqualFold(s, r.ID.String()) {
+		return 0, nil, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
+			"The resource id '%s' in the body does not match the URL.", s)
 	}
 
 	// The id and name keep the casing of the PUT that created the resource,
 	// so responses do not change with the casing of later requests. Deciding
-	// that and writing happen in one Update, so concurrent PUTs for the same
-	// resource with different URL casing cannot disagree about who created it.
-	canonID, canonName := id.WithTypeName(t.Name).String(), id.Name()
-	doc, created, err := e.store.Update(id, func(cur map[string]interface{}) map[string]interface{} {
-		body["id"], body["name"] = canonID, canonName
-		if cur != nil {
-			body["id"], body["name"] = cur["id"], cur["name"]
+	// that, running Validate/Defaults against Current, and persisting happen
+	// in one Update so concurrent PUTs cannot race.
+	canonID, canonName := r.ID.WithTypeName(r.Type.Name).String(), r.ID.Name()
+	doc, created, err := e.store.Update(r.ID, func(cur map[string]any) (map[string]any, error) {
+		r.Current = cur
+		if r.ifNoneMatch && cur != nil {
+			return nil, azerr.New(http.StatusPreconditionFailed, "PreconditionFailed",
+				"The resource '%s' already exists.", r.ID.String())
 		}
-		body["type"] = t.Name
-		return body
+		if len(r.ID.Types) > 1 {
+			_, parentOK, err := r.Store.Get(r.ID.Parent())
+			if err != nil {
+				return nil, err
+			}
+			if !parentOK {
+				return nil, azerr.New(http.StatusNotFound, "ParentResourceNotFound",
+					"Can not perform requested operation on nested resource. Parent resource '%s' not found.",
+					r.ID.Parent().Name())
+			}
+		}
+		r.Doc = cloneMap(r.Body)
+		r.Doc["id"], r.Doc["name"] = canonID, canonName
+		if cur != nil {
+			r.Doc["id"], r.Doc["name"] = cur["id"], cur["name"]
+		}
+		r.Doc["type"] = r.Type.Name
+
+		if r.Type.Hooks.Validate != nil {
+			if err := r.Type.Hooks.Validate(ctx, r); err != nil {
+				return nil, normalizeValidateErr(err)
+			}
+		}
+		if r.Type.Hooks.Defaults != nil {
+			if err := r.Type.Hooks.Defaults(ctx, r); err != nil {
+				return nil, err
+			}
+		}
+		return r.Doc, nil
 	})
 	if err != nil {
-		internalError(w, err)
-		return
+		return 0, nil, err
+	}
+	if r.Type.Hooks.After != nil {
+		r.Type.Hooks.After(ctx, r)
 	}
 	status := http.StatusOK
 	if created {
 		status = http.StatusCreated
 	}
-	writeJSON(w, status, doc)
+	return status, doc, nil
 }
 
-func (e *Engine) delete(w http.ResponseWriter, t *Type, id ID) {
-	var existed bool
-	if len(t.Children) > 0 {
-		existed = e.store.DeleteTree(id)
+func (e *Engine) doDelete(r *Request) (int, any, error) {
+	var (
+		existed bool
+		err     error
+	)
+	if len(r.Type.Children) > 0 {
+		existed, err = e.store.DeleteTree(r.ID)
 	} else {
-		existed = e.store.Delete(id)
+		existed, err = e.store.Delete(r.ID)
+	}
+	if err != nil {
+		return 0, nil, err
 	}
 	if existed {
-		w.WriteHeader(http.StatusOK)
-	} else {
-		w.WriteHeader(http.StatusNoContent)
+		return http.StatusOK, nil, nil
 	}
+	return http.StatusNoContent, nil, nil
 }
 
-// patchTags replaces the tags of an existing resource. Other properties in
-// the PATCH body are ignored. The read and write are one Update, so a
-// concurrent DELETE or PUT cannot be lost or undone by the PATCH.
-func (e *Engine) patchTags(w http.ResponseWriter, r *http.Request, id ID) {
-	body, ok := readObject(w, r)
-	if !ok {
-		return
+// doPatch replaces the tags of an existing resource. Other properties in
+// the PATCH body are ignored. The read, hooks, and write run in one Update,
+// so a concurrent DELETE or PUT cannot be lost or undone by the PATCH.
+func (e *Engine) doPatch(ctx context.Context, r *Request) (int, any, error) {
+	if !r.Type.PatchTags {
+		return 0, nil, azerr.New(http.StatusMethodNotAllowed, "MethodNotAllowed",
+			"The request method 'PATCH' is not allowed.")
 	}
-	tags, has := body["tags"]
-	if _, isMap := tags.(map[string]interface{}); !has || (tags != nil && !isMap) {
-		azerr.BadRequest(w, "The PATCH body must contain a 'tags' object.")
-		return
+	if r.Body == nil {
+		return 0, nil, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
+			"The request content is not a valid JSON object.")
 	}
-	doc, _, err := e.store.Update(id, func(cur map[string]interface{}) map[string]interface{} {
+	tags, has := r.Body["tags"]
+	if _, isMap := tags.(map[string]any); !has || (tags != nil && !isMap) {
+		return 0, nil, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
+			"The PATCH body must contain a 'tags' object.")
+	}
+	doc, _, err := e.store.Update(r.ID, func(cur map[string]any) (map[string]any, error) {
 		if cur == nil {
-			return nil
+			return nil, notFoundErr(r.ID)
 		}
+		r.Current = cur
+		r.Doc = cloneMap(cur)
 		if tags == nil {
-			delete(cur, "tags")
+			delete(r.Doc, "tags")
 		} else {
-			cur["tags"] = tags
+			r.Doc["tags"] = cloneValue(tags)
 		}
-		return cur
+		if r.Type.Hooks.Validate != nil {
+			if err := r.Type.Hooks.Validate(ctx, r); err != nil {
+				return nil, normalizeValidateErr(err)
+			}
+		}
+		if r.Type.Hooks.Defaults != nil {
+			if err := r.Type.Hooks.Defaults(ctx, r); err != nil {
+				return nil, err
+			}
+		}
+		return r.Doc, nil
 	})
 	if err != nil {
-		internalError(w, err)
-		return
+		return 0, nil, err
 	}
-	if doc == nil {
-		notFound(w, id)
-		return
+	if r.Type.Hooks.After != nil {
+		r.Type.Hooks.After(ctx, r)
 	}
-	writeJSON(w, http.StatusOK, doc)
+	return http.StatusOK, doc, nil
 }
 
-func readObject(w http.ResponseWriter, r *http.Request) (map[string]interface{}, bool) {
-	body, err := decodeObject(r.Body)
-	if err != nil || body == nil {
-		azerr.BadRequest(w, "The request content is not a valid JSON object.")
-		return nil, false
+func normalizeValidateErr(err error) error {
+	var se *storeError
+	if errors.As(err, &se) {
+		return err
 	}
-	return body, true
+	var ae *azerr.Error
+	if errors.As(err, &ae) && ae != nil {
+		return err
+	}
+	return azerr.New(http.StatusBadRequest, "InvalidRequestContent", "%s", err.Error())
 }
 
-func notFound(w http.ResponseWriter, id ID) {
-	azerr.WriteError(w, http.StatusNotFound, "ResourceNotFound",
-		fmt.Sprintf("The resource '%s' could not be found.", id.String()))
+func notFoundErr(id ID) *azerr.Error {
+	if id.ScopeKind() == ScopeResourceGroup && id.Scope != nil {
+		// (verify) exact ARM ResourceNotFound wording at RG scope
+		return azerr.New(http.StatusNotFound, "ResourceNotFound",
+			"The Resource '%s/%s' under resource group '%s' was not found.",
+			id.TypeName(), id.Name(), id.Scope.Name())
+	}
+	return azerr.New(http.StatusNotFound, "ResourceNotFound",
+		"The resource '%s' could not be found.", id.String())
 }
 
-func internalError(w http.ResponseWriter, err error) {
-	azerr.WriteError(w, http.StatusInternalServerError, "InternalServerError", err.Error())
+func cloneMap(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = cloneValue(v)
+	}
+	return out
 }
 
-func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+func cloneValue(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		return cloneMap(x)
+	case []any:
+		out := make([]any, len(x))
+		for i, elem := range x {
+			out[i] = cloneValue(elem)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)

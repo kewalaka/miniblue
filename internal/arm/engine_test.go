@@ -28,13 +28,14 @@ func newTestEngine(t *testing.T, st *store.Store) *Engine {
 		Name:        "Microsoft.Test/widgets",
 		APIVersions: []string{"2024-01-01"},
 		Scopes:      ScopeTenant | ScopeManagementGroup | ScopeSubscription | ScopeResourceGroup | ScopeResource,
-		PatchTags:   true,
+		Patch:       PatchTags,
 		Children:    []Type{{Name: "parts"}},
 	})
 	reg.Register(Type{
 		Name:        "Microsoft.Test/gadgets",
 		APIVersions: []string{"2024-01-01"},
 		Scopes:      ScopeSubscription,
+		Patch:       PatchNone,
 		Hooks: Hooks{
 			Validate: func(_ context.Context, r *Request) error {
 				if _, ok := r.Doc["properties"]; !ok {
@@ -285,7 +286,7 @@ func TestEngineRequestErrors(t *testing.T) {
 		{"post item", http.MethodPost, path + apiV, `{}`, http.StatusMethodNotAllowed},
 		{"post collection", http.MethodPost, subScope + "/providers/Microsoft.Test/widgets" + apiV, `{}`, http.StatusMethodNotAllowed},
 		{"delete collection", http.MethodDelete, subScope + "/providers/Microsoft.Test/widgets" + apiV, "", http.StatusMethodNotAllowed},
-		{"patch without PatchTags", http.MethodPatch, subScope + "/providers/Microsoft.Test/gadgets/g" + apiV, `{"tags":{}}`, http.StatusMethodNotAllowed},
+		{"patch with PatchNone", http.MethodPatch, subScope + "/providers/Microsoft.Test/gadgets/g" + apiV, `{"tags":{}}`, http.StatusMethodNotAllowed},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -392,9 +393,142 @@ func TestEnginePatchTags(t *testing.T) {
 	want(t, do(h, http.MethodPatch, path+apiV, `{"properties":{}}`), http.StatusBadRequest)
 	want(t, do(h, http.MethodPatch, path+apiV, `{"tags":"x"}`), http.StatusBadRequest)
 
+	want(t, do(h, http.MethodPatch, path+apiV, `{"tags":{}}`), http.StatusOK)
+	if tags := decode(t, do(h, http.MethodGet, path+apiV, ""))["tags"].(map[string]interface{}); len(tags) != 0 {
+		t.Fatalf("empty tags patch did not clear tags: %v", tags)
+	}
+
 	want(t, do(h, http.MethodPatch, path+apiV, `{"tags":null}`), http.StatusOK)
 	if _, ok := decode(t, do(h, http.MethodGet, path+apiV, ""))["tags"]; ok {
 		t.Fatal("tags not cleared")
+	}
+}
+
+func TestEnginePatchMerge(t *testing.T) {
+	reg := NewRegistry()
+	var (
+		validatedCur bool
+		afterCalled  bool
+	)
+	// Omit Patch to verify the zero value is PatchMerge.
+	reg.Register(Type{
+		Name:        "Microsoft.Test/merges",
+		APIVersions: []string{"2024-01-01"},
+		Scopes:      ScopeSubscription,
+		Hooks: Hooks{
+			Validate: func(_ context.Context, r *Request) error {
+				if r.Op == OpPatch {
+					validatedCur = r.Current != nil
+				}
+				if props, ok := r.Doc["properties"].(map[string]any); ok {
+					if props["bad"] == true {
+						return azerr.New(http.StatusConflict, "InvalidMerge", "bad property")
+					}
+				}
+				return nil
+			},
+			Defaults: func(_ context.Context, r *Request) error {
+				if props, ok := r.Doc["properties"].(map[string]any); ok {
+					if _, has := props["defaulted"]; !has {
+						props["defaulted"] = "yes"
+					}
+				}
+				return nil
+			},
+			After: func(_ context.Context, r *Request) {
+				if r.Op == OpPatch {
+					afterCalled = true
+				}
+			},
+		},
+	})
+	e := NewEngine(reg, NewStore(store.New()))
+	path := subScope + "/providers/Microsoft.Test/merges/m1"
+
+	// Missing resource returns 404.
+	want(t, do(e, http.MethodPatch, path+apiV, `{"properties":{"a":1}}`), http.StatusNotFound)
+
+	// Create resource with nested objects, arrays, numbers, and tags.
+	initial := `{"location":"eastus","tags":{"env":"dev","drop":"x"},"properties":{"keep":"ok","nested":{"a":1,"b":2},"arr":[1,2],"big":9007199254740993,"scalar":"s","obj":{"x":1}}}`
+	want(t, do(e, http.MethodPut, path+apiV, initial), http.StatusCreated)
+
+	// RFC 7386 merge:
+	// - nested object merges recursively (keeps a, updates b, deletes nothing not null)
+	// - null deletes top-level (location) and nested keys (tags.drop)
+	// - null inside a newly created nested object (fresh.gone) is stripped
+	// - arrays replace wholesale
+	// - scalar -> object and object -> scalar replacements work
+	// - server-owned id/name/type cannot be deleted or overwritten
+	patch := `{"id":null,"name":null,"type":"Other/type","location":null,"tags":{"drop":null,"added":"y"},"properties":{"nested":{"b":3,"c":4},"arr":[9],"fresh":{"ok":1,"gone":null},"scalar":{"now":"obj"},"obj":"now-scalar","patchedBig":9007199254740995}}`
+	w := do(e, http.MethodPatch, path+apiV, patch)
+	want(t, w, http.StatusOK)
+
+	if !validatedCur || !afterCalled {
+		t.Fatalf("hooks on patch: validatedCur=%v afterCalled=%v", validatedCur, afterCalled)
+	}
+	for _, num := range []string{`"big":9007199254740993`, `"patchedBig":9007199254740995`} {
+		if !strings.Contains(w.Body.String(), num) {
+			t.Fatalf("%s not preserved in %s", num, w.Body.String())
+		}
+	}
+
+	got := decode(t, w)
+	if got["id"] != path || got["name"] != "m1" || got["type"] != "Microsoft.Test/merges" {
+		t.Fatalf("server-owned identity corrupted: %v", got)
+	}
+	if _, has := got["location"]; has {
+		t.Fatalf("location was not deleted: %v", got)
+	}
+	tags := got["tags"].(map[string]any)
+	if len(tags) != 2 || tags["env"] != "dev" || tags["added"] != "y" {
+		t.Fatalf("tags = %v, want env=dev added=y", tags)
+	}
+	props := got["properties"].(map[string]any)
+	if props["keep"] != "ok" || props["defaulted"] != "yes" || props["obj"] != "now-scalar" {
+		t.Fatalf("props = %v", props)
+	}
+	nested := props["nested"].(map[string]any)
+	if nested["a"] != float64(1) || nested["b"] != float64(3) || nested["c"] != float64(4) {
+		t.Fatalf("nested = %v", nested)
+	}
+	arr := props["arr"].([]any)
+	if len(arr) != 1 || arr[0] != float64(9) {
+		t.Fatalf("arr = %v, want [9]", arr)
+	}
+	fresh := props["fresh"].(map[string]any)
+	if len(fresh) != 1 || fresh["ok"] != float64(1) {
+		t.Fatalf("fresh = %v, want only ok=1 (null stripped)", fresh)
+	}
+	if props["scalar"].(map[string]any)["now"] != "obj" {
+		t.Fatalf("scalar->obj = %v", props["scalar"])
+	}
+
+	// Body name/id mismatch returns 400.
+	want(t, do(e, http.MethodPatch, path+apiV, `{"name":"other"}`), http.StatusBadRequest)
+	want(t, do(e, http.MethodPatch, path+apiV, `{"id":"/subscriptions/other"}`), http.StatusBadRequest)
+
+	// Hook validation error is preserved.
+	w = do(e, http.MethodPatch, path+apiV, `{"properties":{"bad":true}}`)
+	want(t, w, http.StatusConflict)
+	if code := decode(t, w)["error"].(map[string]any)["code"]; code != "InvalidMerge" {
+		t.Fatalf("code = %v, want InvalidMerge", code)
+	}
+}
+
+func TestEnginePatchNoneDirectDo(t *testing.T) {
+	e := newTestEngine(t, store.New())
+	id, err := ParseID(subScope + "/providers/Microsoft.Test/gadgets/g1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = e.Do(context.Background(), &Request{
+		Op:   OpPatch,
+		ID:   id,
+		Body: map[string]any{"tags": map[string]any{}},
+	})
+	var ae *azerr.Error
+	if !errors.As(err, &ae) || ae.Status != http.StatusMethodNotAllowed {
+		t.Fatalf("Do(OpPatch) on PatchNone err = %v, want 405", err)
 	}
 }
 
@@ -624,6 +758,7 @@ func TestEngineStoreErrorsReturn500(t *testing.T) {
 		{"get", http.MethodGet, path + apiV, ""},
 		{"list", http.MethodGet, subScope + "/providers/Microsoft.Test/widgets" + apiV, ""},
 		{"put", http.MethodPut, path + apiV, `{}`},
+		{"patch", http.MethodPatch, path + apiV, `{"tags":{}}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w := do(e, tc.method, tc.url, tc.body)

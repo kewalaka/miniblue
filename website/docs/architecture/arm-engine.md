@@ -68,7 +68,7 @@ The last `providers/{ns}/{type}` group is the resource; everything before it is 
 | `GET {id}` | `200`, or `404 ResourceNotFound` |
 | `DELETE {id}` | `200` if it existed, `204` if not |
 | `GET {collection}` | `200 {"value":[...]}`, sorted by ID |
-| `PATCH {id}` | Only for types with `PatchTags`. Replaces `tags`, other properties are ignored. |
+| `PATCH {id}` | Per `Type.Patch`: RFC 7386 merge (`PatchMerge`, default), tags-only (`PatchTags`), or `405` (`PatchNone`). |
 | other methods | `405 MethodNotAllowed` |
 
 Bodies are raw passthrough plus the server-owned `id`, `name` and `type`. A body `name` or `id` that contradicts the URL is a `400`. An `api-version` that is not in the type's list is a `400 InvalidApiVersionParameter`; a missing `api-version` is accepted, like the rest of miniblue. Errors are written through `internal/azerr`.
@@ -91,7 +91,7 @@ reg.Register(arm.Type{
 | `APIVersions` | accepted `api-version` values |
 | `Scopes` | bitmask of allowed scopes: tenant, management group, subscription, resource group, resource (extension) |
 | `Children` | nested types (`{Name: "subnets"}`); they inherit `APIVersions` and `Scopes` |
-| `PatchTags` | enable `PATCH` of tags |
+| `Patch` | `PatchMerge` (default, RFC 7386), `PatchTags` (tags only), or `PatchNone` (`405`) |
 | `Hooks.Validate` | `func(ID, body) error`, a returned error becomes a `400` |
 | `Hooks.Defaults` | `func(ID, body)`, fill server-side defaults after validation |
 

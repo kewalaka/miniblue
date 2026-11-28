@@ -11,5 +11,6 @@ func Register(reg *arm.Registry) {
 		Name:        "Microsoft.Authorization/policyDefinitions",
 		APIVersions: []string{"2023-04-01"},
 		Scopes:      arm.ScopeSubscription,
+		Patch:       arm.PatchNone,
 	})
 }

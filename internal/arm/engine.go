@@ -41,7 +41,8 @@ type Request struct {
 
 // Engine serves registered resource types with generic ARM CRUD: PUT (201 on
 // create, 200 on update), GET, DELETE (200 if it existed, 204 if not), list
-// at the collection path and, for types that enable it, PATCH of tags.
+// at the collection path and PATCH according to Type.Patch (default RFC 7386
+// JSON Merge Patch).
 // The stored body is whatever the client sent plus the server-owned id, name
 // and type.
 type Engine struct {
@@ -91,7 +92,7 @@ func (e *Engine) Resolve(method, path string, q url.Values) (*Request, bool, err
 	case http.MethodPut:
 		req.Op = OpPut
 	case http.MethodPatch:
-		if !t.PatchTags {
+		if t.Patch == PatchNone {
 			return nil, true, azerr.New(http.StatusMethodNotAllowed, "MethodNotAllowed",
 				"The request method '%s' is not allowed.", method)
 		}
@@ -215,13 +216,8 @@ func (e *Engine) doPut(ctx context.Context, r *Request) (int, any, error) {
 		return 0, nil, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
 			"The request content is not a valid JSON object.")
 	}
-	if n, _ := r.Body["name"].(string); n != "" && !strings.EqualFold(n, r.ID.Name()) {
-		return 0, nil, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
-			"The resource name '%s' in the body does not match '%s' in the URL.", n, r.ID.Name())
-	}
-	if s, _ := r.Body["id"].(string); s != "" && !strings.EqualFold(s, r.ID.String()) {
-		return 0, nil, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
-			"The resource id '%s' in the body does not match the URL.", s)
+	if err := checkBodyIdentity(r); err != nil {
+		return 0, nil, err
 	}
 
 	// The id and name keep the casing of the PUT that created the resource,
@@ -297,11 +293,14 @@ func (e *Engine) doDelete(r *Request) (int, any, error) {
 	return http.StatusNoContent, nil, nil
 }
 
-// doPatch replaces the tags of an existing resource. Other properties in
-// the PATCH body are ignored. The read, hooks, and write run in one Update,
-// so a concurrent DELETE or PUT cannot be lost or undone by the PATCH.
+// doPatch updates an existing resource according to r.Type.Patch: PatchMerge
+// applies an RFC 7386 JSON Merge Patch, PatchTags replaces only tags, and
+// PatchNone returns 405. The read, hooks, and write run in one Update, so a
+// concurrent DELETE or PUT cannot be lost or undone by the PATCH.
 func (e *Engine) doPatch(ctx context.Context, r *Request) (int, any, error) {
-	if !r.Type.PatchTags {
+	switch r.Type.Patch {
+	case PatchMerge, PatchTags:
+	default:
 		return 0, nil, azerr.New(http.StatusMethodNotAllowed, "MethodNotAllowed",
 			"The request method 'PATCH' is not allowed.")
 	}
@@ -309,21 +308,39 @@ func (e *Engine) doPatch(ctx context.Context, r *Request) (int, any, error) {
 		return 0, nil, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
 			"The request content is not a valid JSON object.")
 	}
-	tags, has := r.Body["tags"]
-	if _, isMap := tags.(map[string]any); !has || (tags != nil && !isMap) {
-		return 0, nil, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
-			"The PATCH body must contain a 'tags' object.")
+
+	var tags any
+	switch r.Type.Patch {
+	case PatchMerge:
+		if err := checkBodyIdentity(r); err != nil {
+			return 0, nil, err
+		}
+	case PatchTags:
+		var has bool
+		tags, has = r.Body["tags"]
+		if _, isMap := tags.(map[string]any); !has || (tags != nil && !isMap) {
+			return 0, nil, azerr.New(http.StatusBadRequest, "InvalidRequestContent",
+				"The PATCH body must contain a 'tags' object.")
+		}
 	}
+
 	doc, _, err := e.store.Update(r.ID, func(cur map[string]any) (map[string]any, error) {
 		if cur == nil {
 			return nil, notFoundErr(r.ID)
 		}
 		r.Current = cur
-		r.Doc = cloneMap(cur)
-		if tags == nil {
-			delete(r.Doc, "tags")
-		} else {
-			r.Doc["tags"] = cloneValue(tags)
+		switch r.Type.Patch {
+		case PatchMerge:
+			r.Doc = mergePatch(cloneMap(cur), r.Body)
+			r.Doc["id"], r.Doc["name"] = cur["id"], cur["name"]
+			r.Doc["type"] = r.Type.Name
+		case PatchTags:
+			r.Doc = cloneMap(cur)
+			if tags == nil {
+				delete(r.Doc, "tags")
+			} else {
+				r.Doc["tags"] = cloneValue(tags)
+			}
 		}
 		if r.Type.Hooks.Validate != nil {
 			if err := r.Type.Hooks.Validate(ctx, r); err != nil {
@@ -344,6 +361,40 @@ func (e *Engine) doPatch(ctx context.Context, r *Request) (int, any, error) {
 		r.Type.Hooks.After(ctx, r)
 	}
 	return http.StatusOK, doc, nil
+}
+
+func checkBodyIdentity(r *Request) error {
+	if n, _ := r.Body["name"].(string); n != "" && !strings.EqualFold(n, r.ID.Name()) {
+		return azerr.New(http.StatusBadRequest, "InvalidRequestContent",
+			"The resource name '%s' in the body does not match '%s' in the URL.", n, r.ID.Name())
+	}
+	if s, _ := r.Body["id"].(string); s != "" && !strings.EqualFold(s, r.ID.String()) {
+		return azerr.New(http.StatusBadRequest, "InvalidRequestContent",
+			"The resource id '%s' in the body does not match the URL.", s)
+	}
+	return nil
+}
+
+// mergePatch applies an RFC 7386 JSON Merge Patch to target in place and
+// returns it. Callers must pass a fresh target map; inserted values are cloned
+// so the result shares no mutable state with patch.
+func mergePatch(target, patch map[string]any) map[string]any {
+	for k, v := range patch {
+		if v == nil {
+			delete(target, k)
+			continue
+		}
+		if pm, ok := v.(map[string]any); ok {
+			tm, ok := target[k].(map[string]any)
+			if !ok {
+				tm = make(map[string]any, len(pm))
+			}
+			target[k] = mergePatch(tm, pm)
+			continue
+		}
+		target[k] = cloneValue(v)
+	}
+	return target
 }
 
 func normalizeValidateErr(err error) error {

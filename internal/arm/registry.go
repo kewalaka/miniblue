@@ -6,6 +6,19 @@ import (
 	"strings"
 )
 
+// PatchMode controls how the engine handles PATCH requests for a Type.
+// The zero value (PatchMerge) applies an RFC 7386 JSON Merge Patch.
+type PatchMode uint8
+
+const (
+	// PatchMerge applies an RFC 7386 JSON Merge Patch onto the stored document.
+	PatchMerge PatchMode = iota
+	// PatchTags replaces only the top-level tags map; other fields are ignored.
+	PatchTags
+	// PatchNone disables PATCH and returns 405 MethodNotAllowed.
+	PatchNone
+)
+
 // Type declares a resource type served by the engine.
 type Type struct {
 	// Name is "Namespace/type" for a top-level type; for a child in Children
@@ -20,9 +33,9 @@ type Type struct {
 	// Children are nested types (e.g. subnets under virtualNetworks). They
 	// inherit APIVersions and Scopes when those are empty.
 	Children []Type
-	// PatchTags enables PATCH of the tags property.
-	PatchTags bool
-	Hooks     Hooks
+	// Patch controls PATCH handling (default PatchMerge).
+	Patch PatchMode
+	Hooks Hooks
 }
 
 // Hooks are optional per-type behaviour. The engine is pure passthrough

@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow 
 ## [0.9.0](https://github.com/kewalaka/miniblue/compare/v0.8.0...v0.9.0) (2026-11-28)
 
 
+### Notes
+
+* Key Vault `PUT` now requires an existing resource group.
+* Corrupt file snapshots now fail startup instead of starting empty.
+* `DATABASE_URL` connection failures now fail startup instead of falling back to memory.
+* Resource group `DELETE` cascades to ~21 resource types via scope cleaners.
+* Blob block commit (`comp=block` / `comp=blocklist`) remains unimplemented.
+
 ### Features
 
 * **arm:** generic ARM resource engine with policyDefinitions via azapi ([#2](https://github.com/kewalaka/miniblue/issues/2)) ([1b276fd](https://github.com/kewalaka/miniblue/commit/1b276fd5eddf3e272c95589dd9d338a7bac77e94))

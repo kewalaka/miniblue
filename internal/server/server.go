@@ -95,6 +95,11 @@ func (s *Server) Handler() http.Handler {
 	return CaseInsensitiveARM(s.routeTrie)(s.router)
 }
 
+// ARMRegistry returns the registry of resource types served by the ARM engine.
+func (s *Server) ARMRegistry() *arm.Registry {
+	return s.armTypes
+}
+
 // SaveState persists the store to disk if file-based persistence is active.
 func (s *Server) SaveState() error {
 	return s.store.Save()

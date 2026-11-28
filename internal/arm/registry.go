@@ -3,6 +3,7 @@ package arm
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -106,4 +107,16 @@ func (r *Registry) add(t Type) {
 func (r *Registry) Lookup(id ID) (*Type, bool) {
 	t, ok := r.types[strings.ToLower(id.TypeName())]
 	return t, ok
+}
+
+// Types returns all registered types (including children), sorted by name.
+func (r *Registry) Types() []*Type {
+	out := make([]*Type, 0, len(r.types))
+	for _, t := range r.types {
+		out = append(out, t)
+	}
+	slices.SortFunc(out, func(a, b *Type) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	return out
 }

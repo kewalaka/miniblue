@@ -1,15 +1,18 @@
 package arm
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/moabukar/miniblue/internal/azerr"
 	"github.com/moabukar/miniblue/internal/store"
 )
 
@@ -18,9 +21,7 @@ const (
 	apiV     = "?api-version=2024-01-01"
 )
 
-// newHandler registers synthetic types: widgets (all scopes, a child type and
-// tag PATCH) and gadgets (subscription only, with hooks).
-func newHandler(t *testing.T) http.Handler {
+func newTestEngine(t *testing.T, st *store.Store) *Engine {
 	t.Helper()
 	reg := NewRegistry()
 	reg.Register(Type{
@@ -35,22 +36,30 @@ func newHandler(t *testing.T) http.Handler {
 		APIVersions: []string{"2024-01-01"},
 		Scopes:      ScopeSubscription,
 		Hooks: Hooks{
-			Validate: func(_ ID, body map[string]interface{}) error {
-				if _, ok := body["properties"]; !ok {
+			Validate: func(_ context.Context, r *Request) error {
+				if _, ok := r.Doc["properties"]; !ok {
 					return errors.New("properties is required")
 				}
 				return nil
 			},
-			Defaults: func(_ ID, body map[string]interface{}) {
-				props := body["properties"].(map[string]interface{})
+			Defaults: func(_ context.Context, r *Request) error {
+				props := r.Doc["properties"].(map[string]any)
 				if _, ok := props["mode"]; !ok {
 					props["mode"] = "Indexed"
 				}
+				return nil
 			},
 		},
 	})
+	return NewEngine(reg, NewStore(st))
+}
+
+// newHandler registers synthetic types: widgets (all scopes, a child type and
+// tag PATCH) and gadgets (subscription only, with hooks).
+func newHandler(t *testing.T) http.Handler {
+	t.Helper()
 	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) })
-	return NewEngine(reg, NewStore(store.New())).Middleware(next)
+	return newTestEngine(t, store.New()).Middleware(next)
 }
 
 func do(h http.Handler, method, path, body string) *httptest.ResponseRecorder {
@@ -210,6 +219,7 @@ func TestEngineChildTypes(t *testing.T) {
 	want(t, do(h, http.MethodPut, parent+apiV, `{}`), http.StatusCreated)
 	want(t, do(h, http.MethodPut, parent+"/parts/p1"+apiV, `{}`), http.StatusCreated)
 	want(t, do(h, http.MethodPut, parent+"/parts/p2"+apiV, `{}`), http.StatusCreated)
+	want(t, do(h, http.MethodPut, parent+"x"+apiV, `{}`), http.StatusCreated)
 	want(t, do(h, http.MethodPut, parent+"x/parts/p1"+apiV, `{}`), http.StatusCreated)
 
 	w := do(h, http.MethodGet, parent+"/PARTS"+apiV, "")
@@ -428,5 +438,222 @@ func TestRegistryRejectsBadRegistrations(t *testing.T) {
 			}()
 			f(NewRegistry())
 		})
+	}
+}
+
+func TestEngineResolveAndDo(t *testing.T) {
+	e := newTestEngine(t, store.New())
+	q := url.Values{"api-version": {"2024-01-01"}}
+	itemPath := subScope + "/providers/Microsoft.Test/widgets/w1"
+	collPath := subScope + "/providers/Microsoft.Test/widgets"
+
+	if _, ok, err := e.Resolve(http.MethodGet, "/health", q); ok || err != nil {
+		t.Fatalf("unregistered: ok=%v err=%v", ok, err)
+	}
+
+	req, ok, err := e.Resolve(http.MethodPut, itemPath, q)
+	if !ok || err != nil || req.Op != OpPut {
+		t.Fatalf("Resolve PUT: ok=%v err=%v req=%+v", ok, err, req)
+	}
+	req.Body = map[string]any{"properties": map[string]any{"k": "v"}}
+	status, body, err := e.Do(context.Background(), req)
+	if err != nil || status != http.StatusCreated {
+		t.Fatalf("Do PUT: status=%d err=%v", status, err)
+	}
+	if doc := body.(map[string]any); doc["id"] != itemPath || doc["name"] != "w1" {
+		t.Fatalf("Do PUT doc = %v", doc)
+	}
+
+	listReq, ok, err := e.Resolve(http.MethodGet, collPath, q)
+	if !ok || err != nil || listReq.Op != OpList || listReq.ID.String() != subScope {
+		t.Fatalf("Resolve LIST: ok=%v err=%v req=%+v", ok, err, listReq)
+	}
+	status, body, err = e.Do(context.Background(), listReq)
+	if err != nil || status != http.StatusOK {
+		t.Fatalf("Do LIST: status=%d err=%v", status, err)
+	}
+	if items := body.(map[string]any)["value"].([]map[string]any); len(items) != 1 {
+		t.Fatalf("Do LIST items = %v", items)
+	}
+
+	delReq, ok, err := e.Resolve(http.MethodDelete, itemPath, q)
+	if !ok || err != nil || delReq.Op != OpDelete {
+		t.Fatalf("Resolve DELETE: ok=%v err=%v", ok, err)
+	}
+	status, body, err = e.Do(context.Background(), delReq)
+	if err != nil || status != http.StatusOK || body != nil {
+		t.Fatalf("Do DELETE: status=%d body=%v err=%v", status, body, err)
+	}
+}
+
+func TestEngineServeHTTP(t *testing.T) {
+	e := newTestEngine(t, store.New())
+	want(t, do(e, http.MethodGet, "/health", ""), http.StatusNotFound)
+	path := subScope + "/providers/Microsoft.Test/widgets/w1"
+	want(t, do(e, http.MethodPut, path+apiV, `{}`), http.StatusCreated)
+	want(t, do(e, http.MethodGet, path+apiV, ""), http.StatusOK)
+}
+
+func TestEngineHooksUnderLockWithCurrent(t *testing.T) {
+	reg := NewRegistry()
+	var afterSawCurrent bool
+	var engine *Engine
+	genCount := 0
+
+	reg.Register(Type{
+		Name:        "Microsoft.Test/items",
+		APIVersions: []string{"2024-01-01"},
+		Scopes:      ScopeSubscription,
+		Hooks: Hooks{
+			Validate: func(_ context.Context, r *Request) error {
+				// Lock-free read inside Validate must not deadlock.
+				if _, _, err := r.Store.Get(r.ID); err != nil {
+					return err
+				}
+				props, _ := r.Doc["properties"].(map[string]any)
+				if r.Current != nil {
+					curProps, _ := r.Current["properties"].(map[string]any)
+					if props["immutable"] != curProps["immutable"] {
+						return azerr.New(http.StatusConflict, "ImmutableProperty", "immutable cannot change")
+					}
+				}
+				return nil
+			},
+			Defaults: func(_ context.Context, r *Request) error {
+				props, _ := r.Doc["properties"].(map[string]any)
+				if r.Current != nil {
+					curProps, _ := r.Current["properties"].(map[string]any)
+					props["generated"] = curProps["generated"]
+					return nil
+				}
+				genCount++
+				props["generated"] = fmt.Sprintf("gen-%d", genCount)
+				return nil
+			},
+			After: func(ctx context.Context, r *Request) {
+				afterSawCurrent = r.Current != nil
+				// After runs outside the write lock, so calling Do must not deadlock.
+				getReq, ok, err := engine.Resolve(http.MethodGet, r.ID.String(), url.Values{"api-version": {"2024-01-01"}})
+				if !ok || err != nil {
+					t.Errorf("Resolve in After: ok=%v err=%v", ok, err)
+					return
+				}
+				if status, _, err := engine.Do(ctx, getReq); err != nil || status != http.StatusOK {
+					t.Errorf("Do in After: status=%d err=%v", status, err)
+				}
+			},
+		},
+	})
+	engine = NewEngine(reg, NewStore(store.New()))
+	path := subScope + "/providers/Microsoft.Test/items/i1"
+
+	w := do(engine, http.MethodPut, path+apiV, `{"properties":{"immutable":"v1"}}`)
+	want(t, w, http.StatusCreated)
+	if afterSawCurrent {
+		t.Fatal("After should see nil Current on create")
+	}
+	if gen := decode(t, w)["properties"].(map[string]any)["generated"]; gen != "gen-1" {
+		t.Fatalf("generated = %v, want gen-1", gen)
+	}
+
+	// Update preserving immutable keeps stable generated value.
+	w = do(engine, http.MethodPut, path+apiV, `{"properties":{"immutable":"v1","other":2}}`)
+	want(t, w, http.StatusOK)
+	if !afterSawCurrent {
+		t.Fatal("After should see non-nil Current on update")
+	}
+	if gen := decode(t, w)["properties"].(map[string]any)["generated"]; gen != "gen-1" {
+		t.Fatalf("generated changed across PUT: %v", gen)
+	}
+
+	// Changing immutable returns the typed *azerr.Error (409 ImmutableProperty).
+	w = do(engine, http.MethodPut, path+apiV, `{"properties":{"immutable":"v2"}}`)
+	want(t, w, http.StatusConflict)
+	errObj := decode(t, w)["error"].(map[string]any)
+	if errObj["code"] != "ImmutableProperty" {
+		t.Fatalf("error code = %v, want ImmutableProperty", errObj["code"])
+	}
+}
+
+func TestEngineChildRequiresParent(t *testing.T) {
+	h := newHandler(t)
+	child := subScope + "/providers/Microsoft.Test/widgets/missing/parts/p1"
+	w := do(h, http.MethodPut, child+apiV, `{}`)
+	want(t, w, http.StatusNotFound)
+	if code := decode(t, w)["error"].(map[string]any)["code"]; code != "ParentResourceNotFound" {
+		t.Fatalf("code = %v, want ParentResourceNotFound", code)
+	}
+}
+
+func TestEngineIfNoneMatch(t *testing.T) {
+	h := newHandler(t)
+	path := subScope + "/providers/Microsoft.Test/widgets/w1"
+
+	req := httptest.NewRequest(http.MethodPut, path+apiV, strings.NewReader(`{}`))
+	req.Header.Set("If-None-Match", "*")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	want(t, w, http.StatusCreated)
+
+	req = httptest.NewRequest(http.MethodPut, path+apiV, strings.NewReader(`{}`))
+	req.Header.Set("If-None-Match", "*")
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	want(t, w, http.StatusPreconditionFailed)
+	if code := decode(t, w)["error"].(map[string]any)["code"]; code != "PreconditionFailed" {
+		t.Fatalf("code = %v, want PreconditionFailed", code)
+	}
+
+	// If-Match is ignored.
+	req = httptest.NewRequest(http.MethodPut, path+apiV, strings.NewReader(`{}`))
+	req.Header.Set("If-Match", "*")
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	want(t, w, http.StatusOK)
+}
+
+func TestEngineStoreErrorsReturn500(t *testing.T) {
+	boom := errors.New("db down")
+	fb := &failingBackend{MemoryBackend: store.NewMemoryBackend(), getErr: boom}
+	e := newTestEngine(t, store.NewWithBackend(fb))
+	path := subScope + "/providers/Microsoft.Test/widgets/w1"
+
+	for _, tc := range []struct {
+		name, method, url, body string
+	}{
+		{"get", http.MethodGet, path + apiV, ""},
+		{"list", http.MethodGet, subScope + "/providers/Microsoft.Test/widgets" + apiV, ""},
+		{"put", http.MethodPut, path + apiV, `{}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := do(e, tc.method, tc.url, tc.body)
+			want(t, w, http.StatusInternalServerError)
+			if code := decode(t, w)["error"].(map[string]any)["code"]; code != "InternalServerError" {
+				t.Fatalf("code = %v, want InternalServerError", code)
+			}
+		})
+	}
+
+	fb = &failingBackend{MemoryBackend: store.NewMemoryBackend(), deleteErr: boom}
+	e = newTestEngine(t, store.NewWithBackend(fb))
+	want(t, do(e, http.MethodDelete, path+apiV, ""), http.StatusInternalServerError)
+}
+
+func TestEngineScopeAwareNotFound(t *testing.T) {
+	h := newHandler(t)
+	rgPath := subScope + "/resourceGroups/rg1/providers/Microsoft.Test/widgets/missing"
+	w := do(h, http.MethodGet, rgPath+apiV, "")
+	want(t, w, http.StatusNotFound)
+	msg := decode(t, w)["error"].(map[string]any)["message"].(string)
+	if !strings.Contains(msg, "under resource group 'rg1'") {
+		t.Fatalf("RG 404 message = %q, want 'under resource group'", msg)
+	}
+
+	subPath := subScope + "/providers/Microsoft.Test/widgets/missing"
+	w = do(h, http.MethodGet, subPath+apiV, "")
+	want(t, w, http.StatusNotFound)
+	msg = decode(t, w)["error"].(map[string]any)["message"].(string)
+	if strings.Contains(msg, "under resource group") {
+		t.Fatalf("sub 404 message = %q, should not mention resource group", msg)
 	}
 }

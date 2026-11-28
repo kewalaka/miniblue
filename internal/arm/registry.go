@@ -73,8 +73,8 @@ func (r *Registry) add(t Type) {
 	}
 }
 
-// lookup finds the type for id; the returned Type carries the full type name.
-func (r *Registry) lookup(id ID) (*Type, bool) {
+// Lookup finds the type for id; the returned Type carries the full type name.
+func (r *Registry) Lookup(id ID) (*Type, bool) {
 	t, ok := r.types[strings.ToLower(id.TypeName())]
 	return t, ok
 }

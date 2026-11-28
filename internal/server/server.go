@@ -55,6 +55,7 @@ import (
 type Server struct {
 	router     *chi.Mux
 	store      *store.Store
+	armTypes   *arm.Registry
 	services   []string
 	aksHandler *aks.Handler
 	routeTrie  *routeTrie
@@ -74,6 +75,7 @@ func NewWithStore(st *store.Store) *Server {
 	}
 	s.setupMiddleware()
 	s.setupRoutes()
+	checkEngineOverlap(s.router, s.armTypes)
 	// Build the case-insensitive routing trie AFTER all routes are registered,
 	// then attach it via a final wrapper around the router. We can't put this
 	// in setupMiddleware() because the trie depends on the route list.
@@ -181,11 +183,11 @@ func (s *Server) setupRoutes() {
 	// The ARM engine serves only the types registered here and passes every
 	// other path on. It must come before the authorization middleware, which
 	// 404s Microsoft.Authorization paths it does not know.
-	armTypes := arm.NewRegistry()
+	s.armTypes = arm.NewRegistry()
 	if serviceEnabled("policy", allowed) {
-		policy.Register(armTypes)
+		policy.Register(s.armTypes)
 	}
-	s.router.Use(arm.NewEngine(armTypes, arm.NewStore(s.store)).Middleware)
+	s.router.Use(arm.NewEngine(s.armTypes, arm.NewStore(s.store)).Middleware)
 
 	var authorizationHandler *authorization.Handler
 	if serviceEnabled("authorization", allowed) {
